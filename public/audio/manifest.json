@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "sfx": {
+    "pop": {
+      "generated": true
+    },
+    "horn": {
+      "generated": true
+    },
+    "bounce": {
+      "generated": true
+    },
+    "scratch": {
+      "generated": true
+    },
+    "airhorn": {
+      "generated": true
+    },
+    "chime": {
+      "generated": true
+    },
+    "trombone": {
+      "generated": true
+    }
+  },
+  "music": {
+    "menu": {
+      "file": "audio/music/menu/menu-theme.mp3",
+      "name": "Block Party Theme"
+    },
+    "levels": [
+      {
+        "levels": [
+          1
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level1/Warm it Up.mp3",
+            "name": "Warm it Up",
+            "artist": "Vinnyl Vinnie",
+            "genre": "Funk"
+          },
+          {
+            "file": "audio/music/level1/Midnight Slide In.mp3",
+            "name": "Midnight Slide In",
+            "artist": "Vinnyl Vinnie",
+            "genre": "Lo-fi"
+          }
+        ]
+      },
+      {
+        "levels": [
+          2
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level2/Fortune on the Corner.mp3",
+            "name": "Fortune on the Corner",
+            "genre": "Funk"
+          },
+          {
+            "file": "audio/music/level2/Fortune on the Block.mp3",
+            "name": "Fortune on the Block",
+            "genre": "Funk"
+          },
+          {
+            "file": "audio/music/level2/Block Party Get Lucky.mp3",
+            "name": "Block Party Get Lucky",
+            "genre": "Funk"
+          },
+          {
+            "file": "audio/music/level2/Stoop Kid Level 2.mp3",
+            "name": "Stoop Kid",
+            "genre": "Hip-Hop"
+          },
+          {
+            "file": "audio/music/level2/[2] Block Party Get Lucky.mp3",
+            "name": "Block Party Get Lucky (Remix)",
+            "genre": "Funk"
+          }
+        ]
+      },
+      {
+        "levels": [
+          3
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level3/Gift Factory Block Party.mp3",
+            "name": "Gift Factory Block Party",
+            "genre": "Electronic"
+          },
+          {
+            "file": "audio/music/level3/[3] Level 3 Genos Block Party.mp3",
+            "name": "Geno's Block Party",
+            "genre": "Party"
+          },
+          {
+            "file": "audio/music/level3/[3] Always One More High.mp3",
+            "name": "Always One More High",
+            "genre": "Electronic"
+          }
+        ]
+      }
+    ]
+  }
+}
