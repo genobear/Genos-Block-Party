@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAY_AREA_Y, PLAYABLE_HEIGHT } from '../config/Constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAY_AREA_Y, PLAYABLE_HEIGHT, IS_TOUCH_DEVICE, MOBILE_TOUCH_ZONE_HEIGHT, UI_BORDER_BOTTOM } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 
 interface PowerUpIndicator {
@@ -46,6 +46,7 @@ export class UIScene extends Phaser.Scene {
     this.createLevelDisplay();
     this.createLaunchText();
     this.createPauseButton();
+    this.createMobileTouchHint();
 
     // Listen for game events
     this.setupEventListeners();
@@ -186,6 +187,32 @@ export class UIScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-P', () => {
       this.togglePause();
+    });
+  }
+
+  private createMobileTouchHint(): void {
+    if (!IS_TOUCH_DEVICE) return;
+
+    // Position hint in center of the mobile touch zone
+    const touchZoneY = PLAY_AREA_Y + PLAYABLE_HEIGHT + UI_BORDER_BOTTOM + (MOBILE_TOUCH_ZONE_HEIGHT / 2);
+
+    const hintText = this.add.text(
+      GAME_WIDTH / 2,
+      touchZoneY,
+      '← swipe here to move paddle →',
+      {
+        font: '16px Arial',
+        color: '#ffffff',
+      }
+    ).setOrigin(0.5).setAlpha(0.3);
+
+    // Fade out after a few seconds of gameplay
+    this.time.delayedCall(5000, () => {
+      this.tweens.add({
+        targets: hintText,
+        alpha: 0,
+        duration: 1000,
+      });
     });
   }
 

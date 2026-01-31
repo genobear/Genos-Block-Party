@@ -102,7 +102,7 @@
         z-index: 1;
         width: 100%;
         max-width: 800px;
-        aspect-ratio: 800 / 700;
+        aspect-ratio: 800 / 900;
         background: rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
@@ -591,6 +591,13 @@
       #game-container.ready {
         opacity: 1;
         transform: scale(1) translateY(0);
+      }
+
+      /* Mobile: taller canvas for touch zone below paddle */
+      @media (pointer: coarse) {
+        #game-container {
+          aspect-ratio: 800 / 1050;
+        }
       }
     </style>
   </head>

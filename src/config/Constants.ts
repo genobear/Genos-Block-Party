@@ -2,13 +2,21 @@
 export const UI_BORDER_TOP = 50;    // Space for score/level/lives
 export const UI_BORDER_BOTTOM = 50; // Space for power-up indicators
 
+// Mobile touch zone (extra height below game for touch input)
+export const MOBILE_TOUCH_ZONE_HEIGHT = 150;
+
+// Detect touch device
+export const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
+  ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
 // Playable area dimensions (actual gameplay space)
 export const PLAYABLE_WIDTH = 800;
-export const PLAYABLE_HEIGHT = 600;
+export const PLAYABLE_HEIGHT = 800;
 
-// Total canvas size (playable + borders)
+// Total canvas size (playable + borders + mobile touch zone if applicable)
 export const GAME_WIDTH = PLAYABLE_WIDTH;
-export const GAME_HEIGHT = PLAYABLE_HEIGHT + UI_BORDER_TOP + UI_BORDER_BOTTOM; // 700
+export const GAME_HEIGHT = PLAYABLE_HEIGHT + UI_BORDER_TOP + UI_BORDER_BOTTOM +
+  (IS_TOUCH_DEVICE ? MOBILE_TOUCH_ZONE_HEIGHT : 0);
 
 // Playable area origin (offset from canvas top)
 export const PLAY_AREA_Y = UI_BORDER_TOP; // 50
@@ -28,7 +36,7 @@ export const BALL_SPEED_INCREMENT = 0.05; // Speed increase per level
 export const BRICK_WIDTH = 64;
 export const BRICK_HEIGHT = 28;
 export const BRICK_PADDING = 4;
-export const BRICK_ROWS_START_Y = PLAY_AREA_Y + 30; // 30px into playable area (80 total)
+export const BRICK_ROWS_START_Y = PLAY_AREA_Y + 150; // 150px into playable area for ball bounce space
 export const BRICK_COLS = 10;
 
 // Gameplay
