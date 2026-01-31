@@ -1,0 +1,741 @@
+import Phaser from 'phaser';
+import { AUDIO } from '../config/Constants';
+import type { AudioManifest, TrackMetadata } from '../types/AudioManifest';
+
+interface AudioSettings {
+  musicVolume: number;
+  sfxVolume: number;
+  muted: boolean;
+}
+
+/**
+ * AudioManager - Singleton for managing all game audio
+ *
+ * Features:
+ * - SFX playback with Web Audio (low latency)
+ * - Level music streaming with HTML5 Audio (on-demand loading)
+ * - Shuffled playlist per level with crossfade transitions
+ * - Volume/mute controls persisted to localStorage
+ * - Generated placeholder SFX for development
+ */
+export class AudioManager {
+  private static instance: AudioManager | null = null;
+
+  private scene: Phaser.Scene | null = null;
+  private settings: AudioSettings;
+  private manifest: AudioManifest | null = null;
+
+  // Current music state
+  private currentMusic: Phaser.Sound.BaseSound | null = null;
+  private currentPlaylist: string[] = [];
+  private currentTrackMetadata: TrackMetadata | null = null;
+  private playlistIndex: number = 0;
+  private currentLevelNumber: number = -1;
+  private isTransitioning: boolean = false;
+
+  // Track loaded music keys for cleanup
+  private loadedMusicKeys: Set<string> = new Set();
+
+  // Map audio keys to their metadata for quick lookup
+  private trackMetadataMap: Map<string, TrackMetadata> = new Map();
+
+  // Callbacks for track changes (multiple listeners supported)
+  private onTrackChangeCallbacks: Set<(metadata: TrackMetadata | null) => void> = new Set();
+
+  private constructor() {
+    this.settings = this.loadSettings();
+  }
+
+  /**
+   * Get the singleton instance
+   */
+  static getInstance(): AudioManager {
+    if (!AudioManager.instance) {
+      AudioManager.instance = new AudioManager();
+    }
+    return AudioManager.instance;
+  }
+
+  /**
+   * Initialize the AudioManager with the current scene
+   * Call this in scene.create() before using audio
+   */
+  init(scene: Phaser.Scene): void {
+    this.scene = scene;
+
+    // Apply current mute state to sound manager
+    if (this.scene.sound) {
+      this.scene.sound.mute = this.settings.muted;
+    }
+  }
+
+  /**
+   * Set the audio manifest (called from BootScene after loading)
+   */
+  setManifest(manifest: AudioManifest): void {
+    this.manifest = manifest;
+
+    // Build the metadata lookup map
+    this.trackMetadataMap.clear();
+
+    // Index level tracks by their generated key
+    for (const levelConfig of manifest.music.levels) {
+      for (const track of levelConfig.tracks) {
+        // Generate a key from the file path
+        const key = this.filePathToKey(track.file);
+        this.trackMetadataMap.set(key, track);
+      }
+    }
+
+    // Index menu music
+    if (manifest.music.menu) {
+      this.trackMetadataMap.set('menu-music', manifest.music.menu);
+    }
+  }
+
+  /**
+   * Convert a file path to an audio key
+   * e.g., "audio/music/level1/track1.mp3" -> "level1-track1"
+   */
+  private filePathToKey(filePath: string): string {
+    // Extract meaningful parts from path
+    const match = filePath.match(/level(\d+)\/(.+)\.mp3$/);
+    if (match) {
+      const levelNum = match[1];
+      const trackName = match[2];
+      return `level${levelNum}-${trackName}`;
+    }
+    // Fallback: use filename without extension
+    const filename = filePath.split('/').pop()?.replace('.mp3', '') || filePath;
+    return filename;
+  }
+
+  /**
+   * Check if manifest is loaded
+   */
+  hasManifest(): boolean {
+    return this.manifest !== null;
+  }
+
+  /**
+   * Load settings from localStorage
+   */
+  private loadSettings(): AudioSettings {
+    try {
+      const stored = localStorage.getItem(AUDIO.STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          musicVolume: parsed.musicVolume ?? AUDIO.DEFAULT_MUSIC_VOLUME,
+          sfxVolume: parsed.sfxVolume ?? AUDIO.DEFAULT_SFX_VOLUME,
+          muted: parsed.muted ?? false,
+        };
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return {
+      musicVolume: AUDIO.DEFAULT_MUSIC_VOLUME,
+      sfxVolume: AUDIO.DEFAULT_SFX_VOLUME,
+      muted: false,
+    };
+  }
+
+  /**
+   * Save settings to localStorage
+   */
+  private saveSettings(): void {
+    try {
+      localStorage.setItem(AUDIO.STORAGE_KEY, JSON.stringify(this.settings));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  // =====================
+  // Volume & Mute Controls
+  // =====================
+
+  getMusicVolume(): number {
+    return this.settings.musicVolume;
+  }
+
+  setMusicVolume(volume: number): void {
+    this.settings.musicVolume = Math.max(0, Math.min(1, volume));
+    this.saveSettings();
+
+    // Update currently playing music
+    if (this.currentMusic && 'volume' in this.currentMusic) {
+      (this.currentMusic as Phaser.Sound.WebAudioSound).setVolume(this.settings.musicVolume);
+    }
+  }
+
+  getSfxVolume(): number {
+    return this.settings.sfxVolume;
+  }
+
+  setSfxVolume(volume: number): void {
+    this.settings.sfxVolume = Math.max(0, Math.min(1, volume));
+    this.saveSettings();
+  }
+
+  isMuted(): boolean {
+    return this.settings.muted;
+  }
+
+  setMuted(muted: boolean): void {
+    this.settings.muted = muted;
+    this.saveSettings();
+
+    if (this.scene?.sound) {
+      this.scene.sound.mute = muted;
+    }
+  }
+
+  toggleMute(): boolean {
+    this.setMuted(!this.settings.muted);
+    return this.settings.muted;
+  }
+
+  // =====================
+  // SFX Playback
+  // =====================
+
+  /**
+   * Play a sound effect by key
+   * @param key - The SFX key (e.g., AUDIO.SFX.POP)
+   */
+  playSFX(key: string): void {
+    if (!this.scene?.sound) return;
+
+    // Check if the sound exists in cache
+    if (!this.scene.cache.audio.exists(key)) {
+      console.warn(`SFX not found: ${key}`);
+      return;
+    }
+
+    this.scene.sound.play(key, { volume: this.settings.sfxVolume });
+  }
+
+  // =====================
+  // Music Playback
+  // =====================
+
+  /**
+   * Play a single track (for menu music, etc.)
+   * @param key - The audio key
+   * @param loop - Whether to loop the track
+   */
+  async playMusic(key: string, loop: boolean = true): Promise<void> {
+    if (!this.scene?.sound) return;
+
+    // Check if already playing this track
+    if (this.currentMusic?.key === key && (this.currentMusic as Phaser.Sound.BaseSound).isPlaying) {
+      return;
+    }
+
+    // Crossfade to new track
+    await this.crossfadeTo(key, loop);
+  }
+
+  /**
+   * Stop current music with optional fade out
+   */
+  async stopMusic(fadeOut: boolean = true): Promise<void> {
+    if (!this.currentMusic || !this.scene) return;
+
+    if (fadeOut) {
+      await this.fadeOut(this.currentMusic, AUDIO.CROSSFADE_DURATION);
+    }
+
+    this.currentMusic.destroy();
+    this.currentMusic = null;
+  }
+
+  /**
+   * Fade out current music with configurable duration
+   * Use for graceful endings (game over, win) with longer fades
+   */
+  async fadeOutMusic(duration?: number): Promise<void> {
+    if (!this.currentMusic || !this.scene) return;
+
+    const fadeDuration = duration ?? AUDIO.CROSSFADE_DURATION;
+    await this.fadeOut(this.currentMusic, fadeDuration);
+    this.currentMusic.destroy();
+    this.currentMusic = null;
+  }
+
+  /**
+   * Load and start playing music for a specific level
+   * Implements shuffled playlist with seamless crossfade from any current music
+   */
+  async loadLevelMusic(levelNumber: number): Promise<void> {
+    if (!this.scene) return;
+
+    // Don't reload if same level and already playing
+    if (levelNumber === this.currentLevelNumber && this.currentPlaylist.length > 0) {
+      return;
+    }
+
+    // Track old keys for cleanup AFTER crossfade (deferred unloading)
+    const oldKeys = new Set(this.loadedMusicKeys);
+    const oldLevelNumber = this.currentLevelNumber;
+
+    // Update state for new level
+    this.currentLevelNumber = levelNumber;
+
+    // Get tracks from manifest
+    const tracks = this.getTracksForLevel(levelNumber);
+
+    if (tracks.length === 0) {
+      console.warn(`No music found for level ${levelNumber}`);
+      return;
+    }
+
+    // Queue tracks for loading
+    for (const track of tracks) {
+      if (!this.scene.cache.audio.exists(track.key)) {
+        this.scene.load.audio(track.key, track.path);
+      }
+      // Store metadata mapping
+      this.trackMetadataMap.set(track.key, track.metadata);
+    }
+
+    // Load the tracks
+    const trackKeys = tracks.map(t => t.key);
+    await this.loadTracks(trackKeys);
+
+    // Update playlist and reset index
+    this.currentPlaylist = this.shuffleArray([...trackKeys]);
+    this.playlistIndex = 0;
+
+    // Start playing (crossfade happens here - old music fades out, new fades in)
+    await this.playNextTrack();
+
+    // NOW clean up old level's cache (after crossfade complete)
+    if (oldLevelNumber !== -1 && oldLevelNumber !== levelNumber) {
+      this.cleanupOldTracks(oldKeys);
+    }
+  }
+
+  /**
+   * Clean up old track cache after crossfade completes
+   * Preserves tracks that are shared between levels
+   */
+  private cleanupOldTracks(oldKeys: Set<string>): void {
+    oldKeys.forEach(key => {
+      // Don't remove if it's in the current playlist (shared tracks between levels)
+      if (!this.currentPlaylist.includes(key) && this.scene?.cache.audio.exists(key)) {
+        this.scene.cache.audio.remove(key);
+        this.loadedMusicKeys.delete(key);
+      }
+    });
+  }
+
+  /**
+   * Get tracks for a level from the manifest
+   */
+  private getTracksForLevel(levelNumber: number): { key: string; path: string; metadata: TrackMetadata }[] {
+    if (!this.manifest) {
+      console.warn('No audio manifest loaded');
+      return [];
+    }
+
+    // Find the level config that includes this level number
+    const levelConfig = this.manifest.music.levels.find(
+      config => config.levels.includes(levelNumber)
+    );
+
+    if (!levelConfig) {
+      console.warn(`No music configured for level ${levelNumber}`);
+      return [];
+    }
+
+    // Map tracks to keys and paths
+    return levelConfig.tracks.map(track => ({
+      key: this.filePathToKey(track.file),
+      path: track.file,
+      metadata: track,
+    }));
+  }
+
+  /**
+   * Get all level numbers that have music configured
+   */
+  getAvailableLevelsWithMusic(): number[] {
+    if (!this.manifest) return [];
+
+    const levels = new Set<number>();
+    for (const config of this.manifest.music.levels) {
+      for (const level of config.levels) {
+        levels.add(level);
+      }
+    }
+    return Array.from(levels).sort((a, b) => a - b);
+  }
+
+  /**
+   * Load audio tracks
+   */
+  private loadTracks(keys: string[]): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.scene) {
+        resolve();
+        return;
+      }
+
+      // Check if all tracks are already loaded
+      const allLoaded = keys.every(key => this.scene!.cache.audio.exists(key));
+      if (allLoaded) {
+        resolve();
+        return;
+      }
+
+      // Wait for loading to complete
+      this.scene.load.once('complete', () => {
+        // Track which keys were successfully loaded
+        keys.forEach(key => {
+          if (this.scene!.cache.audio.exists(key)) {
+            this.loadedMusicKeys.add(key);
+          }
+        });
+        resolve();
+      });
+
+      this.scene.load.once('loaderror', (file: Phaser.Loader.File) => {
+        // Remove failed tracks from playlist
+        const index = this.currentPlaylist.indexOf(file.key);
+        if (index > -1) {
+          this.currentPlaylist.splice(index, 1);
+        }
+      });
+
+      this.scene.load.start();
+    });
+  }
+
+  /**
+   * Play the next track in the playlist
+   */
+  private async playNextTrack(): Promise<void> {
+    if (this.currentPlaylist.length === 0 || !this.scene) return;
+
+    // Filter playlist to only include successfully loaded tracks
+    const availableTracks = this.currentPlaylist.filter(key =>
+      this.scene!.cache.audio.exists(key)
+    );
+
+    if (availableTracks.length === 0) {
+      console.warn('No playable tracks in playlist');
+      return;
+    }
+
+    // Get next track (wrap around)
+    const nextKey = availableTracks[this.playlistIndex % availableTracks.length];
+    this.playlistIndex = (this.playlistIndex + 1) % availableTracks.length;
+
+    // Crossfade to the next track
+    await this.crossfadeTo(nextKey, false);
+
+    // Set up listener for track completion
+    if (this.currentMusic) {
+      this.currentMusic.once('complete', () => {
+        if (!this.isTransitioning) {
+          this.playNextTrack();
+        }
+      });
+    }
+  }
+
+  /**
+   * Crossfade from current track to a new track
+   */
+  private async crossfadeTo(key: string, loop: boolean = false): Promise<void> {
+    if (!this.scene?.sound) return;
+
+    // Check if audio exists
+    if (!this.scene.cache.audio.exists(key)) {
+      console.warn(`Audio not found for crossfade: ${key}`);
+      return;
+    }
+
+    this.isTransitioning = true;
+
+    // Create the new track at volume 0
+    const newTrack = this.scene.sound.add(key, {
+      volume: 0,
+      loop,
+    });
+
+    // Start playing new track
+    newTrack.play();
+
+    // Fade out old track (if exists) and fade in new track simultaneously
+    const fadePromises: Promise<void>[] = [];
+
+    if (this.currentMusic) {
+      fadePromises.push(this.fadeOut(this.currentMusic, AUDIO.CROSSFADE_DURATION));
+    }
+
+    fadePromises.push(this.fadeIn(newTrack, AUDIO.CROSSFADE_DURATION));
+
+    await Promise.all(fadePromises);
+
+    // Clean up old track
+    if (this.currentMusic) {
+      this.currentMusic.destroy();
+    }
+
+    this.currentMusic = newTrack;
+    this.currentTrackMetadata = this.trackMetadataMap.get(key) || null;
+    this.isTransitioning = false;
+
+    // Notify all track change listeners
+    if (this.currentTrackMetadata) {
+      this.onTrackChangeCallbacks.forEach(callback => callback(this.currentTrackMetadata));
+    }
+  }
+
+  /**
+   * Fade in a sound
+   */
+  private fadeIn(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.scene) {
+        resolve();
+        return;
+      }
+
+      this.scene.tweens.add({
+        targets: sound,
+        volume: this.settings.musicVolume,
+        duration,
+        onComplete: () => resolve(),
+      });
+    });
+  }
+
+  /**
+   * Fade out a sound
+   */
+  private fadeOut(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
+    return new Promise((resolve) => {
+      if (!this.scene) {
+        resolve();
+        return;
+      }
+
+      this.scene.tweens.add({
+        targets: sound,
+        volume: 0,
+        duration,
+        onComplete: () => resolve(),
+      });
+    });
+  }
+
+  /**
+   * Unload current level's music to free memory
+   */
+  unloadLevelMusic(): void {
+    // Stop current music
+    if (this.currentMusic) {
+      this.currentMusic.stop();
+      this.currentMusic.destroy();
+      this.currentMusic = null;
+    }
+
+    // Remove loaded music from cache
+    this.loadedMusicKeys.forEach(key => {
+      if (this.scene?.cache.audio.exists(key)) {
+        this.scene.cache.audio.remove(key);
+      }
+    });
+
+    this.loadedMusicKeys.clear();
+    this.currentPlaylist = [];
+    this.playlistIndex = 0;
+  }
+
+  /**
+   * Preload music for the next level (background loading)
+   */
+  preloadLevelMusic(levelNumber: number): void {
+    if (!this.scene) return;
+
+    // Get tracks from manifest
+    const tracks = this.getTracksForLevel(levelNumber);
+
+    if (tracks.length === 0) {
+      return; // No tracks for this level
+    }
+
+    // Silently preload tracks in background
+    for (const track of tracks) {
+      if (!this.scene.cache.audio.exists(track.key)) {
+        this.scene.load.audio(track.key, track.path);
+      }
+      // Store metadata mapping
+      this.trackMetadataMap.set(track.key, track.metadata);
+    }
+
+    // Start loading without waiting
+    this.scene.load.start();
+  }
+
+  // =====================
+  // Utilities
+  // =====================
+
+  /**
+   * Fisher-Yates shuffle algorithm
+   */
+  private shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  /**
+   * Pause music (for pause menu)
+   */
+  pauseMusic(): void {
+    if (this.currentMusic && (this.currentMusic as Phaser.Sound.BaseSound).isPlaying) {
+      this.currentMusic.pause();
+    }
+  }
+
+  /**
+   * Resume music (after pause menu)
+   */
+  resumeMusic(): void {
+    if (this.currentMusic && (this.currentMusic as Phaser.Sound.BaseSound).isPaused) {
+      this.currentMusic.resume();
+    }
+  }
+
+  /**
+   * Check if music is currently playing
+   */
+  isMusicPlaying(): boolean {
+    return (this.currentMusic as Phaser.Sound.BaseSound)?.isPlaying ?? false;
+  }
+
+  /**
+   * Skip to the next track in the playlist
+   */
+  async skipToNextTrack(): Promise<void> {
+    if (this.currentPlaylist.length === 0) return;
+    await this.playNextTrack();
+  }
+
+  /**
+   * Skip to the previous track in the playlist
+   */
+  async skipToPreviousTrack(): Promise<void> {
+    if (this.currentPlaylist.length === 0) return;
+
+    // Go back 2 positions (playNextTrack increments by 1)
+    const len = this.currentPlaylist.length;
+    this.playlistIndex = (this.playlistIndex - 2 + len) % len;
+    await this.playNextTrack();
+  }
+
+  /**
+   * Restart current track from beginning and pause
+   */
+  restartAndPause(): void {
+    if (this.currentMusic) {
+      const sound = this.currentMusic as Phaser.Sound.WebAudioSound;
+      // Seek to beginning (setSeek returns the sound for chaining)
+      sound.setSeek(0);
+      // Pause
+      sound.pause();
+    }
+  }
+
+  // =====================
+  // Metadata Accessors
+  // =====================
+
+  /**
+   * Get the full metadata for the currently playing track
+   */
+  getCurrentTrackMetadata(): TrackMetadata | null {
+    return this.currentTrackMetadata;
+  }
+
+  /**
+   * Get the display name of the currently playing track
+   */
+  getCurrentTrackName(): string | null {
+    return this.currentTrackMetadata?.name || null;
+  }
+
+  /**
+   * Get the artist of the currently playing track
+   */
+  getCurrentTrackArtist(): string | null {
+    return this.currentTrackMetadata?.artist || null;
+  }
+
+  /**
+   * Get the genre of the currently playing track
+   */
+  getCurrentTrackGenre(): string | null {
+    return this.currentTrackMetadata?.genre || null;
+  }
+
+  /**
+   * Get metadata for a specific track by key
+   */
+  getTrackMetadata(key: string): TrackMetadata | null {
+    return this.trackMetadataMap.get(key) || null;
+  }
+
+  /**
+   * Register a callback for track changes (used by NowPlayingToast, PauseScene, etc.)
+   * The callback is invoked whenever a new track starts playing.
+   * @returns A cleanup function to remove the listener
+   */
+  onTrackChange(callback: (metadata: TrackMetadata | null) => void): () => void {
+    this.onTrackChangeCallbacks.add(callback);
+    return () => {
+      this.onTrackChangeCallbacks.delete(callback);
+    };
+  }
+
+  /**
+   * Clear level tracking state without stopping music
+   * Use when transitioning scenes but wanting seamless music crossfade
+   */
+  clearLevelState(): void {
+    this.currentLevelNumber = -1;
+    this.currentPlaylist = [];
+    this.playlistIndex = 0;
+    // Note: Don't clear loadedMusicKeys - the new scene will clean up after crossfade
+  }
+
+  /**
+   * Reset audio state for scene transitions (preserves singleton)
+   * Use this when restarting game or returning to menu
+   * Note: For seamless transitions, prefer clearLevelState() + let new scene handle music
+   */
+  reset(): void {
+    this.stopMusic(false);
+    this.unloadLevelMusic();
+    this.currentLevelNumber = -1;
+    this.currentTrackMetadata = null;
+  }
+
+  /**
+   * Clean up when game ends completely
+   * Note: Generally prefer reset() for scene transitions
+   */
+  destroy(): void {
+    this.reset();
+  }
+}
