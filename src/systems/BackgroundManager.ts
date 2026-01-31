@@ -63,7 +63,7 @@ export class BackgroundManager {
     if (!wrapper) return;
 
     // Try to use level background image
-    const imagePath = `/art/level${levelNumber}/bg.jpg`;
+    const imagePath = `art/level${levelNumber}/bg.jpg`;
 
     // Get the level's base color for fallback
     const levelIndex = levelNumber - 1;
@@ -111,7 +111,7 @@ export class BackgroundManager {
    * Build the background image CSS value for a level
    */
   private static buildLevelBackgroundImage(levelNumber: number): string {
-    const imagePath = `/art/level${levelNumber}/bg.jpg`;
+    const imagePath = `art/level${levelNumber}/bg.jpg`;
     const levelIndex = levelNumber - 1;
     const level = LEVELS[levelIndex];
     const fallbackGradient = level
