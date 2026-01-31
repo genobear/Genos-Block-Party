@@ -344,9 +344,286 @@
           letter-spacing: 2px;
         }
       }
+      /* ============================================
+         LOADING OVERLAY - Instant, branded splash
+         ============================================ */
+
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 9999;
+
+        /* Rich gradient matching game aesthetic */
+        background:
+          radial-gradient(ellipse at 30% 20%, rgba(255, 105, 180, 0.15) 0%, transparent 50%),
+          radial-gradient(ellipse at 70% 80%, rgba(0, 191, 255, 0.12) 0%, transparent 50%),
+          linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 40%, #2d1a3d 70%, #1a1a2e 100%);
+
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 48px;
+
+        /* Smooth fade transition */
+        opacity: 1;
+        transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: all;
+      }
+
+      #loading-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #loading-overlay.removed {
+        display: none;
+      }
+
+      /* Title container with perspective */
+      .loading-title {
+        text-align: center;
+        transform-style: preserve-3d;
+        perspective: 800px;
+      }
+
+      .loading-title .title-genos {
+        display: block;
+        font-family: 'Bebas Neue', 'Impact', sans-serif;
+        font-size: clamp(42px, 10vw, 72px);
+        color: #ff69b4;
+        letter-spacing: 0.15em;
+        text-shadow:
+          0 0 40px rgba(255, 105, 180, 0.6),
+          0 0 80px rgba(255, 105, 180, 0.3),
+          0 4px 0 #cc5490;
+        animation: title-glow 2s ease-in-out infinite alternate;
+      }
+
+      .loading-title .title-block-party {
+        display: block;
+        font-family: 'Bebas Neue', 'Impact', sans-serif;
+        font-size: clamp(56px, 14vw, 96px);
+        color: #ffffff;
+        letter-spacing: 0.12em;
+        line-height: 0.9;
+        text-shadow:
+          0 0 30px rgba(255, 255, 255, 0.4),
+          0 6px 0 rgba(0, 0, 0, 0.4),
+          2px 2px 0 #ff69b4,
+          -2px -2px 0 #00bfff;
+        animation: title-float 3s ease-in-out infinite;
+      }
+
+      @keyframes title-glow {
+        0% { text-shadow: 0 0 40px rgba(255, 105, 180, 0.6), 0 0 80px rgba(255, 105, 180, 0.3), 0 4px 0 #cc5490; }
+        100% { text-shadow: 0 0 60px rgba(255, 105, 180, 0.8), 0 0 120px rgba(255, 105, 180, 0.5), 0 4px 0 #cc5490; }
+      }
+
+      @keyframes title-float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+      }
+
+      /* Block-based loading indicator - party bricks! */
+      .loading-blocks {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .block-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      .loading-block {
+        width: 36px;
+        height: 18px;
+        border-radius: 4px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+        animation: block-pulse 1.4s ease-in-out infinite;
+        box-shadow:
+          0 3px 0 rgba(0, 0, 0, 0.3),
+          0 0 12px var(--block-glow, rgba(255, 105, 180, 0.5));
+      }
+
+      /* Party colors for each block */
+      .loading-block:nth-child(1) { background-color: #ff69b4; --block-glow: rgba(255, 105, 180, 0.6); }
+      .loading-block:nth-child(2) { background-color: #ffa500; --block-glow: rgba(255, 165, 0, 0.6); }
+      .loading-block:nth-child(3) { background-color: #00bfff; --block-glow: rgba(0, 191, 255, 0.6); }
+      .loading-block:nth-child(4) { background-color: #ffd700; --block-glow: rgba(255, 215, 0, 0.6); }
+      .loading-block:nth-child(5) { background-color: #a78bfa; --block-glow: rgba(167, 139, 250, 0.6); }
+
+      /* Staggered animation delays for wave effect */
+      .block-row:nth-child(1) .loading-block:nth-child(1) { animation-delay: 0s; }
+      .block-row:nth-child(1) .loading-block:nth-child(2) { animation-delay: 0.1s; }
+      .block-row:nth-child(1) .loading-block:nth-child(3) { animation-delay: 0.2s; }
+      .block-row:nth-child(1) .loading-block:nth-child(4) { animation-delay: 0.3s; }
+      .block-row:nth-child(1) .loading-block:nth-child(5) { animation-delay: 0.4s; }
+
+      .block-row:nth-child(2) .loading-block:nth-child(1) { animation-delay: 0.5s; }
+      .block-row:nth-child(2) .loading-block:nth-child(2) { animation-delay: 0.6s; }
+      .block-row:nth-child(2) .loading-block:nth-child(3) { animation-delay: 0.7s; }
+      .block-row:nth-child(2) .loading-block:nth-child(4) { animation-delay: 0.8s; }
+      .block-row:nth-child(2) .loading-block:nth-child(5) { animation-delay: 0.9s; }
+
+      @keyframes block-pulse {
+        0%, 100% {
+          transform: scale(1) translateY(0);
+          opacity: 0.4;
+          filter: brightness(0.7);
+        }
+        50% {
+          transform: scale(1.1) translateY(-4px);
+          opacity: 1;
+          filter: brightness(1.2);
+        }
+      }
+
+      .loading-text {
+        font-family: 'Barlow', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.5);
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        transition: opacity 0.3s ease-out;
+      }
+
+      .loading-text.hidden {
+        opacity: 0;
+      }
+
+      /* Click to Continue Button */
+      .click-to-continue {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 16px 40px;
+        margin-top: 8px;
+
+        font-family: 'Bebas Neue', 'Impact', sans-serif;
+        font-size: 22px;
+        letter-spacing: 0.15em;
+        color: #ffffff;
+
+        background: linear-gradient(
+          135deg,
+          rgba(255, 105, 180, 0.3) 0%,
+          rgba(255, 105, 180, 0.15) 100%
+        );
+        border: 2px solid rgba(255, 105, 180, 0.6);
+        border-radius: 8px;
+        cursor: pointer;
+
+        box-shadow:
+          0 0 20px rgba(255, 105, 180, 0.3),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+        transition: all 0.2s ease-out;
+        animation: button-pulse 2s ease-in-out infinite;
+      }
+
+      .click-to-continue:hover {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 105, 180, 0.5) 0%,
+          rgba(255, 105, 180, 0.25) 100%
+        );
+        border-color: rgba(255, 105, 180, 0.9);
+        box-shadow:
+          0 0 30px rgba(255, 105, 180, 0.5),
+          0 0 60px rgba(255, 105, 180, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        transform: scale(1.05);
+      }
+
+      .click-to-continue:active {
+        transform: scale(0.98);
+      }
+
+      .continue-icon {
+        font-size: 18px;
+        animation: icon-bounce 1s ease-in-out infinite;
+      }
+
+      @keyframes button-pulse {
+        0%, 100% {
+          box-shadow:
+            0 0 20px rgba(255, 105, 180, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        50% {
+          box-shadow:
+            0 0 30px rgba(255, 105, 180, 0.5),
+            0 0 50px rgba(255, 105, 180, 0.2),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+      }
+
+      @keyframes icon-bounce {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(4px); }
+      }
+
+      /* Hide game elements until ready */
+      #bg-wrapper {
+        opacity: 0;
+        transition: opacity 0.6s ease-out;
+      }
+
+      #bg-wrapper.ready {
+        opacity: 1;
+      }
+
+      #game-container {
+        opacity: 0;
+        transform: scale(0.98) translateY(10px);
+        transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+      }
+
+      #game-container.ready {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
     </style>
   </head>
   <body>
+    <!-- Loading Overlay - renders immediately before JS -->
+    <div id="loading-overlay">
+      <div class="loading-title">
+        <span class="title-genos">GENO'S</span>
+        <span class="title-block-party">BLOCK PARTY</span>
+      </div>
+      <div class="loading-blocks">
+        <div class="block-row">
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+        </div>
+        <div class="block-row">
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+          <div class="loading-block"></div>
+        </div>
+        <div class="loading-text">Loading...</div>
+        <button class="click-to-continue" style="display: none;">
+          <span class="continue-text">Click to Start</span>
+          <span class="continue-icon">▶</span>
+        </button>
+      </div>
+    </div>
+
     <div id="bg-wrapper"></div>
     <div id="bg-transition"></div>
     <div id="game-container"></div>

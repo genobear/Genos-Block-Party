@@ -16,7 +16,6 @@ import { PowerUpType } from '../types/PowerUpTypes';
 import { LEVELS, LevelData } from '../config/LevelData';
 import {
   GAME_WIDTH,
-  GAME_HEIGHT,
   PLAYABLE_WIDTH,
   PLAYABLE_HEIGHT,
   PLAY_AREA_Y,
@@ -120,9 +119,8 @@ export class GameScene extends Phaser.Scene {
     this.screenEffects = new ScreenEffects(this);
     this.powerUpFeedbackSystem = new PowerUpFeedbackSystem(this);
 
-    // Wire up particle system to ball and ball pool for fireball effects
-    this.ball.setParticleSystem(this.particleSystem);
-    this.ballPool.setParticleSystem(this.particleSystem);
+    // Initialize effect manager for the primary ball (for fireball, disco, etc.)
+    this.ball.initEffectManager(this);
 
     // Get audio manager instance
     this.audioManager = AudioManager.getInstance();

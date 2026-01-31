@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { Ball } from '../objects/Ball';
-import type { ParticleSystem } from '../systems/ParticleSystem';
 
 const POOL_SIZE = 5;
 
@@ -9,7 +8,6 @@ export class BallPool {
   private pool: Ball[] = [];
   private group: Phaser.Physics.Arcade.Group;
   private primaryBall: Ball | null = null;
-  private particleSystem: ParticleSystem | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -23,6 +21,7 @@ export class BallPool {
     // Pre-populate pool (excluding primary ball)
     for (let i = 0; i < POOL_SIZE; i++) {
       const ball = new Ball(scene, -100, -100);
+      ball.initEffectManager(scene); // Initialize effect manager for pooled balls
       ball.deactivate();
       this.pool.push(ball);
       this.group.add(ball);
@@ -44,19 +43,13 @@ export class BallPool {
   }
 
   /**
-   * Set particle system reference for fireball visual effects
-   */
-  setParticleSystem(system: ParticleSystem): void {
-    this.particleSystem = system;
-
-    // Set on all pooled balls
-    this.pool.forEach((ball) => ball.setParticleSystem(system));
-  }
-
-  /**
    * Spawn extra balls for Disco power-up
    */
-  spawnExtraBalls(count: number, fromBall: Ball, speedMultiplier: number): Ball[] {
+  spawnExtraBalls(
+    count: number,
+    fromBall: Ball,
+    speedMultiplier: number
+  ): Ball[] {
     const spawned: Ball[] = [];
 
     for (let i = 0; i < count; i++) {
@@ -65,14 +58,10 @@ export class BallPool {
       if (!ball) {
         // Pool exhausted, create new one
         ball = new Ball(this.scene, -100, -100);
+        ball.initEffectManager(this.scene); // Initialize effect manager for new balls
         ball.deactivate();
         this.pool.push(ball);
         this.group.add(ball);
-      }
-
-      // Set particle system for visual effects
-      if (this.particleSystem) {
-        ball.setParticleSystem(this.particleSystem);
       }
 
       // Activate at same position as source ball
@@ -81,13 +70,18 @@ export class BallPool {
       // Launch at different angles
       const angleOffset = (i + 1) * 30; // 30, 60 degrees offset
       const baseAngle = Phaser.Math.DegToRad(-90);
-      const angle = baseAngle + Phaser.Math.DegToRad(angleOffset * (i % 2 === 0 ? 1 : -1));
+      const angle =
+        baseAngle +
+        Phaser.Math.DegToRad(angleOffset * (i % 2 === 0 ? 1 : -1));
 
       const speed = 400 * speedMultiplier;
       const velocityX = Math.cos(angle) * speed;
       const velocityY = Math.sin(angle) * speed;
 
-      (ball.body as Phaser.Physics.Arcade.Body).setVelocity(velocityX, velocityY);
+      (ball.body as Phaser.Physics.Arcade.Body).setVelocity(
+        velocityX,
+        velocityY
+      );
 
       spawned.push(ball);
     }

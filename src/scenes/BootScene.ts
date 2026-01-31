@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, AUDIO } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
+import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
 
 export class BootScene extends Phaser.Scene {
@@ -10,31 +11,17 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Create loading bar
-    const width = this.cameras.main.width;
-    const height = this.cameras.main.height;
+    // Use HTML loading overlay instead of Phaser graphics
+    const loadingOverlay = LoadingOverlay.getInstance();
 
-    const progressBar = this.add.graphics();
-    const progressBox = this.add.graphics();
-    progressBox.fillStyle(0x222222, 0.8);
-    progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
-
-    const loadingText = this.add.text(width / 2, height / 2 - 50, 'Loading...', {
-      font: '20px Arial',
-      color: '#ffffff'
-    }).setOrigin(0.5);
-
-    // Update progress bar
+    // Update overlay text during load progress
     this.load.on('progress', (value: number) => {
-      progressBar.clear();
-      progressBar.fillStyle(0xffffff, 1);
-      progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
+      const percent = Math.round(value * 100);
+      loadingOverlay.setLoadingText(`Loading... ${percent}%`);
     });
 
     this.load.on('complete', () => {
-      progressBar.destroy();
-      progressBox.destroy();
-      loadingText.destroy();
+      loadingOverlay.setLoadingText('Preparing...');
     });
 
     // Load audio manifest first
@@ -215,6 +202,57 @@ export class BootScene extends Phaser.Scene {
     flame.fillCircle(6, 6, 6);
     flame.generateTexture('particle-flame', 12, 12);
     flame.destroy();
+
+    // Mirror facet particle (small diamond for mirror ball reflections)
+    const mirrorFacet = this.make.graphics({ x: 0, y: 0 });
+    mirrorFacet.fillStyle(0xffffff);
+    mirrorFacet.beginPath();
+    mirrorFacet.moveTo(4, 0);
+    mirrorFacet.lineTo(8, 4);
+    mirrorFacet.lineTo(4, 8);
+    mirrorFacet.lineTo(0, 4);
+    mirrorFacet.closePath();
+    mirrorFacet.fillPath();
+    mirrorFacet.generateTexture('particle-mirror-facet', 8, 8);
+    mirrorFacet.destroy();
+
+    // Light ray particle (elongated beam for mirror ball light reflections)
+    const lightRay = this.make.graphics({ x: 0, y: 0 });
+    lightRay.fillStyle(0xffffff);
+    lightRay.beginPath();
+    lightRay.moveTo(2, 0);
+    lightRay.lineTo(4, 0);
+    lightRay.lineTo(4, 20);
+    lightRay.lineTo(2, 20);
+    lightRay.closePath();
+    lightRay.fillPath();
+    // Add tapered glow at top
+    lightRay.fillStyle(0xffffff, 0.6);
+    lightRay.fillCircle(3, 2, 3);
+    lightRay.generateTexture('particle-light-ray', 6, 20);
+    lightRay.destroy();
+
+    // Glint particle (4-point star for light refractions)
+    const glint = this.make.graphics({ x: 0, y: 0 });
+    glint.fillStyle(0xffffff);
+    glint.beginPath();
+    // Vertical spike
+    glint.moveTo(5, 0);
+    glint.lineTo(6, 4);
+    glint.lineTo(5, 10);
+    glint.lineTo(4, 4);
+    glint.closePath();
+    glint.fillPath();
+    // Horizontal spike
+    glint.beginPath();
+    glint.moveTo(0, 5);
+    glint.lineTo(4, 4);
+    glint.lineTo(10, 5);
+    glint.lineTo(4, 6);
+    glint.closePath();
+    glint.fillPath();
+    glint.generateTexture('particle-glint', 10, 10);
+    glint.destroy();
   }
 
   /**

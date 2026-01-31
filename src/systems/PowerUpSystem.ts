@@ -6,6 +6,7 @@ import { Paddle } from '../objects/Paddle';
 import { Ball } from '../objects/Ball';
 import { Brick } from '../objects/Brick';
 import { PowerUpType, selectRandomPowerUpType, selectRandomEffectType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
+import { BallEffectType } from '../effects/BallEffectTypes';
 
 /**
  * Active effect tracking
@@ -153,19 +154,22 @@ export class PowerUpSystem {
   }
 
   /**
-   * Apply Disco effect (spawn 2 extra balls)
+   * Apply Disco effect (spawn 2 extra balls with sparkle effects)
    */
   private applyDisco(): void {
     // Only spawn if primary ball is launched (in play)
     if (this.primaryBall.isLaunched()) {
       const newBalls = this.ballPool.spawnExtraBalls(2, this.primaryBall, this.speedMultiplier);
 
-      // If fireball is active, apply to newly spawned balls
-      if (this.fireballLevel > 0) {
-        newBalls.forEach((ball) => {
+      newBalls.forEach((ball) => {
+        // Apply disco sparkle effect to new balls
+        ball.applyEffect(BallEffectType.DISCO_SPARKLE);
+
+        // If fireball is active, apply it too (effects stack!)
+        if (this.fireballLevel > 0) {
           ball.setFireball(this.fireballLevel);
-        });
-      }
+        }
+      });
     }
     // No duration tracking - instant effect
     this.events.emit('effectApplied', PowerUpType.DISCO);

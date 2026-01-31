@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
+import { LoadingOverlay } from '../utils/LoadingOverlay';
 
 export class MenuScene extends Phaser.Scene {
   // Track menu elements for transition animation
@@ -28,10 +29,6 @@ export class MenuScene extends Phaser.Scene {
 
     // Set the full-viewport background (use level 1 for menu)
     BackgroundManager.setLevelBackground(1);
-
-    // Play menu music
-    const audioManager = AudioManager.getInstance();
-    audioManager.playMusic('menu-music', true);
 
     // Title
     const titleTop = this.add.text(centerX, 120, "GENO'S", {
@@ -127,6 +124,22 @@ export class MenuScene extends Phaser.Scene {
 
     // Add some floating decorations
     this.createDecorations();
+
+    // Show "Click to Start" button - the click unlocks audio context
+    LoadingOverlay.getInstance().showContinueButton(() => {
+      // This callback runs on user click, which unlocks browser audio
+      const audioManager = AudioManager.getInstance();
+      const webAudioSound = this.sound as Phaser.Sound.WebAudioSoundManager;
+
+      // Resume audio context if suspended
+      if (webAudioSound.context?.state === 'suspended') {
+        webAudioSound.context.resume().then(() => {
+          audioManager.playMusic('menu-music', true);
+        });
+      } else {
+        audioManager.playMusic('menu-music', true);
+      }
+    });
   }
 
   private startGameWithTransition(): void {

@@ -1,7 +1,13 @@
 import Phaser from 'phaser';
-import { BALL_RADIUS, BALL_SPEED_BASE, GAME_HEIGHT, PADDLE_HEIGHT } from '../config/Constants';
+import {
+  BALL_RADIUS,
+  BALL_SPEED_BASE,
+  GAME_HEIGHT,
+  PADDLE_HEIGHT,
+} from '../config/Constants';
 import { Paddle } from './Paddle';
-import type { ParticleSystem } from '../systems/ParticleSystem';
+import { BallEffectManager } from '../effects/BallEffectManager';
+import { BallEffectType } from '../effects/BallEffectTypes';
 
 export class Ball extends Phaser.Physics.Arcade.Sprite {
   private currentSpeed: number = BALL_SPEED_BASE;
@@ -9,17 +15,14 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private isFloating: boolean = false; // Balloon power-up
   private attachedPaddle: Paddle | null = null;
 
-  // FireBall power-up state
+  // FireBall power-up state (gameplay logic)
   private fireball: boolean = false;
   private fireballLevel: number = 0;
   private preCollisionVelocity: Phaser.Math.Vector2 = new Phaser.Math.Vector2();
   private pendingVelocityRestore: boolean = false;
 
-  // Fireball visual effects
-  private particleSystem: ParticleSystem | null = null;
-  private fireballEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
-  private fireballSmokeEmitter: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
-  private fireballPulseTween: Phaser.Tweens.Tween | null = null;
+  // Visual effects manager (handles all particle effects)
+  private effectManager: BallEffectManager | null = null;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'ball');
@@ -30,6 +33,13 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
     // Configure physics body (single source of truth)
     this.initializePhysics();
+  }
+
+  /**
+   * Initialize effect manager (called from GameScene after ball creation)
+   */
+  initEffectManager(scene: Phaser.Scene): void {
+    this.effectManager = new BallEffectManager(scene, this);
   }
 
   /**
@@ -95,7 +105,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       const currentMagnitude = velocity.length();
 
       // Prevent ball from going too slow
-      const minSpeed = this.isFloating ? this.currentSpeed * 0.5 : this.currentSpeed * 0.8;
+      const minSpeed = this.isFloating
+        ? this.currentSpeed * 0.5
+        : this.currentSpeed * 0.8;
       if (currentMagnitude < minSpeed && currentMagnitude > 0) {
         velocity.normalize().scale(minSpeed);
       }
@@ -171,15 +183,11 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.fireball = false;
     this.fireballLevel = 0;
     this.pendingVelocityRestore = false;
-    this.clearFireballVisuals();
-    (this.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
-  }
 
-  /**
-   * Set particle system reference for visual effects
-   */
-  setParticleSystem(system: ParticleSystem): void {
-    this.particleSystem = system;
+    // Clear all visual effects
+    this.effectManager?.clearAll();
+
+    (this.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
   }
 
   /**
@@ -188,7 +196,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   setFireball(level: number): void {
     this.fireball = true;
     this.fireballLevel = level;
-    this.applyFireballVisuals(level);
+    this.effectManager?.applyEffect(BallEffectType.FIREBALL, level);
   }
 
   /**
@@ -197,84 +205,28 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   clearFireball(): void {
     this.fireball = false;
     this.fireballLevel = 0;
-    this.clearFireballVisuals();
+    this.effectManager?.removeEffect(BallEffectType.FIREBALL);
   }
 
   /**
-   * Apply fireball visual effects based on level (caps at level 3)
+   * Apply any ball effect (extensible API for new effects)
    */
-  private applyFireballVisuals(level: number): void {
-    if (!this.particleSystem) return;
-
-    const effectiveLevel = Math.min(level, 3) as 1 | 2 | 3;
-
-    // Apply ball tint based on level
-    const tints: Record<1 | 2 | 3, number> = {
-      1: 0xff6600,
-      2: 0xffaa00,
-      3: 0xffdd00,
-    };
-    this.setTint(tints[effectiveLevel]);
-
-    // Destroy old emitter and create new one with updated level
-    // (Updating emitter properties at runtime is unreliable in Phaser)
-    if (this.fireballEmitter) {
-      this.particleSystem.stopFireballTrail(this.fireballEmitter);
-    }
-    this.fireballEmitter = this.particleSystem.startFireballTrail(this, effectiveLevel);
-
-    // Level 3: Add smoke trail
-    if (effectiveLevel >= 3 && !this.fireballSmokeEmitter) {
-      this.fireballSmokeEmitter = this.particleSystem.startSmokeTrail(this);
-    }
-
-    // Apply pulsing scale effect (level 2+)
-    if (effectiveLevel >= 2) {
-      this.applyPulseTween(effectiveLevel);
-    }
+  applyEffect(type: BallEffectType, level?: number): void {
+    this.effectManager?.applyEffect(type, level);
   }
 
   /**
-   * Clear all fireball visual effects
+   * Remove any ball effect
    */
-  private clearFireballVisuals(): void {
-    // Clear tint
-    this.clearTint();
-
-    // Stop particle trails
-    if (this.particleSystem) {
-      this.particleSystem.stopFireballTrail(this.fireballEmitter);
-      this.particleSystem.stopFireballTrail(this.fireballSmokeEmitter);
-    }
-    this.fireballEmitter = null;
-    this.fireballSmokeEmitter = null;
-
-    // Stop pulse tween
-    if (this.fireballPulseTween) {
-      this.fireballPulseTween.stop();
-      this.fireballPulseTween = null;
-      this.setScale(1);
-    }
+  removeEffect(type: BallEffectType): void {
+    this.effectManager?.removeEffect(type);
   }
 
   /**
-   * Apply pulsing scale animation for fireball
+   * Check if a specific effect is active
    */
-  private applyPulseTween(level: number): void {
-    if (this.fireballPulseTween) {
-      this.fireballPulseTween.stop();
-    }
-
-    const maxScale = level >= 3 ? 1.25 : 1.15;
-
-    this.fireballPulseTween = this.scene.tweens.add({
-      targets: this,
-      scale: { from: 1, to: maxScale },
-      duration: 150,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+  hasEffect(type: BallEffectType): boolean {
+    return this.effectManager?.hasEffect(type) ?? false;
   }
 
   /**
