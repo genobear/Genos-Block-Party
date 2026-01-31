@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Read(//home/scott/.claude/skills/phaser-gamedev/references/**)"
-    ]
-  }
-}
