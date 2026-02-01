@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { CurrencyManager } from '../systems/CurrencyManager';
+import { TransitionManager } from '../systems/TransitionManager';
 import { GameScene } from './GameScene';
 
 export class PauseScene extends Phaser.Scene {
@@ -12,12 +13,17 @@ export class PauseScene extends Phaser.Scene {
   private artistText!: Phaser.GameObjects.Text | null;
   private noTrackText!: Phaser.GameObjects.Text | null;
   private unsubscribeTrackChange: (() => void) | null = null;
+  private container!: Phaser.GameObjects.Container;
+  private isTransitioning: boolean = false;
 
   constructor() {
     super('PauseScene');
   }
 
   create(): void {
+    // Reset transition flag when scene is re-opened
+    this.isTransitioning = false;
+
     // Get AudioManager and init with this scene so it can use our sound/tween systems
     // (GameScene is paused, so we need an active scene for audio operations)
     this.audioManager = AudioManager.getInstance();
@@ -34,67 +40,67 @@ export class PauseScene extends Phaser.Scene {
     );
 
     // Pause container
-    const container = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    this.container = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
     // Pause title
     const title = this.add.text(0, -190, 'PAUSED', {
       font: 'bold 48px Arial',
       color: '#ffffff',
     }).setOrigin(0.5);
-    container.add(title);
+    this.container.add(title);
 
     // Track info (mini version - just name/artist for quick reference)
     const trackInfo = this.createTrackInfoMini();
     trackInfo.setPosition(0, -100);
-    container.add(trackInfo);
+    this.container.add(trackInfo);
 
     // Music playback controls
     const musicControls = this.createMusicControls();
     musicControls.setPosition(0, -50);
-    container.add(musicControls);
+    this.container.add(musicControls);
 
     // Settings button
     const settingsButton = this.createButton(0, 20, 'SETTINGS', 0x666666, () => {
       this.scene.stop();
       this.scene.launch('SettingsScene', { returnTo: 'PauseScene' });
     });
-    container.add(settingsButton);
+    this.container.add(settingsButton);
 
     // Music Player button (vintage brown)
     const musicPlayerButton = this.createButton(0, 90, 'MUSIC PLAYER', 0x8b4513, () => {
       this.scene.stop();
       this.scene.launch('MusicPlayerScene', { returnTo: 'PauseScene' });
     });
-    container.add(musicPlayerButton);
+    this.container.add(musicPlayerButton);
 
     // Resume button
     const resumeButton = this.createButton(0, 160, 'RESUME', COLORS.PADDLE, () => {
       this.resumeGame();
     });
-    container.add(resumeButton);
+    this.container.add(resumeButton);
 
     // Restart button
     const restartButton = this.createButton(0, 230, 'RESTART', 0x4ade80, () => {
-      this.restartGame();
+      this.restartGameWithTransition();
     });
-    container.add(restartButton);
+    this.container.add(restartButton);
 
     // Quit button
     const quitButton = this.createButton(0, 300, 'QUIT TO MENU', 0xff6b6b, () => {
-      this.quitToMenu();
+      this.quitToMenuWithTransition();
     });
-    container.add(quitButton);
+    this.container.add(quitButton);
 
     // Instructions
     const instructions = this.add.text(0, 360, 'Press ESC or P to resume', {
       font: '16px Arial',
       color: '#888888',
     }).setOrigin(0.5);
-    container.add(instructions);
+    this.container.add(instructions);
 
     // Animate in
-    container.setScale(0.8);
-    container.setAlpha(0);
+    this.container.setScale(0.8);
+    this.container.setAlpha(0);
     overlay.setAlpha(0);
 
     this.tweens.add({
@@ -104,7 +110,7 @@ export class PauseScene extends Phaser.Scene {
     });
 
     this.tweens.add({
-      targets: container,
+      targets: this.container,
       scale: 1,
       alpha: 1,
       duration: 200,
@@ -293,6 +299,40 @@ export class PauseScene extends Phaser.Scene {
       this.scene.resume('GameScene');
       this.scene.stop();
     }
+  }
+
+  private restartGameWithTransition(): void {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+
+    const transitionManager = TransitionManager.getInstance();
+    transitionManager.init(this);
+
+    transitionManager.transition(
+      'menu-to-game',
+      1,
+      [this.container],
+      () => {
+        this.restartGame();
+      }
+    );
+  }
+
+  private quitToMenuWithTransition(): void {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+
+    const transitionManager = TransitionManager.getInstance();
+    transitionManager.init(this);
+
+    transitionManager.transition(
+      'game-over-to-menu',
+      1,
+      [this.container],
+      () => {
+        this.quitToMenu();
+      }
+    );
   }
 
   private restartGame(): void {

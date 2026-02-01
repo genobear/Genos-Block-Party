@@ -722,12 +722,6 @@ export class GameOverScene extends Phaser.Scene {
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
 
-    // Update legacy high score
-    const currentHigh = parseInt(localStorage.getItem('genos-block-party-highscore') || '0', 10);
-    if (this.finalScore > currentHigh) {
-      localStorage.setItem('genos-block-party-highscore', this.finalScore.toString());
-    }
-
     // Flash confirmation
     this.initialsTexts.forEach(text => text.setColor('#4ade80'));
     this.tweens.add({

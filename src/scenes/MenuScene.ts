@@ -139,8 +139,8 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('MusicPlayerScene', { returnTo: 'MenuScene' });
     });
 
-    // High score display
-    const highScore = localStorage.getItem('genos-block-party-highscore') || '0';
+    // High score display (derived from leaderboard)
+    const highScore = this.getHighScoreFromLeaderboard();
     const highScoreText = this.add.text(centerX, GAME_HEIGHT - 60, `High Score: ${highScore}`, {
       font: '20px Arial',
       color: '#ffd93d',
@@ -225,5 +225,20 @@ export class MenuScene extends Phaser.Scene {
         ease: 'Sine.easeInOut',
       });
     }
+  }
+
+  private getHighScoreFromLeaderboard(): string {
+    try {
+      const data = localStorage.getItem('genos-block-party-leaderboard');
+      if (data) {
+        const leaderboard = JSON.parse(data) as { initials: string; score: number }[];
+        if (leaderboard.length > 0) {
+          return leaderboard[0].score.toString();
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return '0';
   }
 }
