@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { Ball } from '../objects/Ball';
+import { Paddle } from '../objects/Paddle';
 
-const POOL_SIZE = 5;
+const POOL_SIZE = 6; // Increased to account for initial ball being in pool
 
 export class BallPool {
   private scene: Phaser.Scene;
   private pool: Ball[] = [];
   private group: Phaser.Physics.Arcade.Group;
-  private primaryBall: Ball | null = null;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -18,10 +18,10 @@ export class BallPool {
       runChildUpdate: true,
     });
 
-    // Pre-populate pool (excluding primary ball)
+    // Pre-populate pool
     for (let i = 0; i < POOL_SIZE; i++) {
       const ball = new Ball(scene, -100, -100);
-      ball.initEffectManager(scene); // Initialize effect manager for pooled balls
+      ball.initEffectManager(scene);
       ball.deactivate();
       this.pool.push(ball);
       this.group.add(ball);
@@ -29,64 +29,65 @@ export class BallPool {
   }
 
   /**
-   * Set the primary ball (the main ball that triggers game over)
+   * Spawn balls at a position, optionally attached to paddle
    */
-  setPrimaryBall(ball: Ball): void {
-    this.primaryBall = ball;
-    this.group.add(ball);
-
-    // IMPORTANT: group.add() resets physics properties, so we must restore them
-    const body = ball.body as Phaser.Physics.Arcade.Body;
-    body.setBounce(1, 1);
-    body.setCollideWorldBounds(true);
-    body.onWorldBounds = true;
-  }
-
-  /**
-   * Spawn extra balls for Disco power-up
-   */
-  spawnExtraBalls(
+  spawnBalls(
     count: number,
-    fromBall: Ball,
-    speedMultiplier: number
+    x: number,
+    y: number,
+    speedMultiplier: number,
+    attachToPaddle?: Paddle
   ): Ball[] {
     const spawned: Ball[] = [];
 
     for (let i = 0; i < count; i++) {
-      let ball = this.pool.find((b) => !b.active && b !== this.primaryBall);
+      let ball = this.pool.find((b) => !b.active);
 
       if (!ball) {
         // Pool exhausted, create new one
         ball = new Ball(this.scene, -100, -100);
-        ball.initEffectManager(this.scene); // Initialize effect manager for new balls
+        ball.initEffectManager(this.scene);
         ball.deactivate();
         this.pool.push(ball);
         this.group.add(ball);
       }
 
-      // Activate at same position as source ball
-      ball.activate(fromBall.x, fromBall.y);
+      // Activate at position
+      ball.activate(x, y);
 
-      // Launch at different angles
-      const angleOffset = (i + 1) * 30; // 30, 60 degrees offset
-      const baseAngle = Phaser.Math.DegToRad(-90);
-      const angle =
-        baseAngle +
-        Phaser.Math.DegToRad(angleOffset * (i % 2 === 0 ? 1 : -1));
+      if (attachToPaddle) {
+        // Attach to paddle (waiting for launch)
+        ball.attachToPaddle(attachToPaddle);
+      } else {
+        // Launch immediately at different angles
+        const angleOffset = (i + 1) * 30; // 30, 60 degrees offset
+        const baseAngle = Phaser.Math.DegToRad(-90);
+        const angle =
+          baseAngle +
+          Phaser.Math.DegToRad(angleOffset * (i % 2 === 0 ? 1 : -1));
 
-      const speed = 400 * speedMultiplier;
-      const velocityX = Math.cos(angle) * speed;
-      const velocityY = Math.sin(angle) * speed;
+        const speed = 400 * speedMultiplier;
+        const velocityX = Math.cos(angle) * speed;
+        const velocityY = Math.sin(angle) * speed;
 
-      (ball.body as Phaser.Physics.Arcade.Body).setVelocity(
-        velocityX,
-        velocityY
-      );
+        const body = ball.body as Phaser.Physics.Arcade.Body;
+        body.setVelocity(velocityX, velocityY);
+
+        // Mark as launched since we're giving it velocity
+        ball.markAsLaunched();
+      }
 
       spawned.push(ball);
     }
 
     return spawned;
+  }
+
+  /**
+   * Convenience method to spawn a single ball attached to paddle
+   */
+  spawnAttachedToPaddle(paddle: Paddle, x: number, y: number): Ball {
+    return this.spawnBalls(1, x, y, 1, paddle)[0];
   }
 
   /**
@@ -100,19 +101,7 @@ export class BallPool {
    * Get all active balls
    */
   getActiveBalls(): Ball[] {
-    const active: Ball[] = [];
-
-    if (this.primaryBall?.active) {
-      active.push(this.primaryBall);
-    }
-
-    this.pool.forEach((ball) => {
-      if (ball.active) {
-        active.push(ball);
-      }
-    });
-
-    return active;
+    return this.pool.filter((ball) => ball.active);
   }
 
   /**
@@ -127,36 +116,21 @@ export class BallPool {
    */
   update(): void {
     this.pool.forEach((ball) => {
-      if (ball.active && ball !== this.primaryBall && ball.isOutOfBounds()) {
+      if (ball.active && ball.isOutOfBounds()) {
         ball.deactivate();
-        this.scene.events.emit('extraBallLost');
+        this.scene.events.emit('ballLost', ball);
       }
     });
   }
 
   /**
-   * Deactivate all extra balls (keep primary)
+   * Deactivate all balls
    */
-  clearExtras(): void {
+  clearAll(): void {
     this.pool.forEach((ball) => {
-      if (ball.active && ball !== this.primaryBall) {
+      if (ball.active) {
         ball.deactivate();
       }
     });
-  }
-
-  /**
-   * Check if only primary ball remains
-   */
-  hasOnlyPrimaryBall(): boolean {
-    const activeBalls = this.getActiveBalls();
-    return activeBalls.length === 1 && activeBalls[0] === this.primaryBall;
-  }
-
-  /**
-   * Check if primary ball is lost (for game over check)
-   */
-  isPrimaryBallLost(): boolean {
-    return this.primaryBall !== null && !this.primaryBall.active;
   }
 }

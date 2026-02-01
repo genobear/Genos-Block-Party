@@ -14,6 +14,7 @@ import { NowPlayingToast } from '../systems/NowPlayingToast';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
 import { PowerUpType } from '../types/PowerUpTypes';
+import { BallEffectType } from '../effects/BallEffectTypes';
 import { LEVELS, LevelData } from '../config/LevelData';
 import {
   GAME_WIDTH,
@@ -32,10 +33,9 @@ import {
 export class GameScene extends Phaser.Scene {
   // Game objects
   private paddle!: Paddle;
-  private ball!: Ball;
   private bricks!: Phaser.Physics.Arcade.StaticGroup;
 
-  // Power-up and multi-ball systems
+  // Ball pool (all balls are equal, no primary ball)
   private ballPool!: BallPool;
   private powerUpSystem!: PowerUpSystem;
 
@@ -45,7 +45,7 @@ export class GameScene extends Phaser.Scene {
   private powerUpFeedbackSystem!: PowerUpFeedbackSystem;
   private collisionHandler!: CollisionHandler;
   private electricArcSystem!: ElectricArcSystem;
-  private dangerSparks: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
+  private dangerSparkEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private isInDanger: boolean = false;
 
   // Audio
@@ -60,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   private isGameOver: boolean = false;
   private canLaunch: boolean = true;
   private lastDebugShowDropChance: boolean = false;
+  private isLevelTransitioning: boolean = false;
 
   constructor() {
     super('GameScene');
@@ -85,19 +86,19 @@ export class GameScene extends Phaser.Scene {
     // Create paddle
     this.paddle = new Paddle(this);
 
-    // Create ball (positioned within playable area)
-    this.ball = new Ball(this, PLAYABLE_WIDTH / 2, PLAY_AREA_Y + PLAYABLE_HEIGHT - 100);
-    this.ball.attachToPaddle(this.paddle);
-
-    // Create ball pool and add primary ball
+    // Create ball pool and spawn initial ball attached to paddle
     this.ballPool = new BallPool(this);
-    this.ballPool.setPrimaryBall(this.ball);
+    this.ballPool.spawnAttachedToPaddle(
+      this.paddle,
+      PLAYABLE_WIDTH / 2,
+      PLAY_AREA_Y + PLAYABLE_HEIGHT - 100
+    );
 
-    // Listen for extra ball loss to check if all balls are gone
-    this.events.on('extraBallLost', this.checkAllBallsLost, this);
+    // Listen for any ball loss
+    this.events.on('ballLost', this.onBallLost, this);
 
-    // Create power-up system
-    this.powerUpSystem = new PowerUpSystem(this, this.paddle, this.ball, this.ballPool);
+    // Create power-up system (no longer needs primary ball reference)
+    this.powerUpSystem = new PowerUpSystem(this, this.paddle, this.ballPool);
 
     // Expose Brick class for debug console: window.Brick.debugDropChance = 1
     (window as unknown as { Brick: typeof Brick }).Brick = Brick;
@@ -116,7 +117,7 @@ export class GameScene extends Phaser.Scene {
         levelName: this.currentLevel?.name,
         lives: this.lives,
         score: this.score,
-        ballLaunched: this.ball.isLaunched(),
+        activeBalls: this.ballPool.getActiveCount(),
         canLaunch: this.canLaunch,
       }),
     };
@@ -125,9 +126,6 @@ export class GameScene extends Phaser.Scene {
     this.particleSystem = new ParticleSystem(this);
     this.screenEffects = new ScreenEffects(this);
     this.powerUpFeedbackSystem = new PowerUpFeedbackSystem(this);
-
-    // Initialize effect manager for the primary ball (for fireball, disco, etc.)
-    this.ball.initEffectManager(this);
 
     // Get audio manager instance and initialize with this scene
     this.audioManager = AudioManager.getInstance();
@@ -203,7 +201,7 @@ export class GameScene extends Phaser.Scene {
    */
   shutdown(): void {
     // Clean up scene events
-    this.events.off('extraBallLost', this.checkAllBallsLost, this);
+    this.events.off('ballLost', this.onBallLost, this);
     this.events.off('shutdown', this.shutdown, this);
 
     // Clean up physics world events (check if physics exists)
@@ -237,8 +235,10 @@ export class GameScene extends Phaser.Scene {
     // Update paddle
     this.paddle.update(time, delta);
 
-    // Update ball
-    this.ball.update(time, delta);
+    // Update all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.update(time, delta);
+    });
 
     // Update power-up and ball pool systems
     this.powerUpSystem.update();
@@ -255,29 +255,56 @@ export class GameScene extends Phaser.Scene {
       });
       this.lastDebugShowDropChance = Brick.debugShowDropChance;
     }
-
-    // Check if primary ball fell out of bounds
-    // Only lose life if all balls are gone (multi-ball support)
-    if (this.ball.active && this.ball.isLaunched() && this.ball.isOutOfBounds()) {
-      this.ball.deactivate();
-
-      // Check if any extra balls remain
-      if (this.ballPool.getActiveCount() === 0) {
-        this.handleBallLost();
-      }
-    }
   }
 
   private handleClick(): void {
-    if (!this.ball.isLaunched() && this.canLaunch && !this.isGameOver) {
+    // Can launch if there are any unlaunched balls
+    const hasUnlaunchedBall = this.ballPool.getActiveBalls().some((b) => !b.isLaunched());
+    if (hasUnlaunchedBall && this.canLaunch && !this.isGameOver) {
       this.launchBall();
     }
   }
 
   private launchBall(): void {
-    this.ball.launch(this.currentLevel.ballSpeedMultiplier);
+    // Launch all unlaunched balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (!ball.isLaunched()) {
+        ball.launch(this.currentLevel.ballSpeedMultiplier);
+      }
+    });
     this.events.emit('ballLaunched');
     this.canLaunch = false;
+  }
+
+  /**
+   * Handle individual ball loss - check if all balls are gone
+   */
+  private onBallLost(_ball: Ball): void {
+    // Don't lose lives during level transition
+    if (this.isLevelTransitioning) return;
+
+    // Update multi-ball effects (remove disco sparkle when back to 1 ball)
+    this.updateMultiBallEffects();
+
+    // Check if any balls remain
+    if (this.ballPool.getActiveCount() === 0) {
+      this.handleAllBallsLost();
+    }
+  }
+
+  /**
+   * Update effects based on ball count (disco sparkle only when multi-ball)
+   */
+  private updateMultiBallEffects(): void {
+    const ballCount = this.ballPool.getActiveCount();
+    const activeBalls = this.ballPool.getActiveBalls();
+
+    if (ballCount <= 1) {
+      // Remove disco sparkle from remaining ball
+      activeBalls.forEach((ball) => {
+        ball.removeEffect(BallEffectType.DISCO_SPARKLE);
+      });
+    }
   }
 
   private loadLevel(index: number): void {
@@ -373,19 +400,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Check if all balls are lost after an extra ball falls out
-   */
-  private checkAllBallsLost(): void {
-    // Don't lose lives during level transition
-    if (this.isLevelTransitioning) return;
-
-    if (this.ballPool.getActiveCount() === 0) {
-      this.handleBallLost();
-    }
-  }
-
-  private handleBallLost(): void {
+  private handleAllBallsLost(): void {
     // Don't lose lives during level transition
     if (this.isLevelTransitioning) return;
     this.lives--;
@@ -418,18 +433,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private resetBall(): void {
-    // Clear any extra balls
-    this.ballPool.clearExtras();
+    // Clear all balls
+    this.ballPool.clearAll();
 
-    // Reset primary ball (positioned within playable area)
-    this.ball.reset();
-    this.ball.activate(this.paddle.x, PLAY_AREA_Y + PLAYABLE_HEIGHT - 100);
-    this.ball.attachToPaddle(this.paddle);
+    // Spawn new ball attached to paddle
+    this.ballPool.spawnAttachedToPaddle(
+      this.paddle,
+      this.paddle.x,
+      PLAY_AREA_Y + PLAYABLE_HEIGHT - 100
+    );
+
     this.canLaunch = true;
     this.events.emit('ballReset');
   }
-
-  private isLevelTransitioning: boolean = false;
 
   private handleLevelComplete(): void {
     // Prevent double-triggering during transition
@@ -448,9 +464,9 @@ export class GameScene extends Phaser.Scene {
     // Exit danger mode if active
     this.exitDangerMode();
 
-    // Clear power-ups and extra balls
+    // Clear power-ups and all balls
     this.powerUpSystem.clear();
-    this.ballPool.clearExtras();
+    this.ballPool.clearAll();
     this.events.emit('effectsCleared');
 
     // Check if there are more levels
@@ -472,11 +488,15 @@ export class GameScene extends Phaser.Scene {
     const transitionManager = TransitionManager.getInstance();
     transitionManager.init(this);
 
+    // Get any active ball for transition animation (may be null)
+    const activeBalls = this.ballPool.getActiveBalls();
+    const transitionBall = activeBalls.length > 0 ? activeBalls[0] : null;
+
     transitionManager.transitionToNextLevel(
       nextLevelNumber,
       this.bricks,
       this.paddle,
-      this.ball,
+      transitionBall,
       () => {
         // Reset paddle visual properties and position BEFORE loading level
         // (transition animation sets scale/alpha/rotation and moves position)
@@ -541,7 +561,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Enter danger mode when on last life with last ball
+   * Enter danger mode when on last life
    */
   private enterDangerMode(): void {
     if (this.isInDanger) return;
@@ -551,8 +571,11 @@ export class GameScene extends Phaser.Scene {
     // Show danger indicator (pulsing red vignette)
     this.screenEffects.showDangerIndicator();
 
-    // Add spark trail to ball
-    this.dangerSparks = this.particleSystem.dangerSparks(this.ball);
+    // Add spark trail to all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      const sparks = this.particleSystem.dangerSparks(ball);
+      if (sparks) this.dangerSparkEmitters.push(sparks);
+    });
 
     // Enable slow-motion briefly when entering danger
     this.screenEffects.enableSlowMotion(0.7, 500);
@@ -569,9 +592,11 @@ export class GameScene extends Phaser.Scene {
     // Hide danger indicator
     this.screenEffects.hideDangerIndicator();
 
-    // Stop danger sparks
-    this.particleSystem.stopDangerSparks(this.dangerSparks);
-    this.dangerSparks = null;
+    // Stop all danger spark emitters
+    this.dangerSparkEmitters.forEach((emitter) => {
+      this.particleSystem.stopDangerSparks(emitter);
+    });
+    this.dangerSparkEmitters = [];
 
     // Ensure slow motion is disabled
     this.screenEffects.disableSlowMotion();

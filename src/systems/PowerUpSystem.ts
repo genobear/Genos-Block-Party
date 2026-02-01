@@ -41,7 +41,6 @@ export class PowerUpSystem {
   private powerUpPool: PowerUpPool;
   private ballPool: BallPool;
   private paddle: Paddle;
-  private primaryBall: Ball;
   private activeEffects: ActiveEffect[] = [];
   private speedMultiplier: number = 1;
 
@@ -75,12 +74,10 @@ export class PowerUpSystem {
   constructor(
     scene: Phaser.Scene,
     paddle: Paddle,
-    primaryBall: Ball,
     ballPool: BallPool
   ) {
     this.scene = scene;
     this.paddle = paddle;
-    this.primaryBall = primaryBall;
     this.ballPool = ballPool;
     this.powerUpPool = new PowerUpPool(scene);
     this.events = new Phaser.Events.EventEmitter();
@@ -183,14 +180,9 @@ export class PowerUpSystem {
       this.balloonTimer.destroy();
     }
 
-    // Apply to primary ball
-    this.applyBalloonToBall(this.primaryBall);
-
-    // Apply to any extra balls
+    // Apply to all active balls
     this.ballPool.getActiveBalls().forEach((ball) => {
-      if (ball !== this.primaryBall) {
-        this.applyBalloonToBall(ball);
-      }
+      this.applyBalloonToBall(ball);
     });
 
     // Global expiration timer
@@ -246,26 +238,41 @@ export class PowerUpSystem {
    * Uses propagation config to apply all active propagatable effects to new balls
    */
   private applyDisco(): void {
-    // Find any active ball to use as spawn source (allows multiball even if primary is lost)
+    // Find any launched ball to use as spawn position
     const activeBalls = this.ballPool.getActiveBalls();
-    const sourceBall = activeBalls.length > 0 ? activeBalls[0] : null;
+    const launchedBall = activeBalls.find((ball) => ball.isLaunched());
 
-    // Only spawn if there's at least one ball in play
-    if (sourceBall && sourceBall.isLaunched()) {
-      const newBalls = this.ballPool.spawnExtraBalls(2, sourceBall, this.speedMultiplier);
+    // Determine spawn position
+    let spawnX: number, spawnY: number;
+    if (launchedBall) {
+      spawnX = launchedBall.x;
+      spawnY = launchedBall.y;
+    } else {
+      // Edge case: no launched balls, spawn at paddle position
+      spawnX = this.paddle.x;
+      spawnY = this.paddle.y - 50;
+    }
 
-      newBalls.forEach((ball) => {
-        // Apply disco sparkle effect to new balls
+    // Spawn new balls
+    const newBalls = this.ballPool.spawnBalls(2, spawnX, spawnY, this.speedMultiplier);
+
+    // Apply disco sparkle to ALL balls when multi-ball is active
+    const allBalls = this.ballPool.getActiveBalls();
+    if (allBalls.length > 1) {
+      allBalls.forEach((ball) => {
         ball.applyEffect(BallEffectType.DISCO_SPARKLE);
-
-        // Apply all propagatable active effects using the config registry
-        this.propagationConfigs.forEach((config) => {
-          if (config.propagateToNewBalls && config.isActive()) {
-            config.applyToBall(ball);
-          }
-        });
       });
     }
+
+    // Apply propagatable effects to new balls only
+    newBalls.forEach((ball) => {
+      this.propagationConfigs.forEach((config) => {
+        if (config.propagateToNewBalls && config.isActive()) {
+          config.applyToBall(ball);
+        }
+      });
+    });
+
     // No duration tracking - instant effect
     this.events.emit('effectApplied', PowerUpType.DISCO);
   }
@@ -298,14 +305,9 @@ export class PowerUpSystem {
       this.electricBallTimer.destroy();
     }
 
-    // Apply to primary ball
-    this.applyElectricBallToBall(this.primaryBall);
-
-    // Apply to any extra balls
+    // Apply to all active balls
     this.ballPool.getActiveBalls().forEach((ball) => {
-      if (ball !== this.primaryBall) {
-        this.applyElectricBallToBall(ball);
-      }
+      this.applyElectricBallToBall(ball);
     });
 
     // Global expiration timer
@@ -334,10 +336,7 @@ export class PowerUpSystem {
     this.electricBallEndTime = 0;
     this.electricBallTimer = null;
 
-    // Clear from primary ball
-    this.primaryBall.clearElectricBall();
-
-    // Clear from all extra balls
+    // Clear from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearElectricBall();
     });
@@ -376,14 +375,9 @@ export class PowerUpSystem {
       this.fireballTimer.destroy();
     }
 
-    // Apply to primary ball
-    this.primaryBall.setFireball(this.fireballLevel);
-
-    // Apply to any extra balls
+    // Apply to all active balls
     this.ballPool.getActiveBalls().forEach((ball) => {
-      if (ball !== this.primaryBall) {
-        ball.setFireball(this.fireballLevel);
-      }
+      ball.setFireball(this.fireballLevel);
     });
 
     // Schedule expiration
@@ -402,10 +396,7 @@ export class PowerUpSystem {
     this.fireballLevel = 0;
     this.fireballTimer = null;
 
-    // Clear from primary ball
-    this.primaryBall.clearFireball();
-
-    // Clear from all extra balls
+    // Clear from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
     });
@@ -498,10 +489,6 @@ export class PowerUpSystem {
       this.fireballTimer = null;
     }
     this.fireballLevel = 0;
-    this.primaryBall.clearFireball();
-    this.ballPool.getActiveBalls().forEach((ball) => {
-      ball.clearFireball();
-    });
 
     // Clear Electric Ball state
     if (this.electricBallTimer) {
@@ -509,10 +496,6 @@ export class PowerUpSystem {
       this.electricBallTimer = null;
     }
     this.electricBallEndTime = 0;
-    this.primaryBall.clearElectricBall();
-    this.ballPool.getActiveBalls().forEach((ball) => {
-      ball.clearElectricBall();
-    });
 
     // Clear Balloon state
     if (this.balloonTimer) {
@@ -520,6 +503,11 @@ export class PowerUpSystem {
       this.balloonTimer = null;
     }
     this.balloonEndTime = 0;
-    // Ball.setFloating handles its own cleanup via internal timer
+
+    // Clear effects from all balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearFireball();
+      ball.clearElectricBall();
+    });
   }
 }

@@ -99,13 +99,13 @@ export class TransitionManager {
     nextLevelNumber: number,
     bricks: Phaser.Physics.Arcade.StaticGroup,
     paddle: Phaser.GameObjects.Sprite,
-    ball: Phaser.GameObjects.Sprite,
+    ball: Phaser.GameObjects.Sprite | null,
     onLoadLevel: TransitionCallback
   ): Promise<void> {
     const elements = [
       ...bricks.getChildren(),
       paddle,
-      ball,
+      ...(ball ? [ball] : []),
     ].filter(Boolean);
 
     await this.transition(

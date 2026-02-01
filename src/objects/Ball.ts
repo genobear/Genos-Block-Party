@@ -222,6 +222,13 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Mark ball as launched (used when spawning with velocity)
+   */
+  markAsLaunched(): void {
+    this.launched = true;
+  }
+
+  /**
    * Reset ball state
    */
   reset(): void {
