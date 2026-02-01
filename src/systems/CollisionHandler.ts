@@ -35,6 +35,7 @@ export class CollisionHandler {
 
   // Callbacks for game state changes
   private onScoreChange: (points: number) => void;
+  private onBrickHit: () => void;
   private onLevelComplete: () => void;
   private getBrickCount: () => number;
 
@@ -46,6 +47,7 @@ export class CollisionHandler {
     audioManager: AudioManager,
     callbacks: {
       onScoreChange: (points: number) => void;
+      onBrickHit: () => void;
       onLevelComplete: () => void;
       getBrickCount: () => number;
     }
@@ -56,6 +58,7 @@ export class CollisionHandler {
     this.powerUpFeedbackSystem = powerUpFeedbackSystem;
     this.audioManager = audioManager;
     this.onScoreChange = callbacks.onScoreChange;
+    this.onBrickHit = callbacks.onBrickHit;
     this.onLevelComplete = callbacks.onLevelComplete;
     this.getBrickCount = callbacks.getBrickCount;
   }
@@ -140,7 +143,10 @@ export class CollisionHandler {
     const isFireball = ball.isFireballActive();
     const damage = isFireball ? ball.getFireballLevel() : 1;
 
-    // Add score
+    // Increment multiplier (before scoring so it applies)
+    this.onBrickHit();
+
+    // Add score (multiplier is applied in GameScene.addScore)
     this.onScoreChange(brick.getScoreValue());
 
     // Trigger Electric Ball AOE if active (triggers on every hit, not just destruction)
@@ -228,6 +234,9 @@ export class CollisionHandler {
     adjacentBricks.forEach((brick) => {
       this.scene.time.delayedCall(damageDelay, () => {
         if (!brick || !brick.active) return;
+
+        // Increment multiplier for AOE hits too
+        this.onBrickHit();
 
         // Score for AOE hits (50% of normal value)
         this.onScoreChange(Math.floor(brick.getScoreValue() * 0.5));

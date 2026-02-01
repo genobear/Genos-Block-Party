@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAY_AREA_Y, PLAYABLE_HEIGHT, IS_TOUCH_DEVICE, MOBILE_TOUCH_ZONE_HEIGHT, UI_BORDER_BOTTOM } from '../config/Constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAY_AREA_Y, PLAYABLE_HEIGHT, IS_TOUCH_DEVICE, MOBILE_TOUCH_ZONE_HEIGHT, UI_BORDER_BOTTOM, MULTIPLIER } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { GameScene } from './GameScene';
 import { CurrencyManager } from '../systems/CurrencyManager';
@@ -16,6 +16,7 @@ interface PowerUpIndicator {
 export class UIScene extends Phaser.Scene {
   // UI elements
   private scoreText!: Phaser.GameObjects.Text;
+  private multiplierText!: Phaser.GameObjects.Text;
   private livesContainer!: Phaser.GameObjects.Container;
   private levelText!: Phaser.GameObjects.Text;
   private launchText!: Phaser.GameObjects.Text;
@@ -72,6 +73,12 @@ export class UIScene extends Phaser.Scene {
       font: 'bold 28px Arial',
       color: '#ffffff',
     });
+
+    // Multiplier display (positioned to right of score)
+    this.multiplierText = this.add.text(140, 28, '', {
+      font: 'bold 24px Arial',
+      color: '#ffff00',
+    }).setAlpha(0);
   }
 
   private createLivesDisplay(): void {
@@ -236,6 +243,9 @@ export class UIScene extends Phaser.Scene {
     // Score updates
     gameScene.events.on('scoreUpdate', this.updateScore, this);
 
+    // Multiplier updates
+    gameScene.events.on('multiplierUpdate', this.updateMultiplier, this);
+
     // Lives updates
     gameScene.events.on('livesUpdate', this.updateLives, this);
 
@@ -258,6 +268,7 @@ export class UIScene extends Phaser.Scene {
     // Clean up on scene shutdown
     this.events.on('shutdown', () => {
       gameScene.events.off('scoreUpdate', this.updateScore, this);
+      gameScene.events.off('multiplierUpdate', this.updateMultiplier, this);
       gameScene.events.off('livesUpdate', this.updateLives, this);
       gameScene.events.off('levelUpdate', this.updateLevel, this);
       gameScene.events.off('ballLaunched', this.hideLaunchText, this);
@@ -280,6 +291,40 @@ export class UIScene extends Phaser.Scene {
       onStart: () => {
         this.scoreText.setText(score.toString());
       },
+    });
+  }
+
+  private updateMultiplier(multiplier: number, _hitCount: number): void {
+    if (multiplier < MULTIPLIER.MIN_DISPLAY_THRESHOLD) {
+      // Hide when low
+      this.tweens.add({
+        targets: this.multiplierText,
+        alpha: 0,
+        duration: 200,
+      });
+      return;
+    }
+
+    // Format: "x2.3"
+    this.multiplierText.setText(`x${multiplier.toFixed(1)}`);
+
+    // Color based on multiplier level
+    if (multiplier >= 3.0) {
+      this.multiplierText.setColor('#ff4444'); // Red for high
+    } else if (multiplier >= 2.0) {
+      this.multiplierText.setColor('#ffaa00'); // Orange for medium
+    } else {
+      this.multiplierText.setColor('#ffff00'); // Yellow for low
+    }
+
+    // Pulse animation
+    this.tweens.add({
+      targets: this.multiplierText,
+      alpha: 1,
+      scale: 1.2,
+      duration: 100,
+      yoyo: true,
+      onComplete: () => this.multiplierText.setScale(1),
     });
   }
 
@@ -481,7 +526,7 @@ export class UIScene extends Phaser.Scene {
   private onGameEnd(): void {
     // Hide UI elements during game over
     this.tweens.add({
-      targets: [this.scoreText, this.livesContainer, this.levelText, this.pauseButton],
+      targets: [this.scoreText, this.multiplierText, this.livesContainer, this.levelText, this.pauseButton],
       alpha: 0,
       duration: 500,
     });

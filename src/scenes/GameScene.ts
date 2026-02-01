@@ -28,6 +28,7 @@ import {
   BRICK_COLS,
   STARTING_LIVES,
   AUDIO,
+  MULTIPLIER,
 } from '../config/Constants';
 
 export class GameScene extends Phaser.Scene {
@@ -62,6 +63,11 @@ export class GameScene extends Phaser.Scene {
   private lastDebugShowDropChance: boolean = false;
   private isLevelTransitioning: boolean = false;
 
+  // Multiplier state
+  private hitCount: number = 0;
+  private multiplier: number = MULTIPLIER.BASE;
+  private lastHitTime: number = 0;
+
   constructor() {
     super('GameScene');
   }
@@ -74,6 +80,11 @@ export class GameScene extends Phaser.Scene {
     this.isGameOver = false;
     this.isLevelTransitioning = false;
     this.canLaunch = true;
+
+    // Reset multiplier state
+    this.hitCount = 0;
+    this.multiplier = MULTIPLIER.BASE;
+    this.lastHitTime = 0;
 
     // Set transparent background so CSS background shows through
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
@@ -146,6 +157,7 @@ export class GameScene extends Phaser.Scene {
       this.audioManager,
       {
         onScoreChange: (points: number) => this.addScore(points),
+        onBrickHit: () => this.incrementMultiplier(),
         onLevelComplete: () => this.handleLevelComplete(),
         getBrickCount: () => this.bricks.countActive(),
       }
@@ -187,6 +199,7 @@ export class GameScene extends Phaser.Scene {
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
     this.events.emit('levelUpdate', this.currentLevel.name);
+    this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
 
     // Input for launching ball
     this.input.on('pointerdown', this.handleClick, this);
@@ -243,6 +256,9 @@ export class GameScene extends Phaser.Scene {
     // Update power-up and ball pool systems
     this.powerUpSystem.update();
     this.ballPool.update();
+
+    // Update multiplier decay
+    this.updateMultiplierDecay(time, delta);
 
     // Update debug drop chance display on bricks
     if (Brick.debugShowDropChance || this.lastDebugShowDropChance !== Brick.debugShowDropChance) {
@@ -412,6 +428,9 @@ export class GameScene extends Phaser.Scene {
     // Large screen shake
     this.cameras.main.shake(200, 0.01);
 
+    // Reset multiplier on life loss
+    this.resetMultiplier();
+
     // Clear power-up effects
     this.powerUpSystem.clear();
     this.events.emit('effectsCleared');
@@ -463,6 +482,9 @@ export class GameScene extends Phaser.Scene {
 
     // Exit danger mode if active
     this.exitDangerMode();
+
+    // Reset multiplier for next level
+    this.resetMultiplier();
 
     // Clear power-ups and all balls
     this.powerUpSystem.clear();
@@ -556,8 +578,57 @@ export class GameScene extends Phaser.Scene {
   }
 
   private addScore(points: number): void {
-    this.score += points;
+    const multipliedPoints = Math.floor(points * this.multiplier);
+    this.score += multipliedPoints;
     this.events.emit('scoreUpdate', this.score);
+  }
+
+  /**
+   * Increment the score multiplier on each brick hit
+   */
+  private incrementMultiplier(): void {
+    this.hitCount++;
+    this.lastHitTime = this.time.now;
+    this.multiplier = Math.min(
+      MULTIPLIER.MAX_MULTIPLIER,
+      MULTIPLIER.BASE + Math.log(this.hitCount + 1) * MULTIPLIER.SCALE_FACTOR
+    );
+    this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
+  }
+
+  /**
+   * Decay the multiplier over time when not hitting bricks
+   * Decay rate scales with multiplier level - slower when low, faster when high
+   */
+  private updateMultiplierDecay(time: number, delta: number): void {
+    if (this.multiplier <= MULTIPLIER.BASE) return;
+
+    const timeSinceHit = time - this.lastHitTime;
+    if (timeSinceHit > MULTIPLIER.DECAY_DELAY_MS) {
+      // Scale decay rate based on how far above base we are
+      // At 1.1x: ~2.5% decay rate, at 3.0x: ~50%, at 5.0x: 100%
+      const multiplierAboveBase = this.multiplier - MULTIPLIER.BASE;
+      const maxAboveBase = MULTIPLIER.MAX_MULTIPLIER - MULTIPLIER.BASE;
+      const decayScale = multiplierAboveBase / maxAboveBase;
+      const effectiveDecayRate = MULTIPLIER.DECAY_RATE * decayScale;
+
+      const decay = effectiveDecayRate * (delta / 1000);
+      this.multiplier = Math.max(MULTIPLIER.BASE, this.multiplier - decay);
+      if (this.multiplier <= MULTIPLIER.BASE) {
+        this.hitCount = 0;
+      }
+      this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
+    }
+  }
+
+  /**
+   * Reset the multiplier to base value
+   */
+  private resetMultiplier(): void {
+    this.hitCount = 0;
+    this.multiplier = MULTIPLIER.BASE;
+    this.lastHitTime = 0;
+    this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
   }
 
   /**
