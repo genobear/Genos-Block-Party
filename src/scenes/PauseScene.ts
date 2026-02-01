@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
+import { CurrencyManager } from '../systems/CurrencyManager';
+import { GameScene } from './GameScene';
 
 export class PauseScene extends Phaser.Scene {
   private audioManager!: AudioManager;
@@ -309,14 +311,21 @@ export class PauseScene extends Phaser.Scene {
     // If level lock is ON, will switch to user's selected station playlist
     this.audioManager.handleReturnToMenu();
 
-    const uiScene = this.scene.get('UIScene') as unknown as { quitToMenu?: () => void };
-    if (uiScene && typeof uiScene.quitToMenu === 'function') {
-      uiScene.quitToMenu();
-    } else {
-      // Fallback
-      this.scene.stop('GameScene');
-      this.scene.stop();
-      this.scene.start('MenuScene');
+    // Get current score from GameScene for currency award
+    const gameScene = this.scene.get('GameScene') as GameScene;
+    const currentScore = gameScene?.getScore?.() ?? 0;
+
+    // Award currency for partial game progress
+    if (currentScore > 0) {
+      CurrencyManager.getInstance().awardCurrencyFromScore(currentScore);
     }
+
+    // Stop all game-related scenes
+    this.scene.stop('GameScene');
+    this.scene.stop('UIScene');
+    this.scene.stop();
+
+    // Go directly to menu
+    this.scene.start('MenuScene');
   }
 }

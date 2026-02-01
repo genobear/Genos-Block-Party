@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, PLAY_AREA_Y, PLAYABLE_HEIGHT, IS_TOUCH_DEVICE, MOBILE_TOUCH_ZONE_HEIGHT, UI_BORDER_BOTTOM } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
+import { GameScene } from './GameScene';
+import { CurrencyManager } from '../systems/CurrencyManager';
+import { AudioManager } from '../systems/AudioManager';
 
 interface PowerUpIndicator {
   container: Phaser.GameObjects.Container;
@@ -495,9 +498,24 @@ export class UIScene extends Phaser.Scene {
   // Public method to quit to menu (called from PauseScene)
   public quitToMenu(): void {
     this.isPaused = false;
+
+    // Get current score from GameScene for currency award
+    const gameScene = this.scene.get('GameScene') as GameScene;
+    const currentScore = gameScene?.getScore?.() ?? 0;
+
+    // Award currency for partial game progress
+    if (currentScore > 0) {
+      CurrencyManager.getInstance().awardCurrencyFromScore(currentScore);
+    }
+
+    // Handle audio transition
+    AudioManager.getInstance().handleReturnToMenu();
+
     this.scene.stop('GameScene');
     this.scene.stop('PauseScene');
     this.scene.stop('UIScene');
+
+    // Go directly to menu
     this.scene.start('MenuScene');
   }
 }

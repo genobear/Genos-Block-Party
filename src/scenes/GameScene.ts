@@ -528,7 +528,7 @@ export class GameScene extends Phaser.Scene {
     // Emit game over event
     this.events.emit('gameOver');
 
-    // Transition to game over scene
+    // Transition to game over scene (currency awarded there)
     this.time.delayedCall(500, () => {
       this.scene.stop('UIScene');
       this.scene.start('GameOverScene', { score: this.score, isWin: false });
@@ -548,7 +548,7 @@ export class GameScene extends Phaser.Scene {
     // Emit game win event
     this.events.emit('gameWin');
 
-    // Transition to game over scene (with win state)
+    // Transition to game over scene (currency awarded there)
     this.time.delayedCall(500, () => {
       this.scene.stop('UIScene');
       this.scene.start('GameOverScene', { score: this.score, isWin: true });
@@ -558,6 +558,13 @@ export class GameScene extends Phaser.Scene {
   private addScore(points: number): void {
     this.score += points;
     this.events.emit('scoreUpdate', this.score);
+  }
+
+  /**
+   * Get the current score (for PauseScene quit flow)
+   */
+  public getScore(): number {
+    return this.score;
   }
 
   /**

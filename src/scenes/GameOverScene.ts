@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS, AUDIO } from '../config/Constants';
+import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
+import { CurrencyManager } from '../systems/CurrencyManager';
+import { TransitionManager } from '../systems/TransitionManager';
+import { AUDIO } from '../config/Constants';
 
 interface HighScoreEntry {
   initials: string;
@@ -10,6 +13,20 @@ interface HighScoreEntry {
 const STORAGE_KEY = 'genos-block-party-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 5;
 
+// Layout constants
+const PANEL_WIDTH = 320;
+const PANEL_PADDING = 16;
+const PANEL_GAP = 16;
+const PANEL_RADIUS = 12;
+
+// Colors
+const PANEL_BG = 0x1a1a2e;
+const PANEL_BORDER = 0x3d3d5c;
+
+// Animation timing
+const STAGGER_DELAY = 150;
+const PANEL_ANIM_DURATION = 400;
+
 export class GameOverScene extends Phaser.Scene {
   private finalScore: number = 0;
   private isWin: boolean = false;
@@ -17,6 +34,13 @@ export class GameOverScene extends Phaser.Scene {
   private currentInitials: string = '';
   private initialsText!: Phaser.GameObjects.Text;
   private cursorBlink!: Phaser.Time.TimerEvent;
+  private currencyEarned: number = 0;
+  private totalCurrency: number = 0;
+
+  // Track elements for transitions
+  private panelElements: Phaser.GameObjects.GameObject[] = [];
+  private decorations: Phaser.GameObjects.GameObject[] = [];
+  private isTransitioning: boolean = false;
 
   constructor() {
     super('GameOverScene');
@@ -26,13 +50,19 @@ export class GameOverScene extends Phaser.Scene {
     this.finalScore = data.score || 0;
     this.isWin = data.isWin || false;
     this.currentInitials = '';
+    this.panelElements = [];
+    this.decorations = [];
+    this.isTransitioning = false;
+
+    // Award currency immediately (visuals animate later)
+    const currencyManager = CurrencyManager.getInstance();
+    this.currencyEarned = currencyManager.awardCurrencyFromScore(this.finalScore);
+    this.totalCurrency = currencyManager.getTotalCurrency();
   }
 
   create(): void {
     // Play appropriate sound
     const audioManager = AudioManager.getInstance();
-
-    // Play trombone for game over, or airhorn for win
     if (this.isWin) {
       audioManager.playSFX(AUDIO.SFX.AIRHORN);
     } else {
@@ -43,8 +73,11 @@ export class GameOverScene extends Phaser.Scene {
     const leaderboard = this.getLeaderboard();
     this.isNewHighScore = this.checkIsHighScore(this.finalScore, leaderboard);
 
-    // Create background overlay
-    this.add.rectangle(
+    // Keep the level background (don't change it) - just set transparent camera
+    this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
+
+    // Create semi-transparent overlay
+    const overlay = this.add.rectangle(
       GAME_WIDTH / 2,
       GAME_HEIGHT / 2,
       GAME_WIDTH,
@@ -52,116 +85,436 @@ export class GameOverScene extends Phaser.Scene {
       0x000000,
       0.85
     );
+    this.panelElements.push(overlay);
 
-    // Create the main container
-    const container = this.add.container(GAME_WIDTH / 2, 0);
+    // Calculate vertical layout
+    const centerX = GAME_WIDTH / 2;
+    let currentY = 70;
 
-    // Title
-    const titleText = this.isWin ? 'YOU WIN!' : 'GAME OVER';
-    const titleColor = this.isWin ? '#4ade80' : '#ff6b6b';
+    // 1. Title with glow effect
+    currentY = this.createTitle(centerX, currentY);
 
-    const title = this.add.text(0, 80, titleText, {
-      font: 'bold 56px Arial',
-      color: titleColor,
-    }).setOrigin(0.5);
-    container.add(title);
+    // 2. Score panel
+    currentY = this.createScorePanel(centerX, currentY, STAGGER_DELAY);
 
-    // Animate title
-    this.tweens.add({
-      targets: title,
-      scale: { from: 0, to: 1 },
-      duration: 500,
-      ease: 'Back.easeOut',
-    });
+    // 3. Currency panel
+    currentY = this.createCurrencyPanel(centerX, currentY, STAGGER_DELAY * 2);
 
-    // Score display
-    const scoreLabel = this.add.text(0, 150, 'FINAL SCORE', {
-      font: 'bold 16px Arial',
-      color: '#888888',
-    }).setOrigin(0.5);
-    container.add(scoreLabel);
-
-    const scoreText = this.add.text(0, 185, this.finalScore.toString(), {
-      font: 'bold 48px Arial',
-      color: '#ffd93d',
-    }).setOrigin(0.5);
-    container.add(scoreText);
-
-    // Animate score counting up
-    this.tweens.addCounter({
-      from: 0,
-      to: this.finalScore,
-      duration: 1500,
-      ease: 'Power2',
-      onUpdate: (tween) => {
-        const value = tween.getValue();
-        if (value !== null) {
-          scoreText.setText(Math.floor(value).toString());
-        }
-      },
-    });
-
+    // 4. Leaderboard panel (or high score entry)
     if (this.isNewHighScore) {
-      this.createHighScoreEntry(container);
+      currentY = this.createHighScoreEntryPanel(centerX, currentY, leaderboard, STAGGER_DELAY * 3);
     } else {
-      this.createLeaderboardDisplay(container, leaderboard);
-      this.createActionButtons(container, 350);
+      currentY = this.createLeaderboardPanel(centerX, currentY, leaderboard, STAGGER_DELAY * 3);
     }
+
+    // 5. Action buttons
+    this.createActionButtons(centerX, currentY + PANEL_GAP, STAGGER_DELAY * 4);
 
     // Add decorative particles
     this.createParticles();
   }
 
-  private createHighScoreEntry(container: Phaser.GameObjects.Container): void {
-    // New high score announcement
-    const newHighText = this.add.text(0, 240, 'NEW HIGH SCORE!', {
-      font: 'bold 24px Arial',
-      color: '#ff69b4',
-    }).setOrigin(0.5);
-    container.add(newHighText);
+  private createTitle(x: number, y: number): number {
+    const titleText = this.isWin ? 'YOU WIN!' : 'GAME OVER';
+    const titleColor = this.isWin ? '#4ade80' : '#ff6b6b';
 
-    // Flash animation
+    // Outer glow layer (large, very soft)
+    const glowOuter = this.add.text(x, y, titleText, {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '52px',
+      color: titleColor,
+    }).setOrigin(0.5).setAlpha(0.15).setScale(1.15);
+    this.panelElements.push(glowOuter);
+
+    // Inner glow layer (medium soft)
+    const glowInner = this.add.text(x, y, titleText, {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '52px',
+      color: titleColor,
+    }).setOrigin(0.5).setAlpha(0.25).setScale(1.08);
+    this.panelElements.push(glowInner);
+
+    // Main title
+    const title = this.add.text(x, y, titleText, {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '52px',
+      color: titleColor,
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    this.panelElements.push(title);
+
+    // Animate title entrance
+    title.setScale(0);
+    glowInner.setScale(0);
+    glowOuter.setScale(0);
+
     this.tweens.add({
-      targets: newHighText,
-      alpha: 0.5,
-      duration: 300,
+      targets: title,
+      scale: 1,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: glowInner,
+      scale: 1.08,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: glowOuter,
+      scale: 1.15,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    // Subtle glow pulse on outer layer
+    this.tweens.add({
+      targets: glowOuter,
+      alpha: { from: 0.15, to: 0.25 },
+      scaleX: { from: 1.15, to: 1.25 },
+      scaleY: { from: 1.15, to: 1.25 },
+      duration: 1500,
       yoyo: true,
       repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    return y + 70;
+  }
+
+  private createScorePanel(x: number, topY: number, delay: number): number {
+    const panelHeight = 90;
+    const centerY = topY + panelHeight / 2;
+    this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
+
+    // Label
+    const label = this.add.text(x, centerY - 15, 'FINAL SCORE', {
+      fontFamily: 'Arial',
+      fontSize: '14px',
+      color: '#888888',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(label);
+
+    // Score value with count-up
+    const scoreText = this.add.text(x, centerY + 18, '0', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '42px',
+      color: '#ffd93d',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(scoreText);
+
+    // Animate panel contents
+    this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+      this.tweens.add({
+        targets: [label, scoreText],
+        alpha: 1,
+        duration: 200,
+      });
+
+      // Count up score
+      this.tweens.addCounter({
+        from: 0,
+        to: this.finalScore,
+        duration: 1200,
+        ease: 'Power2',
+        onUpdate: (tween) => {
+          const value = tween.getValue();
+          if (value !== null) {
+            scoreText.setText(Math.floor(value).toLocaleString());
+          }
+        },
+      });
+    });
+
+    return topY + panelHeight + PANEL_GAP;
+  }
+
+  private createCurrencyPanel(x: number, topY: number, delay: number): number {
+    const panelHeight = 115;
+    const centerY = topY + panelHeight / 2;
+    this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
+
+    // Earned label
+    const earnedLabel = this.add.text(x, centerY - 30, 'COINS EARNED', {
+      fontFamily: 'Arial',
+      fontSize: '12px',
+      color: '#888888',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(earnedLabel);
+
+    // Earned amount (green, prominent)
+    const earnedText = this.add.text(x, centerY - 5, '+0', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '32px',
+      color: '#4ade80',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(earnedText);
+
+    // Divider line
+    const divider = this.add.rectangle(x, centerY + 22, PANEL_WIDTH - 60, 1, 0x444444).setAlpha(0);
+    this.panelElements.push(divider);
+
+    // Total label and value
+    const totalText = this.add.text(x, centerY + 40, 'Total: 0', {
+      fontFamily: 'Arial',
+      fontSize: '16px',
+      color: '#aaaaaa',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(totalText);
+
+    // Animate panel contents
+    this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+      this.tweens.add({
+        targets: [earnedLabel, earnedText, divider, totalText],
+        alpha: 1,
+        duration: 200,
+      });
+
+      // Count up earned currency
+      this.tweens.addCounter({
+        from: 0,
+        to: this.currencyEarned,
+        duration: 1000,
+        ease: 'Power2',
+        onUpdate: (tween) => {
+          const value = tween.getValue();
+          if (value !== null) {
+            earnedText.setText(`+${Math.floor(value)}`);
+          }
+        },
+        onComplete: () => {
+          // Pulse on complete
+          this.tweens.add({
+            targets: earnedText,
+            scale: { from: 1, to: 1.15 },
+            yoyo: true,
+            duration: 150,
+          });
+        },
+      });
+
+      // Count up total (from previous to new)
+      const previousTotal = this.totalCurrency - this.currencyEarned;
+      this.time.delayedCall(600, () => {
+        this.tweens.addCounter({
+          from: previousTotal,
+          to: this.totalCurrency,
+          duration: 500,
+          ease: 'Power2',
+          onUpdate: (tween) => {
+            const value = tween.getValue();
+            if (value !== null) {
+              totalText.setText(`Total: ${Math.floor(value).toLocaleString()}`);
+            }
+          },
+        });
+      });
+    });
+
+    return topY + panelHeight + PANEL_GAP;
+  }
+
+  private createLeaderboardPanel(
+    x: number,
+    topY: number,
+    leaderboard: HighScoreEntry[],
+    delay: number
+  ): number {
+    const entryHeight = 28;
+    const headerHeight = 35;
+    const panelHeight = headerHeight + Math.max(leaderboard.length, 1) * entryHeight + PANEL_PADDING;
+    const centerY = topY + panelHeight / 2;
+    this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
+
+    // Header
+    const header = this.add.text(x, topY + 20, 'LEADERBOARD', {
+      fontFamily: 'Arial',
+      fontSize: '16px',
+      color: '#a78bfa',
+      fontStyle: 'bold',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(header);
+
+    const startY = topY + headerHeight + 10;
+
+    // Animate header
+    this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+      this.tweens.add({
+        targets: header,
+        alpha: 1,
+        duration: 200,
+      });
+    });
+
+    if (leaderboard.length === 0) {
+      const noScores = this.add.text(x, startY + 20, 'No scores yet!', {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#666666',
+        fontStyle: 'italic',
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(noScores);
+
+      this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.7, () => {
+        this.tweens.add({
+          targets: noScores,
+          alpha: 1,
+          duration: 200,
+        });
+      });
+    } else {
+      leaderboard.forEach((entry, index) => {
+        const entryY = startY + index * entryHeight;
+        const isCurrentScore = entry.score === this.finalScore;
+        const textColor = isCurrentScore ? '#ffd93d' : '#ffffff';
+        const rankColor = isCurrentScore ? '#ffd93d' : '#666666';
+
+        // Rank
+        const rank = this.add.text(x - 120, entryY, `${index + 1}.`, {
+          fontFamily: 'Arial',
+          fontSize: '16px',
+          color: rankColor,
+          fontStyle: 'bold',
+        }).setOrigin(0, 0.5).setAlpha(0);
+        this.panelElements.push(rank);
+
+        // Initials
+        const initials = this.add.text(x - 80, entryY, entry.initials, {
+          fontFamily: 'Arial',
+          fontSize: '16px',
+          color: textColor,
+          fontStyle: 'bold',
+        }).setOrigin(0, 0.5).setAlpha(0);
+        this.panelElements.push(initials);
+
+        // Score
+        const score = this.add.text(x + 120, entryY, entry.score.toLocaleString(), {
+          fontFamily: 'Arial',
+          fontSize: '16px',
+          color: textColor,
+        }).setOrigin(1, 0.5).setAlpha(0);
+        this.panelElements.push(score);
+
+        // Stagger entry animations
+        this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5 + index * 50, () => {
+          this.tweens.add({
+            targets: [rank, initials, score],
+            alpha: 1,
+            y: { from: entryY + 10, to: entryY },
+            duration: 250,
+            ease: 'Back.easeOut',
+          });
+        });
+      });
+    }
+
+    return topY + panelHeight + PANEL_GAP;
+  }
+
+  private createHighScoreEntryPanel(
+    x: number,
+    topY: number,
+    _leaderboard: HighScoreEntry[],
+    delay: number
+  ): number {
+    const panelHeight = 180;
+    const centerY = topY + panelHeight / 2;
+    this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
+
+    // New high score announcement
+    const announcement = this.add.text(x, centerY - 55, 'NEW HIGH SCORE!', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '22px',
+      color: '#ff69b4',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(announcement);
+
+    // Flash animation for announcement
+    this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+      this.tweens.add({
+        targets: announcement,
+        alpha: 1,
+        duration: 200,
+      });
+
+      this.tweens.add({
+        targets: announcement,
+        alpha: { from: 1, to: 0.6 },
+        duration: 400,
+        yoyo: true,
+        repeat: -1,
+      });
     });
 
     // Enter initials prompt
-    const promptText = this.add.text(0, 290, 'Enter your initials:', {
-      font: '18px Arial',
-      color: '#ffffff',
-    }).setOrigin(0.5);
-    container.add(promptText);
+    const prompt = this.add.text(x, centerY - 20, 'Enter your initials:', {
+      fontFamily: 'Arial',
+      fontSize: '16px',
+      color: '#aaaaaa',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(prompt);
 
-    // Initials display boxes
+    // Initial boxes
     const boxWidth = 50;
-    const boxSpacing = 10;
+    const boxSpacing = 12;
     const totalWidth = 3 * boxWidth + 2 * boxSpacing;
-    const startX = -totalWidth / 2 + boxWidth / 2;
+    const startBoxX = x - totalWidth / 2 + boxWidth / 2;
 
     for (let i = 0; i < 3; i++) {
       const box = this.add.rectangle(
-        startX + i * (boxWidth + boxSpacing),
-        340,
+        startBoxX + i * (boxWidth + boxSpacing),
+        centerY + 25,
         boxWidth,
-        60,
-        0x333333
-      ).setStrokeStyle(2, 0x888888);
-      container.add(box);
+        55,
+        0x2d2d44
+      ).setStrokeStyle(2, 0x8b5cf6).setAlpha(0);
+      this.panelElements.push(box);
     }
 
     // Initials text
-    this.initialsText = this.add.text(0, 340, '___', {
-      font: 'bold 36px Arial',
+    this.initialsText = this.add.text(x, centerY + 25, '___', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '32px',
       color: '#ffffff',
-      letterSpacing: 20,
-    }).setOrigin(0.5);
-    container.add(this.initialsText);
+      letterSpacing: 24,
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(this.initialsText);
 
-    // Blinking cursor effect
+    // Instructions
+    const instructions = this.add.text(x, centerY + 70, 'Type 3 letters, then press ENTER', {
+      fontFamily: 'Arial',
+      fontSize: '12px',
+      color: '#666666',
+    }).setOrigin(0.5).setAlpha(0);
+    this.panelElements.push(instructions);
+
+    // Animate contents
+    this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+      this.tweens.add({
+        targets: [prompt, this.initialsText, instructions],
+        alpha: 1,
+        duration: 200,
+      });
+
+      // Fade in boxes
+      const boxes = this.panelElements.filter(
+        (el) => el instanceof Phaser.GameObjects.Rectangle && (el as Phaser.GameObjects.Rectangle).fillColor === 0x2d2d44
+      );
+      this.tweens.add({
+        targets: boxes,
+        alpha: 1,
+        duration: 200,
+      });
+    });
+
+    // Blinking cursor
     this.cursorBlink = this.time.addEvent({
       delay: 500,
       callback: this.blinkCursor,
@@ -169,18 +522,154 @@ export class GameOverScene extends Phaser.Scene {
       loop: true,
     });
 
-    // Set up keyboard input
+    // Keyboard input
     this.input.keyboard?.on('keydown', this.handleKeyInput, this);
 
-    // Instructions
-    const instructions = this.add.text(0, 400, 'Type 3 letters, then press ENTER', {
-      font: '14px Arial',
-      color: '#888888',
-    }).setOrigin(0.5);
-    container.add(instructions);
+    return topY + panelHeight + PANEL_GAP;
+  }
 
-    // Create action buttons (positioned lower)
-    this.createActionButtons(container, 470);
+  private createPanel(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    delay: number
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+
+    // Background
+    const bg = this.add.graphics();
+    bg.fillStyle(PANEL_BG, 0.9);
+    bg.fillRoundedRect(-width / 2, -height / 2, width, height, PANEL_RADIUS);
+    bg.lineStyle(2, PANEL_BORDER, 0.8);
+    bg.strokeRoundedRect(-width / 2, -height / 2, width, height, PANEL_RADIUS);
+    container.add(bg);
+
+    // Initial state for animation
+    container.setAlpha(0);
+    container.setY(y + 30);
+
+    // Animate entrance
+    this.tweens.add({
+      targets: container,
+      y: y,
+      alpha: 1,
+      duration: PANEL_ANIM_DURATION,
+      ease: 'Back.easeOut',
+      delay: delay,
+    });
+
+    this.panelElements.push(container);
+    return container;
+  }
+
+  private createActionButtons(x: number, y: number, delay: number): void {
+    const buttonWidth = 140;
+    const buttonHeight = 45;
+    const buttonGap = 20;
+
+    // Play Again button
+    const playAgainBtn = this.createButton(
+      x - buttonWidth / 2 - buttonGap / 2,
+      y,
+      buttonWidth,
+      buttonHeight,
+      'PLAY AGAIN',
+      COLORS.PADDLE,
+      () => this.startGameWithTransition()
+    );
+
+    // Menu button
+    const menuBtn = this.createButton(
+      x + buttonWidth / 2 + buttonGap / 2,
+      y,
+      buttonWidth,
+      buttonHeight,
+      'MENU',
+      0x4a4a6a,
+      () => this.goToMenuWithTransition()
+    );
+
+    // Animate buttons
+    [playAgainBtn, menuBtn].forEach((btn, i) => {
+      btn.setAlpha(0);
+      btn.setY(y + 20);
+
+      this.tweens.add({
+        targets: btn,
+        y: y,
+        alpha: 1,
+        duration: 300,
+        ease: 'Back.easeOut',
+        delay: delay + i * 80,
+      });
+    });
+
+    // Delayed keyboard input
+    this.time.delayedCall(1000, () => {
+      this.input.keyboard?.on('keydown-SPACE', () => {
+        if (!this.isTransitioning && (!this.isNewHighScore || this.currentInitials.length === 3)) {
+          this.startGameWithTransition();
+        }
+      });
+    });
+  }
+
+  private createButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    text: string,
+    color: number,
+    onClick: () => void
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+
+    // Glow layer
+    const glow = this.add.rectangle(0, 0, width + 8, height + 8, color, 0.3);
+    container.add(glow);
+    glow.setVisible(false);
+
+    // Button background
+    const bg = this.add.graphics();
+    bg.fillStyle(color, 1);
+    bg.fillRoundedRect(-width / 2, -height / 2, width, height, 8);
+    container.add(bg);
+
+    // Button text
+    const btnText = this.add.text(0, 0, text, {
+      fontFamily: 'Arial',
+      fontSize: '16px',
+      color: '#ffffff',
+      fontStyle: 'bold',
+    }).setOrigin(0.5);
+    container.add(btnText);
+
+    // Make interactive
+    const hitArea = this.add.rectangle(0, 0, width, height, 0x000000, 0)
+      .setInteractive({ useHandCursor: true });
+    container.add(hitArea);
+
+    hitArea.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      glow.setVisible(true);
+      container.setScale(1.05);
+    });
+
+    hitArea.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      glow.setVisible(false);
+      container.setScale(1);
+    });
+
+    hitArea.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      onClick();
+    });
+
+    this.panelElements.push(container);
+    return container;
   }
 
   private blinkCursor(): void {
@@ -191,7 +680,6 @@ export class GameOverScene extends Phaser.Scene {
 
     if (cursorPos < 3) {
       const visible = this.initialsText.alpha === 1;
-      // Just toggle the underscore visibility at cursor position
       const chars = display.split('');
       if (!visible) {
         chars[cursorPos] = ' ';
@@ -202,6 +690,8 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private handleKeyInput(event: KeyboardEvent): void {
+    if (this.isTransitioning) return;
+
     const key = event.key.toUpperCase();
 
     if (key === 'BACKSPACE' && this.currentInitials.length > 0) {
@@ -221,9 +711,10 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private submitHighScore(): void {
-    // Stop input handling
     this.input.keyboard?.off('keydown', this.handleKeyInput, this);
-    this.cursorBlink.remove();
+    if (this.cursorBlink) {
+      this.cursorBlink.remove();
+    }
 
     // Save to leaderboard
     const leaderboard = this.getLeaderboard();
@@ -232,14 +723,12 @@ export class GameOverScene extends Phaser.Scene {
       score: this.finalScore,
     });
 
-    // Sort and trim
     leaderboard.sort((a, b) => b.score - a.score);
     leaderboard.splice(MAX_LEADERBOARD_ENTRIES);
 
-    // Save
     localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
 
-    // Also update legacy high score for menu display
+    // Update legacy high score
     const currentHigh = parseInt(localStorage.getItem('genos-block-party-highscore') || '0', 10);
     if (this.finalScore > currentHigh) {
       localStorage.setItem('genos-block-party-highscore', this.finalScore.toString());
@@ -254,144 +743,45 @@ export class GameOverScene extends Phaser.Scene {
       yoyo: true,
     });
 
-    // Show leaderboard after delay
+    // Restart scene to show leaderboard
     this.time.delayedCall(500, () => {
+      this.isNewHighScore = false;
       this.scene.restart({ score: this.finalScore, isWin: this.isWin });
     });
   }
 
-  private createLeaderboardDisplay(
-    container: Phaser.GameObjects.Container,
-    leaderboard: HighScoreEntry[]
-  ): void {
-    // Leaderboard header
-    const header = this.add.text(0, 260, 'LEADERBOARD', {
-      font: 'bold 20px Arial',
-      color: '#a78bfa',
-    }).setOrigin(0.5);
-    container.add(header);
-
-    // Leaderboard entries
-    const startY = 295;
-    const lineHeight = 30;
-
-    if (leaderboard.length === 0) {
-      const noScores = this.add.text(0, startY + 30, 'No scores yet!', {
-        font: '18px Arial',
-        color: '#666666',
-      }).setOrigin(0.5);
-      container.add(noScores);
-    } else {
-      leaderboard.forEach((entry, index) => {
-        const isCurrentScore = entry.score === this.finalScore &&
-                               entry.initials === this.currentInitials;
-
-        const rank = this.add.text(-100, startY + index * lineHeight, `${index + 1}.`, {
-          font: 'bold 18px Arial',
-          color: isCurrentScore ? '#ffd93d' : '#888888',
-        }).setOrigin(0, 0.5);
-        container.add(rank);
-
-        const initials = this.add.text(-60, startY + index * lineHeight, entry.initials, {
-          font: 'bold 18px Arial',
-          color: isCurrentScore ? '#ffd93d' : '#ffffff',
-        }).setOrigin(0, 0.5);
-        container.add(initials);
-
-        const score = this.add.text(100, startY + index * lineHeight, entry.score.toString(), {
-          font: '18px Arial',
-          color: isCurrentScore ? '#ffd93d' : '#ffffff',
-        }).setOrigin(1, 0.5);
-        container.add(score);
-      });
-    }
-  }
-
-  private createActionButtons(container: Phaser.GameObjects.Container, yPosition: number): void {
-    // Play Again button
-    const playAgainBtn = this.createButton(
-      -100,
-      yPosition,
-      'PLAY AGAIN',
-      COLORS.PADDLE,
-      () => this.restartGame()
-    );
-    container.add(playAgainBtn);
-
-    // Menu button
-    const menuBtn = this.createButton(
-      100,
-      yPosition,
-      'MENU',
-      0x666666,
-      () => this.goToMenu()
-    );
-    container.add(menuBtn);
-
-    // Add delayed input enable
-    this.time.delayedCall(1000, () => {
-      this.input.keyboard?.on('keydown-SPACE', () => this.restartGame());
-      this.input.keyboard?.on('keydown-ENTER', () => {
-        if (!this.isNewHighScore || this.currentInitials.length === 3) {
-          this.restartGame();
-        }
-      });
-    });
-  }
-
-  private createButton(
-    x: number,
-    y: number,
-    text: string,
-    color: number,
-    onClick: () => void
-  ): Phaser.GameObjects.Container {
-    const buttonContainer = this.add.container(x, y);
-
-    const bg = this.add.rectangle(0, 0, 160, 45, color)
-      .setInteractive({ useHandCursor: true });
-    buttonContainer.add(bg);
-
-    const buttonText = this.add.text(0, 0, text, {
-      font: 'bold 16px Arial',
-      color: '#ffffff',
-    }).setOrigin(0.5);
-    buttonContainer.add(buttonText);
-
-    bg.on('pointerover', () => buttonContainer.setScale(1.05));
-    bg.on('pointerout', () => buttonContainer.setScale(1));
-    bg.on('pointerdown', onClick);
-
-    return buttonContainer;
-  }
-
   private createParticles(): void {
-    // Create celebratory particles if won
-    if (this.isWin) {
-      for (let i = 0; i < 30; i++) {
-        const x = Phaser.Math.Between(50, GAME_WIDTH - 50);
-        const y = Phaser.Math.Between(50, GAME_HEIGHT - 100);
-        const colors = [0xff69b4, 0xffa500, 0x00bfff, 0xffd93d, 0x4ade80];
-        const color = Phaser.Utils.Array.GetRandom(colors);
-        const size = Phaser.Math.Between(3, 8);
+    if (!this.isWin) return;
 
-        const particle = this.add.circle(x, -20, size, color, 0.8);
+    // Confetti particles for win
+    for (let i = 0; i < 40; i++) {
+      const x = Phaser.Math.Between(50, GAME_WIDTH - 50);
+      const y = Phaser.Math.Between(50, GAME_HEIGHT - 150);
+      const colors = [0xff69b4, 0xffa500, 0x00bfff, 0xffd93d, 0x4ade80, 0xa78bfa];
+      const color = Phaser.Utils.Array.GetRandom(colors);
+      const size = Phaser.Math.Between(4, 10);
 
-        this.tweens.add({
-          targets: particle,
-          y: y,
-          duration: Phaser.Math.Between(1000, 2000),
-          ease: 'Bounce.easeOut',
-          delay: Phaser.Math.Between(0, 500),
-        });
+      const particle = this.add.rectangle(x, -30, size, size * 1.5, color, 0.9);
+      particle.setRotation(Phaser.Math.DegToRad(Phaser.Math.Between(0, 360)));
+      this.decorations.push(particle);
 
-        this.tweens.add({
-          targets: particle,
-          alpha: 0,
-          duration: 3000,
-          delay: 2000,
-        });
-      }
+      // Fall animation
+      this.tweens.add({
+        targets: particle,
+        y: y,
+        rotation: particle.rotation + Phaser.Math.DegToRad(Phaser.Math.Between(-360, 360)),
+        duration: Phaser.Math.Between(1500, 2500),
+        ease: 'Bounce.easeOut',
+        delay: Phaser.Math.Between(0, 800),
+      });
+
+      // Fade out
+      this.tweens.add({
+        targets: particle,
+        alpha: 0,
+        duration: 2000,
+        delay: 3000,
+      });
     }
   }
 
@@ -413,19 +803,48 @@ export class GameOverScene extends Phaser.Scene {
     return score > leaderboard[leaderboard.length - 1].score;
   }
 
-  private restartGame(): void {
-    this.scene.stop('UIScene');
-    this.scene.stop();
-    this.scene.start('GameScene');
+  private startGameWithTransition(): void {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+
+    const transitionManager = TransitionManager.getInstance();
+    transitionManager.init(this);
+
+    const allElements = [...this.panelElements, ...this.decorations];
+
+    transitionManager.transition(
+      'menu-to-game',
+      1,
+      allElements,
+      () => {
+        this.scene.stop('UIScene');
+        this.scene.stop();
+        this.scene.start('GameScene');
+      }
+    );
   }
 
-  private goToMenu(): void {
-    // Handle return to menu - rebuilds playlist based on level lock setting
+  private goToMenuWithTransition(): void {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+
     const audioManager = AudioManager.getInstance();
     audioManager.handleReturnToMenu();
 
-    this.scene.stop('UIScene');
-    this.scene.stop();
-    this.scene.start('MenuScene');
+    const transitionManager = TransitionManager.getInstance();
+    transitionManager.init(this);
+
+    const allElements = [...this.panelElements, ...this.decorations];
+
+    transitionManager.transition(
+      'game-over-to-menu',
+      1,
+      allElements,
+      () => {
+        this.scene.stop('UIScene');
+        this.scene.stop();
+        this.scene.start('MenuScene');
+      }
+    );
   }
 }

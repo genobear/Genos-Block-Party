@@ -99,3 +99,18 @@ export const AUDIO = {
   // LocalStorage key for audio settings
   STORAGE_KEY: 'genos-block-party-audio',
 } as const;
+
+// Currency settings
+export const CURRENCY = {
+  // LocalStorage key
+  STORAGE_KEY: 'genos-block-party-currency',
+
+  // Score-to-currency conversion (tiered square root formula)
+  SQRT_MULTIPLIER: 0.5,
+  TIER_THRESHOLDS: [1000, 5000, 10000, 25000] as const,
+  TIER_BONUSES: [5, 10, 20, 30] as const,
+
+  // Award scene timing (ms)
+  AWARD_SCENE_DURATION: 5000,  // Cooldown after animations complete
+  COUNT_UP_DURATION: 1500,
+} as const;
