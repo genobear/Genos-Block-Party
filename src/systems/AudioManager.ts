@@ -45,6 +45,10 @@ export class AudioManager {
   private currentLevelNumber: number = -1;
   private isTransitioning: boolean = false;
 
+  // Track ALL active music sounds to prevent orphaned audio during interrupted crossfades
+  private activeMusicSounds: Set<Phaser.Sound.BaseSound> = new Set();
+  private transitionAbortController: AbortController | null = null;
+
   // User's selected station from Music Player (used when forceLevelMusic is false)
   private selectedStation: 'all' | number | null = 'all';  // 'all', level number, or null for menu
 
@@ -400,8 +404,50 @@ export class AudioManager {
       await this.fadeOut(this.currentMusic, AUDIO.CROSSFADE_DURATION);
     }
 
-    this.currentMusic.destroy();
+    this.destroyMusicSound(this.currentMusic);
     this.currentMusic = null;
+  }
+
+  /**
+   * Stop ALL active music sounds immediately (no fade)
+   * Use this to guarantee a clean state - prevents orphaned audio from interrupted crossfades
+   */
+  stopAllMusic(): void {
+    // Abort any in-progress transition
+    if (this.transitionAbortController) {
+      this.transitionAbortController.abort();
+      this.transitionAbortController = null;
+    }
+
+    // Stop and destroy EVERY tracked sound
+    this.activeMusicSounds.forEach(sound => {
+      try {
+        sound.stop();
+        sound.destroy();
+      } catch {
+        // Sound may already be destroyed
+      }
+    });
+    this.activeMusicSounds.clear();
+
+    // Reset state
+    this.currentMusic = null;
+    this.currentTrackMetadata = null;
+    this.isTransitioning = false;
+  }
+
+  /**
+   * Safely destroy a music sound and remove from tracking
+   */
+  private destroyMusicSound(sound: Phaser.Sound.BaseSound | null): void {
+    if (!sound) return;
+    this.activeMusicSounds.delete(sound);
+    try {
+      sound.stop();
+      sound.destroy();
+    } catch {
+      // Sound may already be destroyed
+    }
   }
 
   /**
@@ -717,6 +763,7 @@ export class AudioManager {
 
   /**
    * Crossfade from current track to a new track
+   * Interruption-safe: can be called while another crossfade is in progress
    * Never loops individual tracks - playlist provides continuous playback
    */
   private async crossfadeTo(key: string): Promise<void> {
@@ -728,6 +775,18 @@ export class AudioManager {
       return;
     }
 
+    // Abort any in-progress transition - this is the key fix for overlapping audio
+    if (this.transitionAbortController) {
+      this.transitionAbortController.abort();
+    }
+
+    // Capture old track before we do anything
+    const oldTrack = this.currentMusic;
+
+    // Create abort controller for THIS transition
+    this.transitionAbortController = new AbortController();
+    const signal = this.transitionAbortController.signal;
+
     this.isTransitioning = true;
 
     // Create the new track at volume 0 (never loop - playlist handles continuity)
@@ -736,64 +795,61 @@ export class AudioManager {
       loop: false,
     });
 
+    // Track the new sound IMMEDIATELY - prevents orphaned audio
+    this.activeMusicSounds.add(newTrack);
+
     // Start playing new track
     newTrack.play();
 
-    // Fade out old track (if exists) and fade in new track simultaneously
-    const fadePromises: Promise<void>[] = [];
+    try {
+      // Fade out old track (if exists) and fade in new track simultaneously
+      await Promise.all([
+        oldTrack
+          ? this.fadeOutWithAbort(oldTrack, AUDIO.CROSSFADE_DURATION, signal)
+          : Promise.resolve(),
+        this.fadeInWithAbort(newTrack, AUDIO.CROSSFADE_DURATION, signal),
+      ]);
 
-    if (this.currentMusic) {
-      fadePromises.push(this.fadeOut(this.currentMusic, AUDIO.CROSSFADE_DURATION));
-    }
+      // Only proceed if not aborted
+      if (!signal.aborted) {
+        // Clean up old track
+        if (oldTrack) {
+          this.destroyMusicSound(oldTrack);
+        }
 
-    fadePromises.push(this.fadeIn(newTrack, AUDIO.CROSSFADE_DURATION));
+        this.currentMusic = newTrack;
+        this.currentTrackMetadata = this.trackMetadataMap.get(key) || null;
 
-    await Promise.all(fadePromises);
+        // Notify all track change listeners
+        if (this.currentTrackMetadata) {
+          this.onTrackChangeCallbacks.forEach(callback => callback(this.currentTrackMetadata));
+        }
 
-    // Clean up old track
-    if (this.currentMusic) {
-      this.currentMusic.destroy();
-    }
-
-    this.currentMusic = newTrack;
-    this.currentTrackMetadata = this.trackMetadataMap.get(key) || null;
-    this.isTransitioning = false;
-
-    // Notify all track change listeners
-    if (this.currentTrackMetadata) {
-      this.onTrackChangeCallbacks.forEach(callback => callback(this.currentTrackMetadata));
-    }
-
-    // Always set up complete handler to play next from playlist
-    this.currentMusic.once('complete', () => {
-      if (!this.isTransitioning && this.currentPlaylist.length > 0) {
-        this.playNextTrack();
+        // Set up complete handler to play next from playlist
+        this.currentMusic.once('complete', () => {
+          if (!this.isTransitioning && this.currentPlaylist.length > 0) {
+            this.playNextTrack();
+          }
+        });
       }
-    });
+    } catch {
+      // Transition was aborted or failed
+      // Clean up the new track if it's orphaned (not the current track)
+      if (signal.aborted && this.currentMusic !== newTrack) {
+        this.destroyMusicSound(newTrack);
+      }
+    } finally {
+      // Only reset state if THIS transition wasn't aborted
+      // (if aborted, the NEW transition owns the state now)
+      if (!signal.aborted) {
+        this.isTransitioning = false;
+        this.transitionAbortController = null;
+      }
+    }
   }
 
   /**
-   * Fade in a sound
-   */
-  private fadeIn(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
-    return new Promise((resolve) => {
-      if (!this.scene?.tweens) {
-        // Scene or tweens not available - resolve immediately
-        resolve();
-        return;
-      }
-
-      this.scene.tweens.add({
-        targets: sound,
-        volume: this.settings.musicVolume,
-        duration,
-        onComplete: () => resolve(),
-      });
-    });
-  }
-
-  /**
-   * Fade out a sound
+   * Fade out a sound (used for stopMusic and fadeOutMusic)
    */
   private fadeOut(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
     return new Promise((resolve) => {
@@ -813,15 +869,89 @@ export class AudioManager {
   }
 
   /**
+   * Fade in a sound with abort support
+   * Rejects if aborted, allowing cleanup
+   */
+  private fadeInWithAbort(
+    sound: Phaser.Sound.BaseSound,
+    duration: number,
+    signal: AbortSignal
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.scene?.tweens) {
+        resolve();
+        return;
+      }
+
+      // Already aborted before we started
+      if (signal.aborted) {
+        reject(new Error('Fade aborted'));
+        return;
+      }
+
+      const tween = this.scene.tweens.add({
+        targets: sound,
+        volume: this.settings.musicVolume,
+        duration,
+        onComplete: () => {
+          signal.removeEventListener('abort', abortHandler);
+          resolve();
+        },
+      });
+
+      const abortHandler = () => {
+        tween.stop();
+        reject(new Error('Fade aborted'));
+      };
+      signal.addEventListener('abort', abortHandler);
+    });
+  }
+
+  /**
+   * Fade out a sound with abort support
+   * Rejects if aborted, allowing cleanup
+   */
+  private fadeOutWithAbort(
+    sound: Phaser.Sound.BaseSound,
+    duration: number,
+    signal: AbortSignal
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.scene?.tweens) {
+        resolve();
+        return;
+      }
+
+      // Already aborted before we started
+      if (signal.aborted) {
+        reject(new Error('Fade aborted'));
+        return;
+      }
+
+      const tween = this.scene.tweens.add({
+        targets: sound,
+        volume: 0,
+        duration,
+        onComplete: () => {
+          signal.removeEventListener('abort', abortHandler);
+          resolve();
+        },
+      });
+
+      const abortHandler = () => {
+        tween.stop();
+        reject(new Error('Fade aborted'));
+      };
+      signal.addEventListener('abort', abortHandler);
+    });
+  }
+
+  /**
    * Unload current level's music to free memory
    */
   unloadLevelMusic(): void {
-    // Stop current music
-    if (this.currentMusic) {
-      this.currentMusic.stop();
-      this.currentMusic.destroy();
-      this.currentMusic = null;
-    }
+    // Stop all tracked music sounds (includes current and any orphaned sounds)
+    this.stopAllMusic();
 
     // Remove loaded music from cache
     this.loadedMusicKeys.forEach(key => {
@@ -992,6 +1122,13 @@ export class AudioManager {
    * When level lock is OFF, continues with current playlist behavior
    */
   async handleReturnToMenu(): Promise<void> {
+    // Abort any in-progress transition to prevent orphaned audio
+    if (this.transitionAbortController) {
+      this.transitionAbortController.abort();
+      this.transitionAbortController = null;
+      this.isTransitioning = false;
+    }
+
     const wasInLevel = this.currentLevelNumber > 0;
     this.currentLevelNumber = -1;
 
@@ -1025,10 +1162,9 @@ export class AudioManager {
    * Note: For seamless transitions, prefer clearLevelState() + let new scene handle music
    */
   reset(): void {
-    this.stopMusic(false);
+    this.stopAllMusic();
     this.unloadLevelMusic();
     this.currentLevelNumber = -1;
-    this.currentTrackMetadata = null;
   }
 
   /**
@@ -1036,6 +1172,8 @@ export class AudioManager {
    * Note: Generally prefer reset() for scene transitions
    */
   destroy(): void {
-    this.reset();
+    this.stopAllMusic();
+    this.unloadLevelMusic();
+    this.currentLevelNumber = -1;
   }
 }

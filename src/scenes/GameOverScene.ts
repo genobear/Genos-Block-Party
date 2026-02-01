@@ -31,8 +31,9 @@ export class GameOverScene extends Phaser.Scene {
   private finalScore: number = 0;
   private isWin: boolean = false;
   private isNewHighScore: boolean = false;
+  private highScoreAlreadyEntered: boolean = false;
   private currentInitials: string = '';
-  private initialsText!: Phaser.GameObjects.Text;
+  private initialsTexts: Phaser.GameObjects.Text[] = [];
   private cursorBlink!: Phaser.Time.TimerEvent;
   private currencyEarned: number = 0;
   private totalCurrency: number = 0;
@@ -42,21 +43,33 @@ export class GameOverScene extends Phaser.Scene {
   private decorations: Phaser.GameObjects.GameObject[] = [];
   private isTransitioning: boolean = false;
 
+  // Track high score entry elements for dynamic replacement
+  private highScoreEntryElements: Phaser.GameObjects.GameObject[] = [];
+  private leaderboardPanelY: number = 0;
+
   constructor() {
     super('GameOverScene');
   }
 
-  init(data: { score: number; isWin: boolean }): void {
+  init(data: { score: number; isWin: boolean; currencyEarned?: number; skipCurrencyAward?: boolean; highScoreEntered?: boolean }): void {
     this.finalScore = data.score || 0;
     this.isWin = data.isWin || false;
     this.currentInitials = '';
     this.panelElements = [];
     this.decorations = [];
+    this.initialsTexts = [];
     this.isTransitioning = false;
+    this.highScoreEntryElements = [];
+    this.leaderboardPanelY = 0;
+    this.highScoreAlreadyEntered = data.highScoreEntered || false;
 
-    // Award currency immediately (visuals animate later)
+    // Award currency only on first entry, not on restart after high score submission
     const currencyManager = CurrencyManager.getInstance();
-    this.currencyEarned = currencyManager.awardCurrencyFromScore(this.finalScore);
+    if (data.skipCurrencyAward) {
+      this.currencyEarned = data.currencyEarned || 0;
+    } else {
+      this.currencyEarned = currencyManager.awardCurrencyFromScore(this.finalScore);
+    }
     this.totalCurrency = currencyManager.getTotalCurrency();
   }
 
@@ -69,9 +82,9 @@ export class GameOverScene extends Phaser.Scene {
       audioManager.playSFX(AUDIO.SFX.TROMBONE);
     }
 
-    // Check if this is a new high score
+    // Check if this is a new high score (unless already entered on previous visit)
     const leaderboard = this.getLeaderboard();
-    this.isNewHighScore = this.checkIsHighScore(this.finalScore, leaderboard);
+    this.isNewHighScore = !this.highScoreAlreadyEntered && this.checkIsHighScore(this.finalScore, leaderboard);
 
     // Keep the level background (don't change it) - just set transparent camera
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
@@ -117,24 +130,9 @@ export class GameOverScene extends Phaser.Scene {
   private createTitle(x: number, y: number): number {
     const titleText = this.isWin ? 'YOU WIN!' : 'GAME OVER';
     const titleColor = this.isWin ? '#4ade80' : '#ff6b6b';
+    const glowColor = this.isWin ? 0x4ade80 : 0xff6b6b;
 
-    // Outer glow layer (large, very soft)
-    const glowOuter = this.add.text(x, y, titleText, {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '52px',
-      color: titleColor,
-    }).setOrigin(0.5).setAlpha(0.15).setScale(1.15);
-    this.panelElements.push(glowOuter);
-
-    // Inner glow layer (medium soft)
-    const glowInner = this.add.text(x, y, titleText, {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '52px',
-      color: titleColor,
-    }).setOrigin(0.5).setAlpha(0.25).setScale(1.08);
-    this.panelElements.push(glowInner);
-
-    // Main title
+    // Single text object with shader-based glow
     const title = this.add.text(x, y, titleText, {
       fontFamily: 'Arial Black, Arial',
       fontSize: '52px',
@@ -144,11 +142,11 @@ export class GameOverScene extends Phaser.Scene {
     }).setOrigin(0.5);
     this.panelElements.push(title);
 
-    // Animate title entrance
-    title.setScale(0);
-    glowInner.setScale(0);
-    glowOuter.setScale(0);
+    // Apply GPU-accelerated glow effect
+    const glowEffect = title.postFX.addGlow(glowColor, 4, 0, false, 0.1, 24);
 
+    // Entrance animation
+    title.setScale(0);
     this.tweens.add({
       targets: title,
       scale: 1,
@@ -156,26 +154,10 @@ export class GameOverScene extends Phaser.Scene {
       ease: 'Back.easeOut',
     });
 
+    // Animated glow pulse (much smoother than scaling text layers)
     this.tweens.add({
-      targets: glowInner,
-      scale: 1.08,
-      duration: 500,
-      ease: 'Back.easeOut',
-    });
-
-    this.tweens.add({
-      targets: glowOuter,
-      scale: 1.15,
-      duration: 500,
-      ease: 'Back.easeOut',
-    });
-
-    // Subtle glow pulse on outer layer
-    this.tweens.add({
-      targets: glowOuter,
-      alpha: { from: 0.15, to: 0.25 },
-      scaleX: { from: 1.15, to: 1.25 },
-      scaleY: { from: 1.15, to: 1.25 },
+      targets: glowEffect,
+      outerStrength: { from: 4, to: 8 },
       duration: 1500,
       yoyo: true,
       repeat: -1,
@@ -424,9 +406,13 @@ export class GameOverScene extends Phaser.Scene {
     _leaderboard: HighScoreEntry[],
     delay: number
   ): number {
+    // Store position for later replacement with leaderboard
+    this.leaderboardPanelY = topY;
+
     const panelHeight = 180;
     const centerY = topY + panelHeight / 2;
-    this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
+    const panel = this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
+    this.highScoreEntryElements.push(panel);
 
     // New high score announcement
     const announcement = this.add.text(x, centerY - 55, 'NEW HIGH SCORE!', {
@@ -435,6 +421,7 @@ export class GameOverScene extends Phaser.Scene {
       color: '#ff69b4',
     }).setOrigin(0.5).setAlpha(0);
     this.panelElements.push(announcement);
+    this.highScoreEntryElements.push(announcement);
 
     // Flash animation for announcement
     this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
@@ -460,32 +447,37 @@ export class GameOverScene extends Phaser.Scene {
       color: '#aaaaaa',
     }).setOrigin(0.5).setAlpha(0);
     this.panelElements.push(prompt);
+    this.highScoreEntryElements.push(prompt);
 
-    // Initial boxes
+    // Initial boxes and text
     const boxWidth = 50;
     const boxSpacing = 12;
     const totalWidth = 3 * boxWidth + 2 * boxSpacing;
     const startBoxX = x - totalWidth / 2 + boxWidth / 2;
 
+    this.initialsTexts = [];
     for (let i = 0; i < 3; i++) {
+      const boxX = startBoxX + i * (boxWidth + boxSpacing);
       const box = this.add.rectangle(
-        startBoxX + i * (boxWidth + boxSpacing),
+        boxX,
         centerY + 25,
         boxWidth,
         55,
         0x2d2d44
       ).setStrokeStyle(2, 0x8b5cf6).setAlpha(0);
       this.panelElements.push(box);
-    }
+      this.highScoreEntryElements.push(box);
 
-    // Initials text
-    this.initialsText = this.add.text(x, centerY + 25, '___', {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '32px',
-      color: '#ffffff',
-      letterSpacing: 24,
-    }).setOrigin(0.5).setAlpha(0);
-    this.panelElements.push(this.initialsText);
+      // Individual text for each initial slot
+      const charText = this.add.text(boxX, centerY + 25, '_', {
+        fontFamily: 'Arial Black, Arial',
+        fontSize: '32px',
+        color: '#ffffff',
+      }).setOrigin(0.5).setAlpha(0);
+      this.initialsTexts.push(charText);
+      this.panelElements.push(charText);
+      this.highScoreEntryElements.push(charText);
+    }
 
     // Instructions
     const instructions = this.add.text(x, centerY + 70, 'Type 3 letters, then press ENTER', {
@@ -494,17 +486,18 @@ export class GameOverScene extends Phaser.Scene {
       color: '#666666',
     }).setOrigin(0.5).setAlpha(0);
     this.panelElements.push(instructions);
+    this.highScoreEntryElements.push(instructions);
 
     // Animate contents
     this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
       this.tweens.add({
-        targets: [prompt, this.initialsText, instructions],
+        targets: [prompt, ...this.initialsTexts, instructions],
         alpha: 1,
         duration: 200,
       });
 
       // Fade in boxes
-      const boxes = this.panelElements.filter(
+      const boxes = this.highScoreEntryElements.filter(
         (el) => el instanceof Phaser.GameObjects.Rectangle && (el as Phaser.GameObjects.Rectangle).fillColor === 0x2d2d44
       );
       this.tweens.add({
@@ -673,19 +666,15 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private blinkCursor(): void {
-    if (!this.initialsText) return;
+    if (this.initialsTexts.length === 0) return;
 
-    const display = this.currentInitials.padEnd(3, '_');
     const cursorPos = this.currentInitials.length;
 
     if (cursorPos < 3) {
-      const visible = this.initialsText.alpha === 1;
-      const chars = display.split('');
-      if (!visible) {
-        chars[cursorPos] = ' ';
-      }
-      this.initialsText.setText(chars.join(''));
-      this.initialsText.setAlpha(1);
+      const cursorText = this.initialsTexts[cursorPos];
+      // Toggle between underscore and empty for cursor blink
+      const currentText = cursorText.text;
+      cursorText.setText(currentText === '_' ? ' ' : '_');
     }
   }
 
@@ -706,8 +695,13 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private updateInitialsDisplay(): void {
-    const display = this.currentInitials.padEnd(3, '_');
-    this.initialsText.setText(display);
+    for (let i = 0; i < 3; i++) {
+      if (i < this.currentInitials.length) {
+        this.initialsTexts[i].setText(this.currentInitials[i]);
+      } else {
+        this.initialsTexts[i].setText('_');
+      }
+    }
   }
 
   private submitHighScore(): void {
@@ -735,18 +729,50 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     // Flash confirmation
-    this.initialsText.setColor('#4ade80');
+    this.initialsTexts.forEach(text => text.setColor('#4ade80'));
     this.tweens.add({
-      targets: this.initialsText,
+      targets: this.initialsTexts,
       scale: 1.2,
       duration: 200,
       yoyo: true,
     });
 
-    // Restart scene to show leaderboard
+    // Replace the high score entry panel with leaderboard
     this.time.delayedCall(500, () => {
-      this.isNewHighScore = false;
-      this.scene.restart({ score: this.finalScore, isWin: this.isWin });
+      this.replaceHighScoreEntryWithLeaderboard();
+    });
+  }
+
+  private replaceHighScoreEntryWithLeaderboard(): void {
+    // Fade out and destroy high score entry elements
+    this.tweens.add({
+      targets: this.highScoreEntryElements,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => {
+        // Remove from panelElements array
+        this.highScoreEntryElements.forEach(el => {
+          const index = this.panelElements.indexOf(el);
+          if (index > -1) {
+            this.panelElements.splice(index, 1);
+          }
+          el.destroy();
+        });
+        this.highScoreEntryElements = [];
+        this.initialsTexts = [];
+
+        // Get updated leaderboard and create the panel
+        const leaderboard = this.getLeaderboard();
+        this.createLeaderboardPanel(
+          GAME_WIDTH / 2,
+          this.leaderboardPanelY,
+          leaderboard,
+          0 // No delay - show immediately
+        );
+
+        // Mark that high score was entered so isNewHighScore is false
+        this.isNewHighScore = false;
+      }
     });
   }
 
