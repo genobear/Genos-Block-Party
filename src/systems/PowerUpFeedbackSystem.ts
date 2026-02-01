@@ -101,6 +101,17 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, alpha: 0.5 },
     },
   },
+  [PowerUpType.ELECTRICBALL]: {
+    displayName: 'ELECTRIC BALL!',
+    color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color,
+    particles: {
+      colors: [0x00ffff, 0x00e5ff, 0x40ffff, 0xffffff, 0xff00ff],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, alpha: 0.45 },
+    },
+  },
 };
 
 /**

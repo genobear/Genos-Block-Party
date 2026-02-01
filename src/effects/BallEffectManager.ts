@@ -4,6 +4,7 @@ import type { IBallEffect } from './handlers/BaseBallEffect';
 import { BallEffectType } from './BallEffectTypes';
 import { FireballEffectHandler } from './handlers/FireballEffectHandler';
 import { DiscoEffectHandler } from './handlers/DiscoEffectHandler';
+import { ElectricBallEffectHandler } from './handlers/ElectricBallEffectHandler';
 
 /**
  * Manages multiple simultaneous particle effects on a Ball
@@ -30,6 +31,7 @@ export class BallEffectManager {
     this.effectRegistry = new Map<BallEffectType, () => IBallEffect>([
       [BallEffectType.FIREBALL, () => new FireballEffectHandler(this.scene)],
       [BallEffectType.DISCO_SPARKLE, () => new DiscoEffectHandler(this.scene)],
+      [BallEffectType.ELECTRIC_TRAIL, () => new ElectricBallEffectHandler(this.scene)],
       // Future effects:
       // [BallEffectType.DANGER_SPARKS, () => new DangerSparksHandler(this.scene)],
       // [BallEffectType.BALLOON_TRAIL, () => new BalloonTrailHandler(this.scene)],

@@ -3,7 +3,7 @@ export const UI_BORDER_TOP = 50;    // Space for score/level/lives
 export const UI_BORDER_BOTTOM = 50; // Space for power-up indicators
 
 // Mobile touch zone (extra height below game for touch input)
-export const MOBILE_TOUCH_ZONE_HEIGHT = 150;
+export const MOBILE_TOUCH_ZONE_HEIGHT = 300;
 
 // Detect if primary input is touch (not just touch-capable)
 // pointer: coarse = finger/touch, pointer: fine = mouse/trackpad
@@ -12,8 +12,9 @@ export const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches;
 
 // Playable area dimensions (actual gameplay space)
+// Taller aspect ratio works better on mobile portrait screens
 export const PLAYABLE_WIDTH = 800;
-export const PLAYABLE_HEIGHT = 800;
+export const PLAYABLE_HEIGHT = 1000; // 25% taller than original 800
 
 // Total canvas size (playable + borders + mobile touch zone if applicable)
 export const GAME_WIDTH = PLAYABLE_WIDTH;
@@ -92,6 +93,7 @@ export const AUDIO = {
     TROMBONE: 'sfx-trombone',
     WHOOSH: 'sfx-whoosh',
     SWOOSH: 'sfx-swoosh',
+    ZAP: 'sfx-zap',
   },
 
   // LocalStorage key for audio settings

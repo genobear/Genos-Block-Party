@@ -7,6 +7,7 @@ import { PowerUpSystem } from './PowerUpSystem';
 import { ParticleSystem } from './ParticleSystem';
 import { PowerUpFeedbackSystem } from './PowerUpFeedbackSystem';
 import { AudioManager } from './AudioManager';
+import { ElectricArcSystem } from './ElectricArcSystem';
 import { BrickType } from '../types/BrickTypes';
 import { COLORS, AUDIO } from '../config/Constants';
 
@@ -30,6 +31,7 @@ export class CollisionHandler {
   private particleSystem: ParticleSystem;
   private powerUpFeedbackSystem: PowerUpFeedbackSystem;
   private audioManager: AudioManager;
+  private electricArcSystem: ElectricArcSystem | null = null;
 
   // Callbacks for game state changes
   private onScoreChange: (points: number) => void;
@@ -56,6 +58,13 @@ export class CollisionHandler {
     this.onScoreChange = callbacks.onScoreChange;
     this.onLevelComplete = callbacks.onLevelComplete;
     this.getBrickCount = callbacks.getBrickCount;
+  }
+
+  /**
+   * Set the ElectricArcSystem (called after bricks are created)
+   */
+  setElectricArcSystem(system: ElectricArcSystem): void {
+    this.electricArcSystem = system;
   }
 
   /**
@@ -134,6 +143,11 @@ export class CollisionHandler {
     // Add score
     this.onScoreChange(brick.getScoreValue());
 
+    // Trigger Electric Ball AOE if active (triggers on every hit, not just destruction)
+    if (ball.isElectricBallActive()) {
+      this.processElectricAOE(brick);
+    }
+
     // Apply damage to the brick
     const isDestroyed = brick.takeDamage(damage);
     let droppedPowerUp = false;
@@ -193,6 +207,74 @@ export class CollisionHandler {
   private processBrickHit(): void {
     this.audioManager.playSFX(AUDIO.SFX.POP);
     this.scene.cameras.main.shake(30, 0.002);
+  }
+
+  /**
+   * Process Electric Ball AOE damage to adjacent bricks
+   */
+  private processElectricAOE(sourceBrick: Brick): void {
+    if (!this.electricArcSystem) return;
+
+    // Get adjacent bricks and trigger arc visuals
+    const adjacentBricks = this.electricArcSystem.triggerAOE(sourceBrick);
+
+    // Apply damage after arc animation delay
+    const damageDelay = ElectricArcSystem.getDamageDelay();
+
+    adjacentBricks.forEach((brick) => {
+      this.scene.time.delayedCall(damageDelay, () => {
+        if (!brick || !brick.active) return;
+
+        // Score for AOE hits (50% of normal value)
+        this.onScoreChange(Math.floor(brick.getScoreValue() * 0.5));
+
+        // Apply 1 damage to adjacent brick
+        const isDestroyed = brick.takeDamage(1);
+
+        if (isDestroyed) {
+          // Process destruction with reduced power-up drop chance
+          this.processAOEBrickDestroyed(brick);
+        } else {
+          // Just play hit sound
+          this.audioManager.playSFX(AUDIO.SFX.POP);
+        }
+      });
+    });
+  }
+
+  /**
+   * Process an AOE-destroyed brick (reduced power-up drop chance)
+   */
+  private processAOEBrickDestroyed(brick: Brick): void {
+    // Audio
+    this.audioManager.playSFX(AUDIO.SFX.HORN);
+
+    // Screen shake (less intense than direct hit)
+    this.scene.cameras.main.shake(30, 0.003);
+
+    // Confetti burst at brick position
+    const brickColor = this.getBrickColor(brick.getType());
+    this.particleSystem.burstConfetti(brick.x, brick.y, brickColor);
+
+    // Immediately deactivate
+    brick.setActive(false);
+    brick.disableBody(true);
+
+    // Check for power-up drop (50% reduced chance for AOE kills)
+    if (Math.random() < brick.getDropChance() * 0.5) {
+      const dropPos = brick.getPowerUpDropPosition();
+      this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+    }
+
+    // Check if level is complete
+    const levelComplete = this.getBrickCount() === 0;
+
+    // Play destroy animation
+    brick.playDestroyAnimation(() => {
+      if (levelComplete) {
+        this.onLevelComplete();
+      }
+    });
   }
 
   /**

@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import {
   BALL_RADIUS,
   BALL_SPEED_BASE,
-  GAME_HEIGHT,
+  PLAY_AREA_Y,
+  PLAYABLE_HEIGHT,
   PADDLE_HEIGHT,
 } from '../config/Constants';
 import { Paddle } from './Paddle';
@@ -13,6 +14,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private currentSpeed: number = BALL_SPEED_BASE;
   private launched: boolean = false;
   private isFloating: boolean = false; // Balloon power-up
+  private isElectricBall: boolean = false; // Electric Ball power-up
   private attachedPaddle: Paddle | null = null;
 
   // FireBall power-up state (gameplay logic)
@@ -104,10 +106,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       const velocity = body.velocity;
       const currentMagnitude = velocity.length();
 
-      // Prevent ball from going too slow
+      // Prevent ball from going too slow (adjust for active effects)
       const minSpeed = this.isFloating
         ? this.currentSpeed * 0.5
-        : this.currentSpeed * 0.8;
+        : this.isElectricBall
+          ? this.currentSpeed * 1.2
+          : this.currentSpeed * 0.8;
       if (currentMagnitude < minSpeed && currentMagnitude > 0) {
         velocity.normalize().scale(minSpeed);
       }
@@ -125,7 +129,11 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
    */
   bounceOffPaddle(paddle: Paddle): void {
     const angle = paddle.getCollisionAngle(this.x);
-    const speed = this.isFloating ? this.currentSpeed * 0.6 : this.currentSpeed;
+    const speed = this.isFloating
+      ? this.currentSpeed * 0.6
+      : this.isElectricBall
+        ? this.currentSpeed * 1.5
+        : this.currentSpeed;
 
     const velocityX = Math.cos(angle) * speed;
     const velocityY = Math.sin(angle) * speed;
@@ -153,6 +161,45 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Apply electric ball effect (Electric Ball power-up - faster ball with AOE damage)
+   */
+  setElectricBall(duration: number): void {
+    // Guard against re-application to prevent velocity stacking
+    if (this.isElectricBall) return;
+
+    this.isElectricBall = true;
+
+    // Speed up current velocity by 50%
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.velocity.scale(1.5);
+
+    // Apply electric speed trail visual effect
+    this.effectManager?.applyEffect(BallEffectType.ELECTRIC_TRAIL);
+
+    // Reset after duration
+    this.scene.time.delayedCall(duration, () => {
+      this.clearElectricBall();
+    });
+  }
+
+  /**
+   * Clear electric ball effect
+   */
+  clearElectricBall(): void {
+    if (!this.isElectricBall) return;
+
+    this.isElectricBall = false;
+    this.effectManager?.removeEffect(BallEffectType.ELECTRIC_TRAIL);
+  }
+
+  /**
+   * Check if electric ball mode is active
+   */
+  isElectricBallActive(): boolean {
+    return this.isElectricBall;
+  }
+
+  /**
    * Set ball speed (for level progression)
    */
   setSpeed(speed: number): void {
@@ -160,10 +207,11 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Check if ball is out of bounds (fell below screen)
+   * Check if ball is out of bounds (fell below playable area)
+   * Uses PLAYABLE_HEIGHT, not GAME_HEIGHT, so touch zone is excluded
    */
   isOutOfBounds(): boolean {
-    return this.y > GAME_HEIGHT + BALL_RADIUS;
+    return this.y > PLAY_AREA_Y + PLAYABLE_HEIGHT + BALL_RADIUS;
   }
 
   /**
@@ -179,6 +227,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   reset(): void {
     this.launched = false;
     this.isFloating = false;
+    this.isElectricBall = false;
     this.attachedPaddle = null;
     this.fireball = false;
     this.fireballLevel = 0;

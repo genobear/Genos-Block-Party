@@ -65,6 +65,7 @@ export class PowerUpSystem {
       [PowerUpType.MYSTERY, () => this.applyMystery()],
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
+      [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
     ]);
   }
 
@@ -157,9 +158,13 @@ export class PowerUpSystem {
    * Apply Disco effect (spawn 2 extra balls with sparkle effects)
    */
   private applyDisco(): void {
-    // Only spawn if primary ball is launched (in play)
-    if (this.primaryBall.isLaunched()) {
-      const newBalls = this.ballPool.spawnExtraBalls(2, this.primaryBall, this.speedMultiplier);
+    // Find any active ball to use as spawn source (allows multiball even if primary is lost)
+    const activeBalls = this.ballPool.getActiveBalls();
+    const sourceBall = activeBalls.length > 0 ? activeBalls[0] : null;
+
+    // Only spawn if there's at least one ball in play
+    if (sourceBall && sourceBall.isLaunched()) {
+      const newBalls = this.ballPool.spawnExtraBalls(2, sourceBall, this.speedMultiplier);
 
       newBalls.forEach((ball) => {
         // Apply disco sparkle effect to new balls
@@ -188,6 +193,25 @@ export class PowerUpSystem {
     }
 
     this.events.emit('mysteryRevealed', randomEffect);
+  }
+
+  /**
+   * Apply Electric Ball effect (speed up ball with AOE damage)
+   */
+  private applyElectricBall(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].duration;
+
+    // Apply to primary ball
+    this.primaryBall.setElectricBall(duration);
+
+    // Apply to any extra balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball !== this.primaryBall) {
+        ball.setElectricBall(duration);
+      }
+    });
+
+    this.trackEffect(PowerUpType.ELECTRICBALL, duration);
   }
 
   /**

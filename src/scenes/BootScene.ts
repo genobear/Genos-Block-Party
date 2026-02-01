@@ -137,6 +137,7 @@ export class BootScene extends Phaser.Scene {
       { name: 'mystery', color: POWERUP_CONFIGS[PowerUpType.MYSTERY].color, symbol: '?' },
       { name: 'powerball', color: POWERUP_CONFIGS[PowerUpType.POWERBALL].color, symbol: 'P' },
       { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
+      { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
     ];
 
     const size = 24;
@@ -253,6 +254,28 @@ export class BootScene extends Phaser.Scene {
     glint.fillPath();
     glint.generateTexture('particle-glint', 10, 10);
     glint.destroy();
+
+    // Speed line particle (elongated tapered streak for fast ball trail)
+    const speedline = this.make.graphics({ x: 0, y: 0 });
+    speedline.fillStyle(0xffffff);
+    speedline.fillRect(0, 5, 2, 2);  // Core (brightest)
+    speedline.fillStyle(0xffffff, 0.7);
+    speedline.fillRect(0, 3, 2, 2);  // Upper fade
+    speedline.fillRect(0, 7, 2, 2);  // Lower fade
+    speedline.fillStyle(0xffffff, 0.3);
+    speedline.fillRect(0, 0, 2, 3);  // Top tip
+    speedline.fillRect(0, 9, 2, 3);  // Bottom tip
+    speedline.generateTexture('particle-speedline', 2, 12);
+    speedline.destroy();
+
+    // Electric particle (small lightning bolt fragment for energy crackle)
+    const electric = this.make.graphics({ x: 0, y: 0 });
+    electric.fillStyle(0xffffff);
+    electric.fillRect(2, 0, 2, 2);
+    electric.fillRect(1, 2, 2, 2);
+    electric.fillRect(3, 4, 2, 2);
+    electric.generateTexture('particle-electric', 6, 6);
+    electric.destroy();
   }
 
   /**
@@ -421,6 +444,22 @@ export class BootScene extends Phaser.Scene {
         const sweep = Math.sin(2 * Math.PI * (300 + t * 800) * t) * 0.45;
         const noise = (Math.random() * 2 - 1) * 0.15;
         data[i] = (sweep + noise) * envelope * 0.35;
+      }
+      return buffer;
+    });
+
+    // Zap sound - electric arc for Electric Ball AOE
+    createSound(AUDIO.SFX.ZAP, (ctx) => {
+      const duration = 0.15;
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        const t = i / ctx.sampleRate;
+        const envelope = Math.exp(-t * 20);
+        // High frequency buzz with noise for electric crackle
+        const buzz = Math.sin(2 * Math.PI * 2000 * t) * Math.sin(2 * Math.PI * 50 * t);
+        const noise = (Math.random() * 2 - 1) * 0.3;
+        data[i] = (buzz + noise) * envelope * 0.25;
       }
       return buffer;
     });

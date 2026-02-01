@@ -8,6 +8,7 @@ import { ParticleSystem } from '../systems/ParticleSystem';
 import { ScreenEffects } from '../systems/ScreenEffects';
 import { PowerUpFeedbackSystem } from '../systems/PowerUpFeedbackSystem';
 import { CollisionHandler } from '../systems/CollisionHandler';
+import { ElectricArcSystem } from '../systems/ElectricArcSystem';
 import { AudioManager } from '../systems/AudioManager';
 import { NowPlayingToast } from '../systems/NowPlayingToast';
 import { BackgroundManager } from '../systems/BackgroundManager';
@@ -43,6 +44,7 @@ export class GameScene extends Phaser.Scene {
   private screenEffects!: ScreenEffects;
   private powerUpFeedbackSystem!: PowerUpFeedbackSystem;
   private collisionHandler!: CollisionHandler;
+  private electricArcSystem!: ElectricArcSystem;
   private dangerSparks: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
   private isInDanger: boolean = false;
 
@@ -104,6 +106,11 @@ export class GameScene extends Phaser.Scene {
     (window as unknown as { GameDebug: object }).GameDebug = {
       skipToLevel: (levelIndex: number) => this.debugSkipToLevel(levelIndex),
       completeLevel: () => this.debugCompleteLevel(),
+      spawnPowerUp: (type: string, x?: number, y?: number) => {
+        const spawnX = x ?? 400;
+        const spawnY = y ?? 300;
+        return this.powerUpSystem.forceSpawn(spawnX, spawnY, type as PowerUpType);
+      },
       getState: () => ({
         level: this.currentLevelIndex,
         levelName: this.currentLevel?.name,
@@ -147,6 +154,10 @@ export class GameScene extends Phaser.Scene {
 
     // Create brick group
     this.bricks = this.physics.add.staticGroup();
+
+    // Create electric arc system for Electric Ball AOE
+    this.electricArcSystem = new ElectricArcSystem(this, this.bricks);
+    this.collisionHandler.setElectricArcSystem(this.electricArcSystem);
 
     // Load first level
     this.loadLevel(0);

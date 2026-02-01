@@ -9,6 +9,7 @@ export enum PowerUpType {
   MYSTERY = 'mystery',   // Random effect
   POWERBALL = 'powerball', // Double power-up drop chance (12s)
   FIREBALL = 'fireball', // Piercing ball with stacking damage (10s)
+  ELECTRICBALL = 'electricball', // Electric ball with AOE damage (8s)
 }
 
 /**
@@ -66,7 +67,7 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     color: 0xff9500,      // Orange/gold
     duration: 12000,      // 12 seconds
     dropWeight: 12,
-    emoji: '⚡',
+    emoji: '💪',
   },
   [PowerUpType.FIREBALL]: {
     type: PowerUpType.FIREBALL,
@@ -74,6 +75,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 10000,      // 10 seconds
     dropWeight: 10,
     emoji: '🔥',
+  },
+  [PowerUpType.ELECTRICBALL]: {
+    type: PowerUpType.ELECTRICBALL,
+    color: 0x00ffff,      // Electric cyan
+    duration: 8000,       // 8 seconds
+    dropWeight: 12,
+    emoji: '⚡',
   },
 };
 
