@@ -74,9 +74,10 @@ export class MusicPlayerScene extends Phaser.Scene {
     this.currentFilter = 'all';
     this.unsubscribeTrackChange = null;
 
-    // Get AudioManager instance but don't call init() - overlay scenes shouldn't
-    // take ownership of the audio scene reference. GameScene/MenuScene own it.
+    // Get AudioManager and init with this scene so it can use our sound/tween systems
+    // (GameScene may be paused, so we need an active scene for audio operations)
     this.audioManager = AudioManager.getInstance();
+    this.audioManager.init(this);
 
     // Load all tracks from manifest
     this.allTracks = this.audioManager.getAllTracks();
