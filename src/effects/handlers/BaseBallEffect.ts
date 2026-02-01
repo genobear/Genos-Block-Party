@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import type { Ball } from '../../objects/Ball';
 import { BallEffectType, EffectDepth } from '../BallEffectTypes';
 
+/** Callback type for when an effect's tint changes */
+export type TintChangeCallback = (effect: IBallEffect) => void;
+
 /**
  * Interface for ball particle effects
  * Each effect type implements this to handle its own emitters
@@ -23,6 +26,12 @@ export interface IBallEffect {
 
   /** Get all emitters for depth management */
   getEmitters(): Phaser.GameObjects.Particles.ParticleEmitter[];
+
+  /** Get the current tint color this effect wants (null if no tint) */
+  getTint(): number | null;
+
+  /** Set callback for when tint changes */
+  setTintChangeCallback(callback: TintChangeCallback | null): void;
 }
 
 /**
@@ -39,8 +48,39 @@ export abstract class BaseBallEffect implements IBallEffect {
   protected colorCycleEvent: Phaser.Time.TimerEvent | null = null;
   protected active: boolean = false;
 
+  /** Current tint color this effect wants (null = no tint preference) */
+  protected currentTint: number | null = null;
+
+  /** Callback to notify manager when tint changes */
+  private tintChangeCallback: TintChangeCallback | null = null;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
+  }
+
+  /**
+   * Set the effect's desired tint color
+   * This notifies the manager to recompute the blended tint
+   */
+  protected setEffectTint(color: number | null): void {
+    this.currentTint = color;
+    if (this.tintChangeCallback) {
+      this.tintChangeCallback(this);
+    }
+  }
+
+  /**
+   * Get the current tint color this effect wants
+   */
+  getTint(): number | null {
+    return this.currentTint;
+  }
+
+  /**
+   * Set callback for when tint changes (used by BallEffectManager)
+   */
+  setTintChangeCallback(callback: TintChangeCallback | null): void {
+    this.tintChangeCallback = callback;
   }
 
   abstract start(ball: Ball, level?: number): void;
@@ -71,6 +111,9 @@ export abstract class BaseBallEffect implements IBallEffect {
       this.colorCycleEvent.destroy();
       this.colorCycleEvent = null;
     }
+
+    // Clear tint and notify manager
+    this.setEffectTint(null);
 
     this.active = false;
     this.ball = null;

@@ -70,7 +70,8 @@ export class DiscoEffectHandler extends BaseBallEffect {
       delay: 80,
       callback: () => {
         if (this.ball && this.active) {
-          this.ball.setTint(this.MIRROR_COLORS[this.colorIndex]);
+          // Use manager's tint blending system
+          this.setEffectTint(this.MIRROR_COLORS[this.colorIndex]);
           this.colorIndex = (this.colorIndex + 1) % this.MIRROR_COLORS.length;
         }
       },
@@ -141,10 +142,7 @@ export class DiscoEffectHandler extends BaseBallEffect {
   }
 
   stop(): void {
-    // Clear ball tint
-    if (this.ball) {
-      this.ball.clearTint();
-    }
+    // Base class handles tint cleanup via setEffectTint(null)
     super.stop();
   }
 }

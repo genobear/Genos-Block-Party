@@ -38,10 +38,10 @@ export class PauseScene extends Phaser.Scene {
     }).setOrigin(0.5);
     container.add(title);
 
-    // Now Playing section
-    const nowPlaying = this.createNowPlayingDisplay();
-    nowPlaying.setPosition(0, -100);
-    container.add(nowPlaying);
+    // Track info (mini version - just name/artist for quick reference)
+    const trackInfo = this.createTrackInfoMini();
+    trackInfo.setPosition(0, -100);
+    container.add(trackInfo);
 
     // Music playback controls
     const musicControls = this.createMusicControls();
@@ -55,26 +55,33 @@ export class PauseScene extends Phaser.Scene {
     });
     container.add(settingsButton);
 
+    // Music Player button (vintage brown)
+    const musicPlayerButton = this.createButton(0, 90, 'MUSIC PLAYER', 0x8b4513, () => {
+      this.scene.stop();
+      this.scene.start('MusicPlayerScene', { returnTo: 'PauseScene' });
+    });
+    container.add(musicPlayerButton);
+
     // Resume button
-    const resumeButton = this.createButton(0, 90, 'RESUME', COLORS.PADDLE, () => {
+    const resumeButton = this.createButton(0, 160, 'RESUME', COLORS.PADDLE, () => {
       this.resumeGame();
     });
     container.add(resumeButton);
 
     // Restart button
-    const restartButton = this.createButton(0, 160, 'RESTART', 0x4ade80, () => {
+    const restartButton = this.createButton(0, 230, 'RESTART', 0x4ade80, () => {
       this.restartGame();
     });
     container.add(restartButton);
 
     // Quit button
-    const quitButton = this.createButton(0, 230, 'QUIT TO MENU', 0xff6b6b, () => {
+    const quitButton = this.createButton(0, 300, 'QUIT TO MENU', 0xff6b6b, () => {
       this.quitToMenu();
     });
     container.add(quitButton);
 
     // Instructions
-    const instructions = this.add.text(0, 290, 'Press ESC or P to resume', {
+    const instructions = this.add.text(0, 360, 'Press ESC or P to resume', {
       font: '16px Arial',
       color: '#888888',
     }).setOrigin(0.5);
@@ -152,7 +159,7 @@ export class PauseScene extends Phaser.Scene {
     return buttonContainer;
   }
 
-  private createNowPlayingDisplay(): Phaser.GameObjects.Container {
+  private createTrackInfoMini(): Phaser.GameObjects.Container {
     this.nowPlayingContainer = this.add.container(0, 0);
 
     // Create all text elements upfront
@@ -175,17 +182,17 @@ export class PauseScene extends Phaser.Scene {
     this.nowPlayingContainer.add(this.noTrackText);
 
     // Set initial state
-    this.updateNowPlayingDisplay();
+    this.updateTrackInfoMini();
 
     // Subscribe to track changes
     this.unsubscribeTrackChange = this.audioManager.onTrackChange(() => {
-      this.updateNowPlayingDisplay();
+      this.updateTrackInfoMini();
     });
 
     return this.nowPlayingContainer;
   }
 
-  private updateNowPlayingDisplay(): void {
+  private updateTrackInfoMini(): void {
     const metadata = this.audioManager.getCurrentTrackMetadata();
 
     if (metadata && metadata.name) {
@@ -295,9 +302,9 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private quitToMenu(): void {
-    // Clear level state but keep music playing for seamless transition
-    // MenuScene's playMusic() will crossfade to menu music
-    this.audioManager.clearLevelState();
+    // Handle return to menu - rebuilds playlist based on level lock setting
+    // If level lock is ON, will switch to user's selected station playlist
+    this.audioManager.handleReturnToMenu();
 
     const uiScene = this.scene.get('UIScene') as unknown as { quitToMenu?: () => void };
     if (uiScene && typeof uiScene.quitToMenu === 'function') {

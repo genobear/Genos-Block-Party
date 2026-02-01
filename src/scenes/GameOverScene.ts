@@ -420,6 +420,10 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private goToMenu(): void {
+    // Handle return to menu - rebuilds playlist based on level lock setting
+    const audioManager = AudioManager.getInstance();
+    audioManager.handleReturnToMenu();
+
     this.scene.stop('UIScene');
     this.scene.stop();
     this.scene.start('MenuScene');

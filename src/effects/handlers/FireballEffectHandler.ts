@@ -79,11 +79,6 @@ export class FireballEffectHandler extends BaseBallEffect {
   }
 
   stop(): void {
-    // Clear ball tint before cleanup
-    if (this.ball) {
-      this.ball.clearTint();
-    }
-
     // Stop smoke separately (tracked outside base emitters array)
     if (this.smokeEmitter) {
       this.smokeEmitter.stop();
@@ -102,8 +97,8 @@ export class FireballEffectHandler extends BaseBallEffect {
   private applyLevel(level: 1 | 2 | 3): void {
     const config = this.LEVEL_CONFIGS[level];
 
-    // Apply ball tint
-    this.ball?.setTint(config.tint);
+    // Apply ball tint via manager's blending system
+    this.setEffectTint(config.tint);
 
     // Create flame emitter (behind ball)
     this.createEmitter('particle-flame', EffectDepth.TRAIL, {
@@ -113,6 +108,20 @@ export class FireballEffectHandler extends BaseBallEffect {
       lifespan: config.lifespan,
       frequency: config.frequency,
       quantity: config.quantity,
+      tint: config.colors,
+      blendMode: Phaser.BlendModes.ADD,
+      angle: { min: 0, max: 360 },
+    });
+
+    // Create overlay emitter (above disco sparkles but below glow)
+    // Smaller, brighter flames that remain visible when combined with disco effect
+    this.createEmitter('particle-flame', EffectDepth.FIRE_OVERLAY, {
+      speed: { min: 15, max: 40 },
+      scale: { start: config.scale.start * 0.6, end: 0 },
+      alpha: { start: 0.7, end: 0 },
+      lifespan: config.lifespan * 0.6,
+      frequency: config.frequency * 1.5,
+      quantity: Math.max(1, Math.floor(config.quantity * 0.6)),
       tint: config.colors,
       blendMode: Phaser.BlendModes.ADD,
       angle: { min: 0, max: 360 },

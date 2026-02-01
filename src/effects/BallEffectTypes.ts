@@ -27,5 +27,6 @@ export enum EffectDepth {
   TRAIL = 10,       // Fire trails, standard trails
   BALL = 15,        // Ball sprite depth
   SPARKLE = 20,     // Sparkles, on top of ball
+  FIRE_OVERLAY = 22, // Fireball flames above sparkles
   GLOW = 25,        // Outermost glow effects
 }

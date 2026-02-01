@@ -24,6 +24,10 @@ export class MenuScene extends Phaser.Scene {
     this.decorations = [];
     this.isTransitioning = false;
 
+    // Initialize audio manager with this scene
+    const audioManager = AudioManager.getInstance();
+    audioManager.init(this);
+
     // Set transparent background so CSS background shows through
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
 
@@ -107,16 +111,44 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('SettingsScene', { returnTo: 'MenuScene' });
     });
 
+    // Music Player button (vintage brown)
+    const musicPlayerButton = this.add.rectangle(centerX, centerY + 200, 200, 50, 0x8b4513)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(musicPlayerButton);
+
+    const musicPlayerText = this.add.text(centerX, centerY + 200, 'MUSIC PLAYER', {
+      font: 'bold 20px Arial',
+      color: '#f5e6c8',
+    }).setOrigin(0.5);
+    this.menuElements.push(musicPlayerText);
+
+    musicPlayerButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      musicPlayerButton.setScale(1.05);
+      musicPlayerText.setScale(1.05);
+    });
+
+    musicPlayerButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      musicPlayerButton.setScale(1);
+      musicPlayerText.setScale(1);
+    });
+
+    musicPlayerButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('MusicPlayerScene', { returnTo: 'MenuScene' });
+    });
+
     // High score display
     const highScore = localStorage.getItem('genos-block-party-highscore') || '0';
-    const highScoreText = this.add.text(centerX, GAME_HEIGHT - 80, `High Score: ${highScore}`, {
+    const highScoreText = this.add.text(centerX, GAME_HEIGHT - 60, `High Score: ${highScore}`, {
       font: '20px Arial',
       color: '#ffd93d',
     }).setOrigin(0.5);
     this.menuElements.push(highScoreText);
 
     // Instructions
-    const instructions = this.add.text(centerX, GAME_HEIGHT - 40, 'Move paddle with mouse or touch', {
+    const instructions = this.add.text(centerX, GAME_HEIGHT - 28, 'Move paddle with mouse or touch', {
       font: '16px Arial',
       color: '#888888',
     }).setOrigin(0.5);
@@ -134,10 +166,17 @@ export class MenuScene extends Phaser.Scene {
       // Resume audio context if suspended
       if (webAudioSound.context?.state === 'suspended') {
         webAudioSound.context.resume().then(() => {
-          audioManager.playMusic('menu-music', true);
+          // Only start menu music if nothing is playing (first visit)
+          // When returning from gameplay, music is already handled by handleReturnToMenu()
+          if (!audioManager.isMusicPlaying()) {
+            audioManager.playMusic('menu-music');
+          }
         });
       } else {
-        audioManager.playMusic('menu-music', true);
+        // Only start menu music if nothing is playing (first visit)
+        if (!audioManager.isMusicPlaying()) {
+          audioManager.playMusic('menu-music');
+        }
       }
     });
   }

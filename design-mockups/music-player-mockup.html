@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Music Player - Geno's Block Party</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=VT323&family=Archivo+Black&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Warm vintage radio palette */
+      --wood-dark: #1a0f0a;
+      --wood-medium: #3d2317;
+      --wood-light: #5c3a2e;
+      --wood-highlight: #8b5a3c;
+
+      /* Dial and glow colors */
+      --dial-cream: #f5e6c8;
+      --dial-amber: #ffb347;
+      --glow-orange: #ff6b35;
+      --glow-warm: rgba(255, 107, 53, 0.4);
+
+      /* Accent colors */
+      --chrome: #c0c0c0;
+      --chrome-dark: #808080;
+      --vinyl-black: #1a1a1a;
+      --felt-green: #1d4d3a;
+
+      /* Text */
+      --text-cream: #f5e6c8;
+      --text-gold: #d4a853;
+      --text-dim: #8b7355;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+      font-family: 'VT323', monospace;
+      overflow: hidden;
+    }
+
+    /* Overlay dimming effect */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+    }
+
+    /* Main radio cabinet */
+    .radio-cabinet {
+      position: relative;
+      width: 680px;
+      background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood-medium) 20%, var(--wood-dark) 100%);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow:
+        0 40px 80px rgba(0, 0, 0, 0.8),
+        inset 0 2px 1px rgba(255, 255, 255, 0.1),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+      border: 3px solid var(--wood-dark);
+    }
+
+    /* Wood grain texture overlay */
+    .radio-cabinet::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 24px;
+      background: repeating-linear-gradient(
+        90deg,
+        transparent 0px,
+        rgba(0, 0, 0, 0.03) 1px,
+        transparent 2px,
+        transparent 8px
+      );
+      pointer-events: none;
+    }
+
+    /* Title banner */
+    .title-banner {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .title-banner h1 {
+      font-family: 'Righteous', cursive;
+      font-size: 32px;
+      color: var(--dial-amber);
+      text-shadow:
+        0 0 20px var(--glow-warm),
+        0 2px 0 var(--wood-dark);
+      letter-spacing: 4px;
+    }
+
+    .title-banner .subtitle {
+      font-size: 14px;
+      color: var(--text-dim);
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Dial display area - the "window" showing current track */
+    .dial-display {
+      background: linear-gradient(180deg, #2a1f15 0%, #1a1208 100%);
+      border-radius: 16px;
+      padding: 4px;
+      margin-bottom: 16px;
+      box-shadow:
+        inset 0 4px 12px rgba(0, 0, 0, 0.8),
+        0 2px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .dial-inner {
+      background: linear-gradient(180deg, var(--dial-cream) 0%, #e8d4a8 100%);
+      border-radius: 12px;
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Amber glow effect behind text */
+    .dial-inner::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 80px;
+      background: radial-gradient(ellipse, var(--glow-warm) 0%, transparent 70%);
+      pointer-events: none;
+      animation: glow-pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes glow-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    /* Dial frequency lines */
+    .dial-inner::after {
+      content: '';
+      position: absolute;
+      bottom: 8px;
+      left: 20px;
+      right: 20px;
+      height: 2px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--wood-medium) 0px,
+        var(--wood-medium) 2px,
+        transparent 2px,
+        transparent 12px
+      );
+      opacity: 0.4;
+    }
+
+    .now-playing {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+
+    .now-playing-label {
+      font-size: 12px;
+      color: var(--wood-medium);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .track-name {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 28px;
+      color: var(--wood-dark);
+      margin-bottom: 4px;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+
+    .track-artist {
+      font-size: 18px;
+      color: var(--wood-light);
+      margin-bottom: 2px;
+    }
+
+    .track-genre {
+      font-size: 14px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Playback controls */
+    .controls-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .control-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-family: 'VT323', monospace;
+      font-size: 24px;
+      color: var(--dial-cream);
+      background: linear-gradient(180deg, var(--chrome) 0%, var(--chrome-dark) 100%);
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.4),
+        inset 0 2px 2px rgba(255, 255, 255, 0.4),
+        inset 0 -2px 2px rgba(0, 0, 0, 0.2);
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .control-btn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 6px 12px rgba(0, 0, 0, 0.5),
+        inset 0 2px 2px rgba(255, 255, 255, 0.4),
+        inset 0 -2px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .control-btn:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.4),
+        inset 0 2px 2px rgba(255, 255, 255, 0.2),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+    }
+
+    .control-btn.play-btn {
+      width: 72px;
+      height: 72px;
+      font-size: 32px;
+      background: linear-gradient(180deg, var(--dial-amber) 0%, var(--glow-orange) 100%);
+      color: var(--wood-dark);
+      box-shadow:
+        0 4px 12px rgba(255, 107, 53, 0.5),
+        inset 0 2px 2px rgba(255, 255, 255, 0.4),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .control-btn.play-btn:hover {
+      box-shadow:
+        0 6px 20px rgba(255, 107, 53, 0.7),
+        inset 0 2px 2px rgba(255, 255, 255, 0.4),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Tuner/filter tabs */
+    .tuner-section {
+      margin-bottom: 12px;
+    }
+
+    .tuner-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .tuner-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      background: var(--vinyl-black);
+      padding: 6px;
+      border-radius: 8px;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+    }
+
+    .tuner-tab {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'VT323', monospace;
+      font-size: 16px;
+      color: var(--text-dim);
+      background: transparent;
+      transition: all 0.2s ease;
+    }
+
+    .tuner-tab:hover {
+      color: var(--text-cream);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tuner-tab.active {
+      color: var(--wood-dark);
+      background: linear-gradient(180deg, var(--dial-amber) 0%, #e69a2e 100%);
+      box-shadow: 0 2px 8px rgba(255, 179, 71, 0.4);
+    }
+
+    /* Track list (speaker grill area) */
+    .track-list-container {
+      background: linear-gradient(180deg, #0d0906 0%, #1a110c 100%);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 16px;
+      box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.8);
+    }
+
+    .track-list {
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    /* Custom scrollbar */
+    .track-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .track-list::-webkit-scrollbar-track {
+      background: var(--vinyl-black);
+      border-radius: 4px;
+    }
+
+    .track-list::-webkit-scrollbar-thumb {
+      background: var(--wood-highlight);
+      border-radius: 4px;
+    }
+
+    .track-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 4px;
+      position: relative;
+    }
+
+    .track-item:hover {
+      background: rgba(255, 179, 71, 0.1);
+    }
+
+    .track-item.playing {
+      background: linear-gradient(90deg, rgba(255, 107, 53, 0.2) 0%, transparent 100%);
+    }
+
+    .track-item.playing::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--glow-orange);
+      border-radius: 0 2px 2px 0;
+      box-shadow: 0 0 8px var(--glow-orange);
+    }
+
+    .playing-indicator {
+      width: 20px;
+      margin-right: 8px;
+      color: var(--glow-orange);
+      font-size: 16px;
+      text-shadow: 0 0 8px var(--glow-orange);
+      animation: blink 1s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .track-info {
+      flex: 1;
+    }
+
+    .track-item-name {
+      font-size: 18px;
+      color: var(--text-cream);
+      margin-bottom: 2px;
+    }
+
+    .track-item-artist {
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .track-level-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: var(--dial-cream);
+      background: var(--wood-medium);
+      white-space: nowrap;
+    }
+
+    .track-level-badge.menu {
+      background: var(--felt-green);
+    }
+
+    /* Settings toggle area */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .toggle-checkbox {
+      width: 48px;
+      height: 26px;
+      background: var(--vinyl-black);
+      border-radius: 13px;
+      position: relative;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+      transition: all 0.3s ease;
+    }
+
+    .toggle-checkbox.checked {
+      background: linear-gradient(180deg, var(--dial-amber) 0%, var(--glow-orange) 100%);
+      box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.2),
+        0 0 12px rgba(255, 179, 71, 0.4);
+    }
+
+    .toggle-checkbox::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: linear-gradient(180deg, #fff 0%, #ddd 100%);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .toggle-checkbox.checked::after {
+      left: 25px;
+    }
+
+    .toggle-label {
+      font-size: 16px;
+      color: var(--text-cream);
+    }
+
+    .toggle-hint {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    /* Back button */
+    .back-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Righteous', cursive;
+      font-size: 20px;
+      letter-spacing: 2px;
+      color: var(--dial-cream);
+      background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood-medium) 100%);
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.4),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      transition: all 0.15s ease;
+    }
+
+    .back-btn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 6px 12px rgba(0, 0, 0, 0.5),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    }
+
+    .back-btn:active {
+      transform: translateY(1px);
+    }
+
+    /* Decorative corner screws */
+    .screw {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: radial-gradient(circle at 30% 30%, var(--chrome), var(--chrome-dark));
+      border-radius: 50%;
+      box-shadow:
+        inset 0 2px 2px rgba(255, 255, 255, 0.3),
+        0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .screw::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(45deg);
+      width: 10px;
+      height: 2px;
+      background: var(--chrome-dark);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+    }
+
+    .screw.top-left { top: 12px; left: 12px; }
+    .screw.top-right { top: 12px; right: 12px; }
+    .screw.bottom-left { bottom: 12px; left: 12px; }
+    .screw.bottom-right { bottom: 12px; right: 12px; }
+
+    /* Vacuum tube glow indicators */
+    .tube-row {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .vacuum-tube {
+      width: 12px;
+      height: 24px;
+      background: linear-gradient(180deg, #4a3020 0%, #2a1810 100%);
+      border-radius: 6px 6px 4px 4px;
+      position: relative;
+      box-shadow: inset 0 -4px 8px rgba(255, 107, 53, 0.6);
+    }
+
+    .vacuum-tube::before {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 10px;
+      background: var(--glow-orange);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--glow-orange);
+      animation: tube-flicker 2s ease-in-out infinite;
+    }
+
+    @keyframes tube-flicker {
+      0%, 100% { opacity: 0.8; }
+      25% { opacity: 1; }
+      50% { opacity: 0.7; }
+      75% { opacity: 0.9; }
+    }
+
+    /* Volume knob decorative */
+    .knob-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 40px;
+      margin-bottom: 16px;
+    }
+
+    .knob-container {
+      text-align: center;
+    }
+
+    .knob {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--chrome) 0%, var(--chrome-dark) 100%);
+      border-radius: 50%;
+      margin: 0 auto 6px;
+      position: relative;
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.4),
+        inset 0 2px 2px rgba(255, 255, 255, 0.4);
+    }
+
+    .knob::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 3px;
+      height: 12px;
+      background: var(--wood-dark);
+      border-radius: 2px;
+    }
+
+    .knob-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* Responsive */
+    @media (max-width: 720px) {
+      .radio-cabinet {
+        width: 95vw;
+        padding: 16px;
+        border-radius: 16px;
+      }
+
+      .title-banner h1 {
+        font-size: 24px;
+      }
+
+      .track-name {
+        font-size: 22px;
+      }
+
+      .control-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+      }
+
+      .control-btn.play-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay"></div>
+
+  <div class="radio-cabinet">
+    <!-- Decorative screws -->
+    <div class="screw top-left"></div>
+    <div class="screw top-right"></div>
+    <div class="screw bottom-left"></div>
+    <div class="screw bottom-right"></div>
+
+    <!-- Title -->
+    <div class="title-banner">
+      <h1>🎵 MUSIC PLAYER</h1>
+      <div class="subtitle">Geno's Block Party</div>
+    </div>
+
+    <!-- Vacuum tube indicators -->
+    <div class="tube-row">
+      <div class="vacuum-tube"></div>
+      <div class="vacuum-tube"></div>
+      <div class="vacuum-tube"></div>
+      <div class="vacuum-tube"></div>
+      <div class="vacuum-tube"></div>
+    </div>
+
+    <!-- Now Playing dial display -->
+    <div class="dial-display">
+      <div class="dial-inner">
+        <div class="now-playing">
+          <div class="now-playing-label">♪ Now Playing ♪</div>
+          <div class="track-name">Warm it Up</div>
+          <div class="track-artist">Vinnyl Vinnie</div>
+          <div class="track-genre">Funk</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="controls-row">
+      <button class="control-btn" title="Previous">⏮</button>
+      <button class="control-btn" title="Stop">⏹</button>
+      <button class="control-btn play-btn" title="Play/Pause">▶</button>
+      <button class="control-btn" title="Next">⏭</button>
+    </div>
+
+    <!-- Decorative knobs -->
+    <div class="knob-row">
+      <div class="knob-container">
+        <div class="knob"></div>
+        <div class="knob-label">Bass</div>
+      </div>
+      <div class="knob-container">
+        <div class="knob"></div>
+        <div class="knob-label">Treble</div>
+      </div>
+    </div>
+
+    <!-- Tuner/filter tabs -->
+    <div class="tuner-section">
+      <div class="tuner-label">⟡ Select Station ⟡</div>
+      <div class="tuner-tabs">
+        <button class="tuner-tab active">ALL</button>
+        <button class="tuner-tab">LVL 1</button>
+        <button class="tuner-tab">LVL 2</button>
+        <button class="tuner-tab">LVL 3</button>
+        <button class="tuner-tab">MENU</button>
+      </div>
+    </div>
+
+    <!-- Track list -->
+    <div class="track-list-container">
+      <div class="track-list">
+        <div class="track-item playing">
+          <span class="playing-indicator">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Warm it Up</div>
+            <div class="track-item-artist">Vinnyl Vinnie</div>
+          </div>
+          <span class="track-level-badge">LVL 1</span>
+        </div>
+
+        <div class="track-item">
+          <span class="playing-indicator" style="visibility: hidden;">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Midnight Slide In</div>
+            <div class="track-item-artist">Vinnyl Vinnie</div>
+          </div>
+          <span class="track-level-badge">LVL 1</span>
+        </div>
+
+        <div class="track-item">
+          <span class="playing-indicator" style="visibility: hidden;">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Fortune on the Corner</div>
+            <div class="track-item-artist">Unknown Artist</div>
+          </div>
+          <span class="track-level-badge">LVL 2</span>
+        </div>
+
+        <div class="track-item">
+          <span class="playing-indicator" style="visibility: hidden;">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Block Party Get Lucky</div>
+            <div class="track-item-artist">Unknown Artist</div>
+          </div>
+          <span class="track-level-badge">LVL 2</span>
+        </div>
+
+        <div class="track-item">
+          <span class="playing-indicator" style="visibility: hidden;">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Stoop Kid</div>
+            <div class="track-item-artist">Unknown Artist</div>
+          </div>
+          <span class="track-level-badge">LVL 2</span>
+        </div>
+
+        <div class="track-item">
+          <span class="playing-indicator" style="visibility: hidden;">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Gift Factory Block Party</div>
+            <div class="track-item-artist">Unknown Artist</div>
+          </div>
+          <span class="track-level-badge">LVL 3</span>
+        </div>
+
+        <div class="track-item">
+          <span class="playing-indicator" style="visibility: hidden;">▶</span>
+          <div class="track-info">
+            <div class="track-item-name">Block Party Theme</div>
+            <div class="track-item-artist">Unknown Artist</div>
+          </div>
+          <span class="track-level-badge menu">MENU</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Force level music toggle -->
+    <div class="settings-row">
+      <div class="toggle-container" onclick="this.querySelector('.toggle-checkbox').classList.toggle('checked')">
+        <div class="toggle-checkbox checked"></div>
+        <span class="toggle-label">Level Theme Lock</span>
+      </div>
+    </div>
+    <div class="toggle-hint">When ON, only songs from the current level play during gameplay</div>
+
+    <!-- Back button -->
+    <button class="back-btn">← BACK</button>
+  </div>
+
+  <script>
+    // Interactive demo functionality
+    document.querySelectorAll('.tuner-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tuner-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+      });
+    });
+
+    document.querySelectorAll('.track-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.track-item').forEach(i => {
+          i.classList.remove('playing');
+          i.querySelector('.playing-indicator').style.visibility = 'hidden';
+        });
+        item.classList.add('playing');
+        item.querySelector('.playing-indicator').style.visibility = 'visible';
+
+        // Update now playing display
+        const name = item.querySelector('.track-item-name').textContent;
+        const artist = item.querySelector('.track-item-artist').textContent;
+        document.querySelector('.track-name').textContent = name;
+        document.querySelector('.track-artist').textContent = artist;
+      });
+    });
+
+    // Play button toggle
+    const playBtn = document.querySelector('.play-btn');
+    let isPlaying = true;
+    playBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      playBtn.textContent = isPlaying ? '▶' : '⏸';
+    });
+  </script>
+</body>
+</html>

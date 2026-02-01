@@ -21,6 +21,21 @@ interface ActiveEffect {
  */
 type EffectHandler = () => void;
 
+/**
+ * Configuration for how effects propagate to new balls spawned during multi-ball
+ * This allows easy configuration of effect behavior when adding new power-ups
+ */
+interface EffectPropagationConfig {
+  /** Should this effect be applied to new balls spawned while effect is active? */
+  propagateToNewBalls: boolean;
+  /** Should this effect be applied to all existing balls when collected? */
+  applyToAllBalls: boolean;
+  /** Function to apply the effect to a single ball */
+  applyToBall: (ball: Ball) => void;
+  /** Function to check if effect is currently active */
+  isActive: () => boolean;
+}
+
 export class PowerUpSystem {
   private scene: Phaser.Scene;
   private powerUpPool: PowerUpPool;
@@ -34,8 +49,22 @@ export class PowerUpSystem {
   private fireballLevel: number = 0;
   private fireballTimer: Phaser.Time.TimerEvent | null = null;
 
+  // Electric Ball global timer state
+  private electricBallEndTime: number = 0;
+  private electricBallTimer: Phaser.Time.TimerEvent | null = null;
+
+  // Balloon global timer state
+  private balloonEndTime: number = 0;
+  private balloonTimer: Phaser.Time.TimerEvent | null = null;
+
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
+
+  /**
+   * Effect propagation registry - defines how each ball effect interacts with multi-ball
+   * Initialized after constructor to access instance methods
+   */
+  private propagationConfigs!: Map<PowerUpType, EffectPropagationConfig>;
 
   /**
    * Effect registry - maps power-up types to their handler functions
@@ -66,6 +95,29 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+    ]);
+
+    // Initialize effect propagation config
+    // Defines how each ball effect interacts with multi-ball spawning
+    this.propagationConfigs = new Map([
+      [PowerUpType.FIREBALL, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => ball.setFireball(this.fireballLevel),
+        isActive: () => this.fireballLevel > 0,
+      }],
+      [PowerUpType.ELECTRICBALL, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => this.applyElectricBallToBall(ball),
+        isActive: () => this.electricBallEndTime > this.scene.time.now,
+      }],
+      [PowerUpType.BALLOON, {
+        propagateToNewBalls: false, // Intentional: new balls spawn at normal speed
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => this.applyBalloonToBall(ball),
+        isActive: () => this.balloonEndTime > this.scene.time.now,
+      }],
     ]);
   }
 
@@ -119,21 +171,56 @@ export class PowerUpSystem {
 
   /**
    * Apply Balloon effect (slow ball)
+   * Uses global timer so all balls expire at the same time
+   * Note: Does NOT propagate to new balls spawned during effect
    */
   private applyBalloon(): void {
     const duration = POWERUP_CONFIGS[PowerUpType.BALLOON].duration;
+    this.balloonEndTime = this.scene.time.now + duration;
+
+    // Cancel existing timer if refreshing effect
+    if (this.balloonTimer) {
+      this.balloonTimer.destroy();
+    }
 
     // Apply to primary ball
-    this.primaryBall.setFloating(duration);
+    this.applyBalloonToBall(this.primaryBall);
 
     // Apply to any extra balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (ball !== this.primaryBall) {
-        ball.setFloating(duration);
+        this.applyBalloonToBall(ball);
       }
     });
 
+    // Global expiration timer
+    this.balloonTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireBalloon();
+    });
+
     this.trackEffect(PowerUpType.BALLOON, duration);
+  }
+
+  /**
+   * Apply Balloon effect to a single ball with remaining duration
+   * Used by propagation config (though balloon doesn't propagate to new balls)
+   */
+  private applyBalloonToBall(ball: Ball): void {
+    const remaining = Math.max(0, this.balloonEndTime - this.scene.time.now);
+    if (remaining > 0) {
+      ball.setFloating(remaining);
+    }
+  }
+
+  /**
+   * Expire Balloon effect from all balls
+   */
+  private expireBalloon(): void {
+    this.balloonEndTime = 0;
+    this.balloonTimer = null;
+    // Ball.setFloating already handles its own timer reset via scene.time.delayedCall
+    // so we don't need to explicitly clear floating state here
+    this.events.emit('effectExpired', PowerUpType.BALLOON);
   }
 
   /**
@@ -156,6 +243,7 @@ export class PowerUpSystem {
 
   /**
    * Apply Disco effect (spawn 2 extra balls with sparkle effects)
+   * Uses propagation config to apply all active propagatable effects to new balls
    */
   private applyDisco(): void {
     // Find any active ball to use as spawn source (allows multiball even if primary is lost)
@@ -170,10 +258,12 @@ export class PowerUpSystem {
         // Apply disco sparkle effect to new balls
         ball.applyEffect(BallEffectType.DISCO_SPARKLE);
 
-        // If fireball is active, apply it too (effects stack!)
-        if (this.fireballLevel > 0) {
-          ball.setFireball(this.fireballLevel);
-        }
+        // Apply all propagatable active effects using the config registry
+        this.propagationConfigs.forEach((config) => {
+          if (config.propagateToNewBalls && config.isActive()) {
+            config.applyToBall(ball);
+          }
+        });
       });
     }
     // No duration tracking - instant effect
@@ -197,21 +287,62 @@ export class PowerUpSystem {
 
   /**
    * Apply Electric Ball effect (speed up ball with AOE damage)
+   * Uses global timer so all balls expire at the same time
    */
   private applyElectricBall(): void {
     const duration = POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].duration;
+    this.electricBallEndTime = this.scene.time.now + duration;
+
+    // Cancel existing timer if refreshing effect
+    if (this.electricBallTimer) {
+      this.electricBallTimer.destroy();
+    }
 
     // Apply to primary ball
-    this.primaryBall.setElectricBall(duration);
+    this.applyElectricBallToBall(this.primaryBall);
 
     // Apply to any extra balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (ball !== this.primaryBall) {
-        ball.setElectricBall(duration);
+        this.applyElectricBallToBall(ball);
       }
     });
 
+    // Global expiration timer
+    this.electricBallTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireElectricBall();
+    });
+
     this.trackEffect(PowerUpType.ELECTRICBALL, duration);
+  }
+
+  /**
+   * Apply Electric Ball effect to a single ball with remaining duration
+   * Used by propagation config when new balls spawn mid-effect
+   */
+  private applyElectricBallToBall(ball: Ball): void {
+    const remaining = Math.max(0, this.electricBallEndTime - this.scene.time.now);
+    if (remaining > 0) {
+      ball.setElectricBall(remaining);
+    }
+  }
+
+  /**
+   * Expire Electric Ball effect from all balls
+   */
+  private expireElectricBall(): void {
+    this.electricBallEndTime = 0;
+    this.electricBallTimer = null;
+
+    // Clear from primary ball
+    this.primaryBall.clearElectricBall();
+
+    // Clear from all extra balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearElectricBall();
+    });
+
+    this.events.emit('effectExpired', PowerUpType.ELECTRICBALL);
   }
 
   /**
@@ -371,5 +502,24 @@ export class PowerUpSystem {
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
     });
+
+    // Clear Electric Ball state
+    if (this.electricBallTimer) {
+      this.electricBallTimer.destroy();
+      this.electricBallTimer = null;
+    }
+    this.electricBallEndTime = 0;
+    this.primaryBall.clearElectricBall();
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearElectricBall();
+    });
+
+    // Clear Balloon state
+    if (this.balloonTimer) {
+      this.balloonTimer.destroy();
+      this.balloonTimer = null;
+    }
+    this.balloonEndTime = 0;
+    // Ball.setFloating handles its own cleanup via internal timer
   }
 }

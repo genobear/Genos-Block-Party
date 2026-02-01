@@ -6,6 +6,18 @@ interface AudioSettings {
   musicVolume: number;
   sfxVolume: number;
   muted: boolean;
+  forceLevelMusic: boolean;
+  forceTrackChangeOnTransition: boolean;
+}
+
+/**
+ * Track info for the Music Player scene
+ */
+export interface TrackInfo {
+  key: string;
+  path: string;
+  metadata: TrackMetadata;
+  level: number | null; // null for menu music
 }
 
 /**
@@ -32,6 +44,9 @@ export class AudioManager {
   private playlistIndex: number = 0;
   private currentLevelNumber: number = -1;
   private isTransitioning: boolean = false;
+
+  // User's selected station from Music Player (used when forceLevelMusic is false)
+  private selectedStation: 'all' | number | null = 'all';  // 'all', level number, or null for menu
 
   // Track loaded music keys for cleanup
   private loadedMusicKeys: Set<string> = new Set();
@@ -129,6 +144,8 @@ export class AudioManager {
           musicVolume: parsed.musicVolume ?? AUDIO.DEFAULT_MUSIC_VOLUME,
           sfxVolume: parsed.sfxVolume ?? AUDIO.DEFAULT_SFX_VOLUME,
           muted: parsed.muted ?? false,
+          forceLevelMusic: parsed.forceLevelMusic ?? true,
+          forceTrackChangeOnTransition: parsed.forceTrackChangeOnTransition ?? true,
         };
       }
     } catch {
@@ -138,6 +155,8 @@ export class AudioManager {
       musicVolume: AUDIO.DEFAULT_MUSIC_VOLUME,
       sfxVolume: AUDIO.DEFAULT_SFX_VOLUME,
       muted: false,
+      forceLevelMusic: true,
+      forceTrackChangeOnTransition: true,
     };
   }
 
@@ -197,6 +216,132 @@ export class AudioManager {
     return this.settings.muted;
   }
 
+  /**
+   * Check if level theme music lock is enabled
+   * When true, only plays songs from the current level during gameplay
+   */
+  isForceLevelMusic(): boolean {
+    return this.settings.forceLevelMusic;
+  }
+
+  /**
+   * Set the level theme music lock
+   */
+  setForceLevelMusic(force: boolean): void {
+    this.settings.forceLevelMusic = force;
+
+    // If turning OFF level lock, also turn OFF force track change (it depends on level lock)
+    if (!force) {
+      this.settings.forceTrackChangeOnTransition = false;
+    }
+
+    this.saveSettings();
+
+    // Rebuild playlist based on new setting
+    if (force && this.currentLevelNumber > 0) {
+      // Switching to level lock ON - rebuild for current level
+      this.rebuildPlaylistForStation();
+    } else if (!force) {
+      // Switching to level lock OFF - use selected station
+      this.rebuildPlaylistForStation();
+    }
+  }
+
+  /**
+   * Check if force track change on transition is enabled
+   * When true, automatically switches to a new track when entering a level or menu
+   * Only available when forceLevelMusic is also enabled
+   */
+  isForceTrackChangeOnTransition(): boolean {
+    return this.settings.forceTrackChangeOnTransition;
+  }
+
+  /**
+   * Set force track change on transition
+   * Can only be enabled if forceLevelMusic is also enabled
+   */
+  setForceTrackChangeOnTransition(force: boolean): void {
+    // Can only enable if level lock is also enabled
+    if (force && !this.settings.forceLevelMusic) {
+      return;
+    }
+    this.settings.forceTrackChangeOnTransition = force;
+    this.saveSettings();
+  }
+
+  /**
+   * Get the user's selected station from Music Player
+   */
+  getSelectedStation(): 'all' | number | null {
+    return this.selectedStation;
+  }
+
+  /**
+   * Set the user's selected station (called from MusicPlayerScene)
+   * Rebuilds playlist unless we're in a level with level theme lock ON
+   */
+  setSelectedStation(station: 'all' | number | null): void {
+    this.selectedStation = station;
+
+    // Rebuild playlist unless we're in a level with level theme lock ON
+    // - In menu (currentLevelNumber <= 0): Always rebuild when station changes
+    // - In level with lock OFF: Rebuild when station changes
+    // - In level with lock ON: Don't rebuild (level tracks take priority)
+    if (!this.settings.forceLevelMusic || this.currentLevelNumber <= 0) {
+      this.rebuildPlaylistForStation();
+    }
+  }
+
+  /**
+   * Rebuild the playlist based on current settings
+   * - If forceLevelMusic is ON: use current level tracks
+   * - If forceLevelMusic is OFF: use selected station
+   */
+  private async rebuildPlaylistForStation(): Promise<void> {
+    if (!this.scene) return;
+
+    let tracks: { key: string; path: string; metadata: TrackMetadata }[];
+
+    if (this.settings.forceLevelMusic && this.currentLevelNumber > 0) {
+      // Level lock ON, in a level - use current level tracks only
+      tracks = this.getTracksForLevel(this.currentLevelNumber);
+    } else if (this.settings.forceLevelMusic && this.currentLevelNumber <= 0) {
+      // Level lock ON, in menu - use menu music
+      tracks = this.getMenuTracks();
+    } else if (this.selectedStation === 'all') {
+      // Level lock OFF - use all tracks
+      tracks = this.getAllTracksForPlaylist();
+    } else if (this.selectedStation === null) {
+      // Level lock OFF, menu station selected - use menu music
+      tracks = this.getMenuTracks();
+    } else {
+      // Level lock OFF, specific level selected - use that level's tracks
+      tracks = this.getTracksForLevel(this.selectedStation);
+    }
+
+    if (tracks.length === 0) {
+      return;
+    }
+
+    // Load tracks if needed
+    for (const track of tracks) {
+      if (!this.scene.cache.audio.exists(track.key)) {
+        this.scene.load.audio(track.key, track.path);
+      }
+      this.trackMetadataMap.set(track.key, track.metadata);
+    }
+
+    const trackKeys = tracks.map(t => t.key);
+    await this.loadTracks(trackKeys);
+
+    // Update playlist with new tracks (shuffled)
+    this.currentPlaylist = this.shuffleArray([...trackKeys]);
+    this.playlistIndex = 0;
+
+    // Track loaded keys
+    trackKeys.forEach(key => this.loadedMusicKeys.add(key));
+  }
+
   // =====================
   // SFX Playback
   // =====================
@@ -223,10 +368,10 @@ export class AudioManager {
 
   /**
    * Play a single track (for menu music, etc.)
+   * Playlist provides looping - individual tracks never loop
    * @param key - The audio key
-   * @param loop - Whether to loop the track
    */
-  async playMusic(key: string, loop: boolean = true): Promise<void> {
+  async playMusic(key: string): Promise<void> {
     if (!this.scene?.sound) return;
 
     // Check if already playing this track
@@ -234,8 +379,15 @@ export class AudioManager {
       return;
     }
 
+    // Ensure playlist exists so complete handler can loop
+    // If no playlist set up, create minimal playlist with just this track
+    if (this.currentPlaylist.length === 0) {
+      this.currentPlaylist = [key];
+      this.playlistIndex = 0;
+    }
+
     // Crossfade to new track
-    await this.crossfadeTo(key, loop);
+    await this.crossfadeTo(key);
   }
 
   /**
@@ -268,6 +420,7 @@ export class AudioManager {
   /**
    * Load and start playing music for a specific level
    * Implements shuffled playlist with seamless crossfade from any current music
+   * When forceLevelMusic is false, loads ALL tracks into the playlist
    */
   async loadLevelMusic(levelNumber: number): Promise<void> {
     if (!this.scene) return;
@@ -284,8 +437,16 @@ export class AudioManager {
     // Update state for new level
     this.currentLevelNumber = levelNumber;
 
-    // Get tracks from manifest
-    const tracks = this.getTracksForLevel(levelNumber);
+    // Get tracks based on forceLevelMusic setting
+    let tracks: { key: string; path: string; metadata: TrackMetadata }[];
+
+    if (this.settings.forceLevelMusic) {
+      // Only load tracks for this specific level
+      tracks = this.getTracksForLevel(levelNumber);
+    } else {
+      // Load ALL tracks from all levels (free play mode)
+      tracks = this.getAllTracksForPlaylist();
+    }
 
     if (tracks.length === 0) {
       console.warn(`No music found for level ${levelNumber}`);
@@ -309,13 +470,46 @@ export class AudioManager {
     this.currentPlaylist = this.shuffleArray([...trackKeys]);
     this.playlistIndex = 0;
 
-    // Start playing (crossfade happens here - old music fades out, new fades in)
-    await this.playNextTrack();
+    // Decide whether to force a track change:
+    // - If forceTrackChangeOnTransition is ON, switch to a new track ONLY if current track is not in new playlist
+    // - If OFF, keep current track playing; when it ends, complete handler plays from updated playlist
+    if (this.settings.forceTrackChangeOnTransition) {
+      const currentKey = this.currentMusic?.key;
+      // Only force track change if current track is NOT in the new playlist
+      if (!currentKey || !this.currentPlaylist.includes(currentKey)) {
+        await this.playNextTrack();
+      }
+    }
+    // Note: If keeping current track, its existing complete handler will use the updated playlist
+    // since it references this.currentPlaylist (which we just updated above)
 
     // NOW clean up old level's cache (after crossfade complete)
-    if (oldLevelNumber !== -1 && oldLevelNumber !== levelNumber) {
+    // Only cleanup when forceLevelMusic is true (otherwise we want to keep all tracks)
+    if (this.settings.forceLevelMusic && oldLevelNumber !== -1 && oldLevelNumber !== levelNumber) {
       this.cleanupOldTracks(oldKeys);
     }
+  }
+
+  /**
+   * Get all tracks from all levels for free play mode
+   */
+  private getAllTracksForPlaylist(): { key: string; path: string; metadata: TrackMetadata }[] {
+    if (!this.manifest) return [];
+
+    const tracks: { key: string; path: string; metadata: TrackMetadata }[] = [];
+
+    for (const levelConfig of this.manifest.music.levels) {
+      for (const track of levelConfig.tracks) {
+        const key = this.filePathToKey(track.file);
+        tracks.push({
+          key,
+          path: track.file,
+          metadata: track,
+        });
+      }
+    }
+
+    return tracks;
   }
 
   /**
@@ -360,6 +554,18 @@ export class AudioManager {
   }
 
   /**
+   * Get menu music tracks
+   */
+  private getMenuTracks(): { key: string; path: string; metadata: TrackMetadata }[] {
+    if (!this.manifest?.music.menu) return [];
+    return [{
+      key: 'menu-music',
+      path: this.manifest.music.menu.file,
+      metadata: this.manifest.music.menu,
+    }];
+  }
+
+  /**
    * Get all level numbers that have music configured
    */
   getAvailableLevelsWithMusic(): number[] {
@@ -372,6 +578,77 @@ export class AudioManager {
       }
     }
     return Array.from(levels).sort((a, b) => a - b);
+  }
+
+  /**
+   * Get all tracks from the manifest (for Music Player scene)
+   */
+  getAllTracks(): TrackInfo[] {
+    if (!this.manifest) return [];
+
+    const tracks: TrackInfo[] = [];
+
+    // Add menu track
+    if (this.manifest.music.menu) {
+      tracks.push({
+        key: 'menu-music',
+        path: this.manifest.music.menu.file,
+        metadata: this.manifest.music.menu,
+        level: null,
+      });
+    }
+
+    // Add all level tracks
+    for (const levelConfig of this.manifest.music.levels) {
+      const levelNum = levelConfig.levels[0]; // Primary level number
+      for (const track of levelConfig.tracks) {
+        const key = this.filePathToKey(track.file);
+        tracks.push({
+          key,
+          path: track.file,
+          metadata: track,
+          level: levelNum,
+        });
+      }
+    }
+
+    return tracks;
+  }
+
+  /**
+   * Get the audio key of the currently playing track
+   */
+  getCurrentTrackKey(): string | null {
+    return this.currentMusic?.key ?? null;
+  }
+
+  /**
+   * Play a specific track by key (for Music Player manual selection)
+   * Loads the track if not already in cache
+   * After this track completes, will resume normal playlist behavior
+   */
+  async playTrackByKey(trackInfo: TrackInfo): Promise<void> {
+    if (!this.scene) return;
+
+    // Guard against double-clicks or rapid selections during transition
+    if (this.isTransitioning) return;
+
+    // Guard against selecting the already-playing track
+    if (this.currentMusic?.key === trackInfo.key && (this.currentMusic as Phaser.Sound.BaseSound).isPlaying) {
+      return;
+    }
+
+    // Load if not in cache
+    if (!this.scene.cache.audio.exists(trackInfo.key)) {
+      this.scene.load.audio(trackInfo.key, trackInfo.path);
+      await this.loadTracks([trackInfo.key]);
+    }
+
+    // Store metadata mapping
+    this.trackMetadataMap.set(trackInfo.key, trackInfo.metadata);
+
+    // Crossfade to the selected track (complete handler set up in crossfadeTo)
+    await this.crossfadeTo(trackInfo.key);
   }
 
   /**
@@ -434,23 +711,15 @@ export class AudioManager {
     const nextKey = availableTracks[this.playlistIndex % availableTracks.length];
     this.playlistIndex = (this.playlistIndex + 1) % availableTracks.length;
 
-    // Crossfade to the next track
-    await this.crossfadeTo(nextKey, false);
-
-    // Set up listener for track completion
-    if (this.currentMusic) {
-      this.currentMusic.once('complete', () => {
-        if (!this.isTransitioning) {
-          this.playNextTrack();
-        }
-      });
-    }
+    // Crossfade to the next track (complete handler set up in crossfadeTo)
+    await this.crossfadeTo(nextKey);
   }
 
   /**
    * Crossfade from current track to a new track
+   * Never loops individual tracks - playlist provides continuous playback
    */
-  private async crossfadeTo(key: string, loop: boolean = false): Promise<void> {
+  private async crossfadeTo(key: string): Promise<void> {
     if (!this.scene?.sound) return;
 
     // Check if audio exists
@@ -461,10 +730,10 @@ export class AudioManager {
 
     this.isTransitioning = true;
 
-    // Create the new track at volume 0
+    // Create the new track at volume 0 (never loop - playlist handles continuity)
     const newTrack = this.scene.sound.add(key, {
       volume: 0,
-      loop,
+      loop: false,
     });
 
     // Start playing new track
@@ -494,6 +763,13 @@ export class AudioManager {
     if (this.currentTrackMetadata) {
       this.onTrackChangeCallbacks.forEach(callback => callback(this.currentTrackMetadata));
     }
+
+    // Always set up complete handler to play next from playlist
+    this.currentMusic.once('complete', () => {
+      if (!this.isTransitioning && this.currentPlaylist.length > 0) {
+        this.playNextTrack();
+      }
+    });
   }
 
   /**
@@ -501,7 +777,8 @@ export class AudioManager {
    */
   private fadeIn(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.scene) {
+      if (!this.scene?.tweens) {
+        // Scene or tweens not available - resolve immediately
         resolve();
         return;
       }
@@ -520,7 +797,8 @@ export class AudioManager {
    */
   private fadeOut(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.scene) {
+      if (!this.scene?.tweens) {
+        // Scene or tweens not available - resolve immediately
         resolve();
         return;
       }
@@ -706,6 +984,28 @@ export class AudioManager {
     return () => {
       this.onTrackChangeCallbacks.delete(callback);
     };
+  }
+
+  /**
+   * Handle returning to menu - rebuilds playlist based on level lock setting
+   * When level lock is ON, switches to menu music playlist
+   * When level lock is OFF, continues with current playlist behavior
+   */
+  async handleReturnToMenu(): Promise<void> {
+    const wasInLevel = this.currentLevelNumber > 0;
+    this.currentLevelNumber = -1;
+
+    // If level lock is ON and we were in a level, rebuild playlist for menu
+    if (this.settings.forceLevelMusic && wasInLevel) {
+      await this.rebuildPlaylistForStation();
+
+      // Only force track change if that setting is also ON
+      if (this.settings.forceTrackChangeOnTransition && this.currentPlaylist.length > 0) {
+        await this.playNextTrack();
+      }
+      // Note: If keeping current track, its existing complete handler will use the updated playlist
+    }
+    // If level lock is OFF, playlist is already based on selected station, no change needed
   }
 
   /**

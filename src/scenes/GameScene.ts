@@ -129,8 +129,9 @@ export class GameScene extends Phaser.Scene {
     // Initialize effect manager for the primary ball (for fireball, disco, etc.)
     this.ball.initEffectManager(this);
 
-    // Get audio manager instance
+    // Get audio manager instance and initialize with this scene
     this.audioManager = AudioManager.getInstance();
+    this.audioManager.init(this);
 
     // Wire up "Now Playing" toast notification
     const nowPlayingToast = NowPlayingToast.getInstance();

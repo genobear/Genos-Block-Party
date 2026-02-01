@@ -76,7 +76,8 @@ export class ElectricBallEffectHandler extends BaseBallEffect {
       delay: 60,
       callback: () => {
         if (this.ball && this.active) {
-          this.ball.setTint(this.BALL_TINTS[this.colorIndex]);
+          // Use manager's tint blending system
+          this.setEffectTint(this.BALL_TINTS[this.colorIndex]);
           this.colorIndex = (this.colorIndex + 1) % this.BALL_TINTS.length;
         }
       },
@@ -148,10 +149,7 @@ export class ElectricBallEffectHandler extends BaseBallEffect {
   }
 
   stop(): void {
-    // Clear ball tint
-    if (this.ball) {
-      this.ball.clearTint();
-    }
+    // Base class handles tint cleanup via setEffectTint(null)
     super.stop();
   }
 }
