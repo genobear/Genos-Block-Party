@@ -4,7 +4,6 @@ import { AudioManager } from '../systems/AudioManager';
 
 export class SettingsScene extends Phaser.Scene {
   private audioManager!: AudioManager;
-  private muteText!: Phaser.GameObjects.Text;
   private returnTo: string = 'MenuScene';
 
   constructor() {
@@ -18,108 +17,113 @@ export class SettingsScene extends Phaser.Scene {
   create(): void {
     this.audioManager = AudioManager.getInstance();
 
-    // When opened from PauseScene, bring to top so it renders above game scenes
-    if (this.returnTo === 'PauseScene') {
-      this.scene.bringToTop();
-    }
+    // Bring to top so it renders above other scenes
+    this.scene.bringToTop();
 
-    // Background
-    this.add.rectangle(
+    // Full-screen dimmed backdrop
+    const backdrop = this.add.rectangle(
       GAME_WIDTH / 2,
       GAME_HEIGHT / 2,
       GAME_WIDTH,
       GAME_HEIGHT,
-      0x1a1a2e
+      0x000000,
+      0.6
     );
+    backdrop.setInteractive(); // Block clicks from passing through
 
-    // Container for all elements
-    const container = this.add.container(GAME_WIDTH / 2, 0);
+    // Panel dimensions
+    const panelWidth = 340;
+    const panelHeight = 300;
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
 
-    // Title
-    const title = this.add.text(0, 100, 'SETTINGS', {
-      font: 'bold 48px Arial',
+    // Container centered on screen
+    const container = this.add.container(centerX, centerY);
+
+    // Panel background with rounded corners effect (using graphics for polish)
+    const panelBg = this.add.graphics();
+    panelBg.fillStyle(0x1a1a2e, 0.98);
+    panelBg.fillRoundedRect(-panelWidth / 2, -panelHeight / 2, panelWidth, panelHeight, 16);
+    panelBg.lineStyle(2, 0x3d3d5c);
+    panelBg.strokeRoundedRect(-panelWidth / 2, -panelHeight / 2, panelWidth, panelHeight, 16);
+    container.add(panelBg);
+
+    // Title - positioned at top of panel with padding
+    const title = this.add.text(0, -panelHeight / 2 + 40, 'SETTINGS', {
+      font: 'bold 36px Arial',
       color: '#ffffff',
     }).setOrigin(0.5);
     container.add(title);
 
     // Audio section header
-    const audioHeader = this.add.text(0, 180, 'Audio', {
-      font: 'bold 24px Arial',
+    const audioHeader = this.add.text(0, -panelHeight / 2 + 90, 'Audio', {
+      font: 'bold 20px Arial',
       color: '#a78bfa',
     }).setOrigin(0.5);
     container.add(audioHeader);
 
+    // Slider layout constants
+    const labelX = -panelWidth / 2 + 30;
+    const sliderX = -15;
+    const musicY = -panelHeight / 2 + 140;
+    const sfxY = -panelHeight / 2 + 190;
+
     // Music volume slider
-    const musicLabel = this.add.text(-120, 240, 'Music:', {
-      font: '20px Arial',
-      color: '#ffffff',
+    const musicLabel = this.add.text(labelX, musicY, 'Music:', {
+      font: '18px Arial',
+      color: '#cccccc',
     }).setOrigin(0, 0.5);
     container.add(musicLabel);
 
     const musicSlider = this.createVolumeSlider(
-      20, 240,
+      sliderX, musicY,
       this.audioManager.getMusicVolume(),
       (value) => this.audioManager.setMusicVolume(value)
     );
     container.add(musicSlider);
 
     // SFX volume slider
-    const sfxLabel = this.add.text(-120, 300, 'SFX:', {
-      font: '20px Arial',
-      color: '#ffffff',
+    const sfxLabel = this.add.text(labelX, sfxY, 'SFX:', {
+      font: '18px Arial',
+      color: '#cccccc',
     }).setOrigin(0, 0.5);
     container.add(sfxLabel);
 
     const sfxSlider = this.createVolumeSlider(
-      20, 300,
+      sliderX, sfxY,
       this.audioManager.getSfxVolume(),
       (value) => this.audioManager.setSfxVolume(value)
     );
     container.add(sfxSlider);
 
-    // Mute toggle
-    const muteLabel = this.add.text(-120, 360, 'Sound:', {
-      font: '20px Arial',
-      color: '#ffffff',
-    }).setOrigin(0, 0.5);
-    container.add(muteLabel);
-
-    const muteButton = this.add.rectangle(60, 360, 80, 40, 0x333333)
-      .setInteractive({ useHandCursor: true });
-    container.add(muteButton);
-
-    this.muteText = this.add.text(60, 360, this.audioManager.isMuted() ? 'OFF' : 'ON', {
-      font: 'bold 18px Arial',
-      color: this.audioManager.isMuted() ? '#ff6b6b' : '#4ade80',
-    }).setOrigin(0.5);
-    container.add(this.muteText);
-
-    muteButton.on('pointerover', () => muteButton.setFillStyle(0x444444));
-    muteButton.on('pointerout', () => muteButton.setFillStyle(0x333333));
-    muteButton.on('pointerdown', () => {
-      const muted = this.audioManager.toggleMute();
-      this.muteText.setText(muted ? 'OFF' : 'ON');
-      this.muteText.setColor(muted ? '#ff6b6b' : '#4ade80');
-    });
-
-    // Back button
-    const backButton = this.createButton(0, 480, 'BACK', 0x666666, () => {
+    // Back button - positioned at bottom of panel
+    const backButton = this.createButton(0, panelHeight / 2 - 50, 'BACK', 0x4a4a6a, () => {
+      // PauseScene stops itself before launching Settings, so we need to re-launch it
+      // MenuScene stays running as an overlay, so just stopping Settings is enough
       if (this.returnTo === 'PauseScene') {
-        // Return to pause menu overlay (game remains paused)
-        this.scene.stop();
         this.scene.launch('PauseScene');
-      } else {
-        this.scene.start('MenuScene');
       }
+      this.scene.stop();
     });
     container.add(backButton);
 
-    // Animate in
+    // Animate in with scale + fade
     container.setAlpha(0);
+    container.setScale(0.9);
+    backdrop.setAlpha(0);
+
+    this.tweens.add({
+      targets: backdrop,
+      alpha: 1,
+      duration: 150,
+    });
+
     this.tweens.add({
       targets: container,
       alpha: 1,
+      scale: 1,
       duration: 200,
+      ease: 'Back.easeOut',
     });
   }
 
@@ -131,20 +135,29 @@ export class SettingsScene extends Phaser.Scene {
     onClick: () => void
   ): Phaser.GameObjects.Container {
     const buttonContainer = this.add.container(x, y);
+    const width = 180;
+    const height = 44;
 
-    const bg = this.add.rectangle(0, 0, 200, 50, color)
-      .setInteractive({ useHandCursor: true });
+    // Rounded rectangle background
+    const bg = this.add.graphics();
+    bg.fillStyle(color, 1);
+    bg.fillRoundedRect(-width / 2, -height / 2, width, height, 8);
     buttonContainer.add(bg);
 
+    // Invisible hit area for interaction
+    const hitArea = this.add.rectangle(0, 0, width, height, 0x000000, 0)
+      .setInteractive({ useHandCursor: true });
+    buttonContainer.add(hitArea);
+
     const buttonText = this.add.text(0, 0, text, {
-      font: 'bold 20px Arial',
+      font: 'bold 18px Arial',
       color: '#ffffff',
     }).setOrigin(0.5);
     buttonContainer.add(buttonText);
 
-    bg.on('pointerover', () => buttonContainer.setScale(1.05));
-    bg.on('pointerout', () => buttonContainer.setScale(1));
-    bg.on('pointerdown', onClick);
+    hitArea.on('pointerover', () => buttonContainer.setScale(1.05));
+    hitArea.on('pointerout', () => buttonContainer.setScale(1));
+    hitArea.on('pointerdown', onClick);
 
     return buttonContainer;
   }

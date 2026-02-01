@@ -55,6 +55,14 @@ export class MusicPlayerScene extends Phaser.Scene {
   private forceTrackChangeSwitchKnob!: Phaser.GameObjects.Arc;
   private forceTrackChangeLabel!: Phaser.GameObjects.Text;
 
+  // Volume slider elements
+  private volumeValueText!: Phaser.GameObjects.Text;
+  private volumeFill!: Phaser.GameObjects.Rectangle;
+  private volumeHandle!: Phaser.GameObjects.Arc;
+
+  // Tooltip container
+  private activeTooltip: Phaser.GameObjects.Container | null = null;
+
   // Track change listener cleanup
   private unsubscribeTrackChange: (() => void) | null = null;
 
@@ -83,15 +91,10 @@ export class MusicPlayerScene extends Phaser.Scene {
     this.allTracks = this.audioManager.getAllTracks();
     this.filteredTracks = [...this.allTracks];
 
-    // Semi-transparent overlay
-    this.add.rectangle(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      GAME_WIDTH,
-      GAME_HEIGHT,
-      0x000000,
-      0.85
-    );
+    // When opened from PauseScene, bring to top so it renders above game scenes
+    if (this.returnTo === 'PauseScene') {
+      this.scene.bringToTop();
+    }
 
     // Create the radio cabinet
     this.createRadioCabinet();
@@ -126,62 +129,65 @@ export class MusicPlayerScene extends Phaser.Scene {
     const cabinet = this.add.container(centerX, GAME_HEIGHT / 2);
 
     // Outer frame
-    const outerFrame = this.add.rectangle(0, 0, 620, 820, RADIO_COLORS.WOOD_DARK);
+    const outerFrame = this.add.rectangle(0, 0, 620, 880, RADIO_COLORS.WOOD_DARK);
     outerFrame.setStrokeStyle(4, RADIO_COLORS.WOOD_HIGHLIGHT);
     cabinet.add(outerFrame);
 
     // Inner frame
-    const innerFrame = this.add.rectangle(0, 0, 600, 800, RADIO_COLORS.WOOD_MEDIUM);
+    const innerFrame = this.add.rectangle(0, 0, 600, 860, RADIO_COLORS.WOOD_MEDIUM);
     cabinet.add(innerFrame);
 
     // Add wood grain effect with lines
     for (let i = -290; i < 290; i += 12) {
-      const line = this.add.rectangle(i, 0, 1, 780, RADIO_COLORS.WOOD_DARK, 0.1);
+      const line = this.add.rectangle(i, 0, 1, 840, RADIO_COLORS.WOOD_DARK, 0.1);
       cabinet.add(line);
     }
 
     // Title
-    const title = this.add.text(0, -360, '🎵 MUSIC PLAYER', {
+    const title = this.add.text(0, -390, '🎵 MUSIC PLAYER 🎵', {
       font: 'bold 28px Arial',
       color: '#ffb347',
     }).setOrigin(0.5);
     cabinet.add(title);
 
-    const subtitle = this.add.text(0, -330, "GENO'S BLOCK PARTY", {
+    const subtitle = this.add.text(0, -360, "GENO'S BLOCK PARTY", {
       font: '12px Arial',
       color: '#8b7355',
     }).setOrigin(0.5);
     cabinet.add(subtitle);
 
     // Vacuum tubes row
-    this.createVacuumTubes(cabinet, 0, -295);
+    this.createVacuumTubes(cabinet, 0, -320);
 
     // Dial display (now playing)
-    this.createDialDisplay(cabinet, 0, -210);
+    this.createDialDisplay(cabinet, 0, -230);
 
     // Playback controls
-    this.createPlaybackControls(cabinet, 0, -110);
+    this.createPlaybackControls(cabinet, 0, -120);
 
-    // Filter tabs
-    this.createFilterTabs(cabinet, 0, -50);
+    // Filter tabs (extra gap after playback controls)
+    this.createFilterTabs(cabinet, 0, -35);
 
     // Track list
-    this.createTrackList(cabinet, 0, 120);
+    this.createTrackList(cabinet, 0, 155);
 
     // Level Theme Lock toggle
-    this.createLevelThemeLockToggle(cabinet, 0, 280);
+    this.createLevelThemeLockToggle(cabinet, 0, 310);
 
     // Force Track Change toggle (depends on Level Theme Lock)
-    this.createForceTrackChangeToggle(cabinet, 0, 330);
+    this.createForceTrackChangeToggle(cabinet, 0, 360);
 
-    // Back button
-    this.createBackButton(cabinet, 0, 385);
+    // Volume slider
+    this.createVolumeSlider(cabinet, 0, 414);
+
+    // Close button (top-left corner)
+    this.createCloseButton(cabinet, -280, -400);
 
     // Corner screws
-    this.createScrew(cabinet, -295, -395);
-    this.createScrew(cabinet, 295, -395);
-    this.createScrew(cabinet, -295, 395);
-    this.createScrew(cabinet, 295, 395);
+    this.createScrew(cabinet, -295, -425);
+    this.createScrew(cabinet, 295, -425);
+    this.createScrew(cabinet, -295, 425);
+    this.createScrew(cabinet, 295, 425);
 
     // Animate in
     cabinet.setScale(0.9);
@@ -366,14 +372,14 @@ export class MusicPlayerScene extends Phaser.Scene {
     const tabs = this.add.container(x, y);
 
     // Label
-    const label = this.add.text(0, -20, '⟡ SELECT STATION ⟡', {
+    const label = this.add.text(0, -25, '⟡ SELECT STATION ⟡', {
       font: '10px Arial',
       color: '#8b7355',
     }).setOrigin(0.5);
     tabs.add(label);
 
-    // Tab container background
-    const tabBg = this.add.rectangle(0, 10, 450, 36, RADIO_COLORS.VINYL_BLACK);
+    // Tab container background (taller to fit two rows)
+    const tabBg = this.add.rectangle(0, 18, 450, 70, RADIO_COLORS.VINYL_BLACK);
     tabBg.setStrokeStyle(1, 0x333333);
     tabs.add(tabBg);
 
@@ -385,18 +391,30 @@ export class MusicPlayerScene extends Phaser.Scene {
       { label: 'MENU', value: 0 },
     ];
 
-    const tabWidth = 70;
-    const startX = -((filters.length - 1) * tabWidth) / 2;
+    // Split into two rows: 6 tabs top, rest bottom
+    const tabWidth = 72;
+    const tabHeight = 26;
+    const row1Count = 6;
+    const row1Y = 3;
+    const row2Y = 33;
 
     filters.forEach((filter, i) => {
-      const tabX = startX + i * tabWidth;
+      const isRow1 = i < row1Count;
+      const rowIndex = isRow1 ? i : i - row1Count;
+      const rowCount = isRow1 ? row1Count : filters.length - row1Count;
+      const tabY = isRow1 ? row1Y : row2Y;
 
-      const btn = this.add.rectangle(tabX, 10, 60, 28, 0x333333);
+      // Center each row independently
+      const startX = -((rowCount - 1) * tabWidth) / 2;
+      const tabX = startX + rowIndex * tabWidth;
+
+      const btn = this.add.rectangle(tabX, tabY, 65, tabHeight, RADIO_COLORS.WOOD_DARK);
+      btn.setStrokeStyle(1, 0x333333);
       btn.setInteractive({ useHandCursor: true });
       tabs.add(btn);
 
-      const txt = this.add.text(tabX, 10, filter.label, {
-        font: '12px Arial',
+      const txt = this.add.text(tabX, tabY, filter.label, {
+        font: '11px Arial',
         color: '#8b7355',
       }).setOrigin(0.5);
       tabs.add(txt);
@@ -405,13 +423,13 @@ export class MusicPlayerScene extends Phaser.Scene {
 
       btn.on('pointerover', () => {
         if (this.currentFilter !== filter.value) {
-          btn.setFillStyle(0x444444);
+          btn.setFillStyle(RADIO_COLORS.WOOD_MEDIUM);
         }
       });
 
       btn.on('pointerout', () => {
         if (this.currentFilter !== filter.value) {
-          btn.setFillStyle(0x333333);
+          btn.setFillStyle(RADIO_COLORS.WOOD_DARK);
         }
       });
 
@@ -453,7 +471,7 @@ export class MusicPlayerScene extends Phaser.Scene {
         tab.button.setFillStyle(RADIO_COLORS.DIAL_AMBER);
         tab.text.setColor('#1a0f0a');
       } else {
-        tab.button.setFillStyle(0x333333);
+        tab.button.setFillStyle(RADIO_COLORS.WOOD_DARK);
         tab.text.setColor('#8b7355');
       }
     });
@@ -463,13 +481,14 @@ export class MusicPlayerScene extends Phaser.Scene {
     this.trackListContainer = this.add.container(x, y);
 
     // Background
-    const listBg = this.add.rectangle(0, 0, 500, 240, RADIO_COLORS.VINYL_BLACK);
+    const listBg = this.add.rectangle(0, 0, 500, 250, RADIO_COLORS.VINYL_BLACK);
     listBg.setStrokeStyle(2, 0x333333);
     this.trackListContainer.add(listBg);
 
     // Create track item slots
     const itemHeight = 38;
-    const startY = -((this.maxVisibleTracks - 1) * itemHeight) / 2;
+    const listPadding = 8; // Top padding to prevent first row overlapping container edge
+    const startY = -((this.maxVisibleTracks - 1) * itemHeight) / 2 + listPadding;
 
     for (let i = 0; i < this.maxVisibleTracks; i++) {
       const itemY = startY + i * itemHeight;
@@ -497,8 +516,8 @@ export class MusicPlayerScene extends Phaser.Scene {
   private createTrackListItem(y: number): Phaser.GameObjects.Container {
     const item = this.add.container(0, y);
 
-    // Background
-    const bg = this.add.rectangle(0, 0, 480, 34, 0x2a2a2a);
+    // Background (narrower to leave space for scroll buttons)
+    const bg = this.add.rectangle(-10, 0, 440, 34, 0x2a2a2a);
     bg.setInteractive({ useHandCursor: true });
     item.add(bg);
 
@@ -523,11 +542,11 @@ export class MusicPlayerScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
     item.add(artistText);
 
-    // Level badge
-    const levelBadge = this.add.rectangle(200, 0, 50, 20, RADIO_COLORS.WOOD_MEDIUM);
+    // Level badge (positioned left of scroll buttons at x=230)
+    const levelBadge = this.add.rectangle(170, 0, 50, 20, RADIO_COLORS.WOOD_MEDIUM);
     item.add(levelBadge);
 
-    const levelText = this.add.text(200, 0, '', {
+    const levelText = this.add.text(170, 0, '', {
       font: '10px Arial',
       color: '#f5e6c8',
     }).setOrigin(0.5);
@@ -660,7 +679,7 @@ export class MusicPlayerScene extends Phaser.Scene {
     const toggle = this.add.container(x, y);
 
     // Background
-    const bg = this.add.rectangle(0, 0, 450, 50, 0x000000, 0.3);
+    const bg = this.add.rectangle(0, 0, 450, 40, 0x000000, 0.3);
     toggle.add(bg);
 
     // Toggle switch
@@ -681,12 +700,8 @@ export class MusicPlayerScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
     toggle.add(label);
 
-    // Help text
-    const helpText = this.add.text(0, 38, 'When ON, only songs from the current level play during gameplay', {
-      font: '11px Arial',
-      color: '#8b7355',
-    }).setOrigin(0.5);
-    toggle.add(helpText);
+    // Info icon with tooltip
+    this.createInfoIcon(toggle, 180, 0, 'When ON, only songs from the\ncurrent level play during gameplay');
 
     // Toggle interaction
     switchBg.on('pointerdown', () => {
@@ -742,7 +757,7 @@ export class MusicPlayerScene extends Phaser.Scene {
     const toggle = this.add.container(x, y);
 
     // Background
-    const bg = this.add.rectangle(0, 0, 450, 45, 0x000000, 0.3);
+    const bg = this.add.rectangle(0, 0, 450, 40, 0x000000, 0.3);
     toggle.add(bg);
 
     // Check if enabled (only available when level lock is ON)
@@ -768,12 +783,8 @@ export class MusicPlayerScene extends Phaser.Scene {
     }).setOrigin(0, 0.5);
     toggle.add(this.forceTrackChangeLabel);
 
-    // Help text
-    const helpText = this.add.text(0, 30, 'Auto-switch tracks on level/menu transitions (requires Level Theme Lock)', {
-      font: '10px Arial',
-      color: '#8b7355',
-    }).setOrigin(0.5);
-    toggle.add(helpText);
+    // Info icon with tooltip
+    this.createInfoIcon(toggle, 180, 0, 'Auto-switch tracks on level/menu\ntransitions (requires Level Theme Lock)');
 
     // Toggle interaction
     this.forceTrackChangeSwitchBg.on('pointerdown', () => {
@@ -801,26 +812,169 @@ export class MusicPlayerScene extends Phaser.Scene {
     parent.add(toggle);
   }
 
-  private createBackButton(parent: Phaser.GameObjects.Container, x: number, y: number): void {
+  private createInfoIcon(parent: Phaser.GameObjects.Container, x: number, y: number, tooltipText: string): void {
+    const icon = this.add.text(x, y, 'ⓘ', {
+      font: '16px Arial',
+      color: '#8b7355',
+    }).setOrigin(0.5);
+    icon.setInteractive({ useHandCursor: true });
+    parent.add(icon);
+
+    icon.on('pointerover', () => {
+      icon.setColor('#f5e6c8');
+      this.showTooltip(x, y - 45, tooltipText, parent);
+    });
+
+    icon.on('pointerout', () => {
+      icon.setColor('#8b7355');
+      this.hideTooltip();
+    });
+  }
+
+  private showTooltip(x: number, y: number, text: string, parent: Phaser.GameObjects.Container): void {
+    this.hideTooltip();
+
+    const tooltip = this.add.container(x, y);
+
+    // Calculate text dimensions
+    const tempText = this.add.text(0, 0, text, {
+      font: '11px Arial',
+      color: '#f5e6c8',
+      align: 'center',
+    }).setOrigin(0.5);
+
+    const padding = 10;
+    const bgWidth = tempText.width + padding * 2;
+    const bgHeight = tempText.height + padding * 2;
+
+    // Background
+    const bg = this.add.rectangle(0, 0, bgWidth, bgHeight, RADIO_COLORS.WOOD_DARK, 0.95);
+    bg.setStrokeStyle(1, RADIO_COLORS.WOOD_HIGHLIGHT);
+    tooltip.add(bg);
+
+    // Text
+    tempText.setOrigin(0.5);
+    tooltip.add(tempText);
+
+    // Arrow pointing down
+    const arrow = this.add.triangle(0, bgHeight / 2 + 5, -6, 0, 6, 0, 0, 8, RADIO_COLORS.WOOD_DARK);
+    tooltip.add(arrow);
+
+    parent.add(tooltip);
+    this.activeTooltip = tooltip;
+
+    // Animate in
+    tooltip.setAlpha(0);
+    tooltip.setScale(0.9);
+    this.tweens.add({
+      targets: tooltip,
+      alpha: 1,
+      scale: 1,
+      duration: 150,
+      ease: 'Power2',
+    });
+  }
+
+  private hideTooltip(): void {
+    if (this.activeTooltip) {
+      this.activeTooltip.destroy();
+      this.activeTooltip = null;
+    }
+  }
+
+  private createVolumeSlider(parent: Phaser.GameObjects.Container, x: number, y: number): void {
+    const slider = this.add.container(x, y);
+    const sliderWidth = 200;
+    const sliderHeight = 8;
+
+    // Background
+    const bg = this.add.rectangle(0, 0, 450, 42, 0x000000, 0.3);
+    slider.add(bg);
+
+    // Volume icon
+    const icon = this.add.text(-200, 0, '🔊', {
+      font: '18px Arial',
+    }).setOrigin(0.5);
+    slider.add(icon);
+
+    // Label
+    const label = this.add.text(-165, 0, 'VOLUME', {
+      font: '12px Arial',
+      color: '#8b7355',
+    }).setOrigin(0, 0.5);
+    slider.add(label);
+
+    // Track background
+    const track = this.add.rectangle(-20, 0, sliderWidth, sliderHeight, RADIO_COLORS.WOOD_DARK)
+      .setOrigin(0, 0.5);
+    track.setStrokeStyle(1, 0x333333);
+    slider.add(track);
+
+    // Fill bar
+    const initialValue = this.audioManager.getMusicVolume();
+    this.volumeFill = this.add.rectangle(-20, 0, sliderWidth * initialValue, sliderHeight, RADIO_COLORS.DIAL_AMBER)
+      .setOrigin(0, 0.5);
+    slider.add(this.volumeFill);
+
+    // Handle
+    this.volumeHandle = this.add.circle(-20 + sliderWidth * initialValue, 0, 10, RADIO_COLORS.DIAL_CREAM);
+    this.volumeHandle.setStrokeStyle(2, RADIO_COLORS.WOOD_HIGHLIGHT);
+    this.volumeHandle.setInteractive({ useHandCursor: true, draggable: true });
+    slider.add(this.volumeHandle);
+
+    // Value display
+    this.volumeValueText = this.add.text(200, 0, `${Math.round(initialValue * 100)}%`, {
+      font: 'bold 14px Arial',
+      color: '#f5e6c8',
+    }).setOrigin(0, 0.5);
+    slider.add(this.volumeValueText);
+
+    // Make track clickable
+    track.setInteractive({ useHandCursor: true });
+    track.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      const localX = pointer.x - (GAME_WIDTH / 2 + x - 20);
+      const value = Phaser.Math.Clamp(localX / sliderWidth, 0, 1);
+      this.updateVolumeSlider(value, sliderWidth);
+    });
+
+    // Drag handling
+    this.input.on('drag', (_pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.GameObject, dragX: number) => {
+      if (gameObject === this.volumeHandle) {
+        const value = Phaser.Math.Clamp((dragX + 20) / sliderWidth, 0, 1);
+        this.updateVolumeSlider(value, sliderWidth);
+      }
+    });
+
+    parent.add(slider);
+  }
+
+  private updateVolumeSlider(value: number, sliderWidth: number): void {
+    this.volumeHandle.x = -20 + value * sliderWidth;
+    this.volumeFill.width = value * sliderWidth;
+    this.volumeValueText.setText(`${Math.round(value * 100)}%`);
+    this.audioManager.setMusicVolume(value);
+  }
+
+  private createCloseButton(parent: Phaser.GameObjects.Container, x: number, y: number): void {
     const btn = this.add.container(x, y);
 
-    const bg = this.add.rectangle(0, 0, 200, 45, RADIO_COLORS.WOOD_LIGHT);
+    const bg = this.add.circle(0, 0, 14, RADIO_COLORS.WOOD_MEDIUM);
     bg.setStrokeStyle(2, RADIO_COLORS.WOOD_HIGHLIGHT);
     bg.setInteractive({ useHandCursor: true });
     btn.add(bg);
 
-    const text = this.add.text(0, 0, '← BACK', {
-      font: 'bold 18px Arial',
+    const text = this.add.text(0, 0, '✕', {
+      font: 'bold 16px Arial',
       color: '#f5e6c8',
     }).setOrigin(0.5);
     btn.add(text);
 
     bg.on('pointerover', () => {
-      btn.setScale(1.05);
+      bg.setFillStyle(RADIO_COLORS.WOOD_HIGHLIGHT);
     });
 
     bg.on('pointerout', () => {
-      btn.setScale(1);
+      bg.setFillStyle(RADIO_COLORS.WOOD_MEDIUM);
     });
 
     bg.on('pointerdown', () => {
@@ -863,6 +1017,12 @@ export class MusicPlayerScene extends Phaser.Scene {
   }
 
   private goBack(): void {
-    this.scene.start(this.returnTo);
+    if (this.returnTo === 'PauseScene') {
+      // Stop overlay and relaunch PauseScene
+      this.scene.stop();
+      this.scene.launch('PauseScene');
+    } else {
+      this.scene.start(this.returnTo);
+    }
   }
 }

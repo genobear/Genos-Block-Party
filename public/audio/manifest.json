@@ -26,7 +26,9 @@
   "music": {
     "menu": {
       "file": "audio/music/menu/menu-theme.mp3",
-      "name": "Block Party Theme"
+      "name": "Block Party Theme",
+      "artist": "Geno",
+      "genre": "Chiptune"
     },
     "levels": [
       {

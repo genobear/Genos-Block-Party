@@ -108,7 +108,7 @@ export class MenuScene extends Phaser.Scene {
 
     settingsButton.on('pointerdown', () => {
       if (this.isTransitioning) return;
-      this.scene.start('SettingsScene', { returnTo: 'MenuScene' });
+      this.scene.launch('SettingsScene', { returnTo: 'MenuScene' });
     });
 
     // Music Player button (vintage brown)

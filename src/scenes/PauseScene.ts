@@ -16,7 +16,10 @@ export class PauseScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Get AudioManager and init with this scene so it can use our sound/tween systems
+    // (GameScene is paused, so we need an active scene for audio operations)
     this.audioManager = AudioManager.getInstance();
+    this.audioManager.init(this);
 
     // Semi-transparent overlay
     const overlay = this.add.rectangle(
@@ -51,14 +54,14 @@ export class PauseScene extends Phaser.Scene {
     // Settings button
     const settingsButton = this.createButton(0, 20, 'SETTINGS', 0x666666, () => {
       this.scene.stop();
-      this.scene.start('SettingsScene', { returnTo: 'PauseScene' });
+      this.scene.launch('SettingsScene', { returnTo: 'PauseScene' });
     });
     container.add(settingsButton);
 
     // Music Player button (vintage brown)
     const musicPlayerButton = this.createButton(0, 90, 'MUSIC PLAYER', 0x8b4513, () => {
       this.scene.stop();
-      this.scene.start('MusicPlayerScene', { returnTo: 'PauseScene' });
+      this.scene.launch('MusicPlayerScene', { returnTo: 'PauseScene' });
     });
     container.add(musicPlayerButton);
 
