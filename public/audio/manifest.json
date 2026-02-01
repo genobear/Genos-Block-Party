@@ -56,26 +56,31 @@
           {
             "file": "audio/music/level2/Fortune on the Corner.mp3",
             "name": "Fortune on the Corner",
+            "artist": "Stoop Kid",
             "genre": "Funk"
           },
           {
             "file": "audio/music/level2/Fortune on the Block.mp3",
             "name": "Fortune on the Block",
+            "artist": "Stoop Kid",
             "genre": "Funk"
           },
           {
             "file": "audio/music/level2/Block Party Get Lucky.mp3",
             "name": "Block Party Get Lucky",
+            "artist": "Stoop Kid",
             "genre": "Funk"
           },
           {
             "file": "audio/music/level2/Stoop Kid Level 2.mp3",
-            "name": "Stoop Kid",
+            "name": "Stoop Kid @ Lvl 2",
+            "artist": "Stoop Kid",
             "genre": "Hip-Hop"
           },
           {
             "file": "audio/music/level2/[2] Block Party Get Lucky.mp3",
             "name": "Block Party Get Lucky (Remix)",
+            "artist": "Stoop Kid",
             "genre": "Funk"
           }
         ]
@@ -88,17 +93,230 @@
           {
             "file": "audio/music/level3/Gift Factory Block Party.mp3",
             "name": "Gift Factory Block Party",
-            "genre": "Electronic"
+            "genre": "Synthpop",
+            "artist": "DJ Synthwave Sam"
           },
           {
-            "file": "audio/music/level3/[3] Level 3 Genos Block Party.mp3",
+            "file": "audio/music/level3/Level 3 Genos Block Party.mp3",
             "name": "Geno's Block Party",
-            "genre": "Party"
+            "genre": "Party",
+            "artist": "DJ Synthwave Sam"
           },
           {
-            "file": "audio/music/level3/[3] Always One More High.mp3",
+            "file": "audio/music/level3/Always One More High.mp3",
             "name": "Always One More High",
-            "genre": "Electronic"
+            "genre": "Electronic",
+            "artist": "DJ Synthwave Sam"
+          }
+        ]
+      },
+      {
+        "levels": [
+          4
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level4/Pinta Grooves.mp3",
+            "name": "Pinta Grooves",
+            "artist": "Señor Bass",
+            "genre": "Latin House"
+          },
+          {
+            "file": "audio/music/level4/Pinta Panic.mp3",
+            "name": "Pinta Panic",
+            "artist": "Señor Bass",
+            "genre": "Latin House"
+          },
+          {
+            "file": "audio/music/level4/Piñata Panic.mp3",
+            "name": "Piñata Panic",
+            "artist": "Señor Bass",
+            "genre": "Latin House"
+          }
+        ]
+      },
+      {
+        "levels": [
+          5
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level5/Dark Maze.mp3",
+            "name": "Dark Maze",
+            "artist": "Sonic Mushroom",
+            "genre": "Techno"
+          },
+          {
+            "file": "audio/music/level5/Master of None.mp3",
+            "name": "Master of None",
+            "artist": "Sonic Mushroom",
+            "genre": "Techno"
+          },
+          {
+            "file": "audio/music/level5/Robot Dominion.mp3",
+            "name": "Robot Dominion",
+            "artist": "Sonic Mushroom",
+            "genre": "Techno"
+          }
+        ]
+      },
+      {
+        "levels": [
+          6
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level6/Balloon Bonanza Block Party.mp3",
+            "name": "Balloon Bonanza Block Party",
+            "artist": "Rude Boy Rudy",
+            "genre": "Ska"
+          },
+          {
+            "file": "audio/music/level6/Balloon Riot.mp3",
+            "name": "Balloon Riot",
+            "artist": "Rude Boy Rudy",
+            "genre": "Ska"
+          },
+          {
+            "file": "audio/music/level6/Skanking at the Block Party.mp3",
+            "name": "Skanking at the Block Party",
+            "artist": "Rude Boy Rudy",
+            "genre": "Ska"
+          },
+          {
+            "file": "audio/music/level6/Skanking at the Block Party Remix.mp3",
+            "name": "Skanking at the Block Party (Remix)",
+            "artist": "Rude Boy Rudy",
+            "genre": "Ska"
+          }
+        ]
+      },
+      {
+        "levels": [
+          7
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level7/Genos Basement Level 7.mp3",
+            "name": "Geno's Basement",
+            "artist": "Neon Reaper",
+            "genre": "Synthwave"
+          },
+          {
+            "file": "audio/music/level7/Last Call.mp3",
+            "name": "Last Call",
+            "artist": "Neon Reaper",
+            "genre": "Synthwave"
+          },
+          {
+            "file": "audio/music/level7/Neon Trenchcoat Heart.mp3",
+            "name": "Neon Trenchcoat Heart",
+            "artist": "Neon Reaper",
+            "genre": "Synthwave"
+          },
+          {
+            "file": "audio/music/level7/Nicotine Saint.mp3",
+            "name": "Nicotine Saint",
+            "artist": "Neon Reaper",
+            "genre": "Synthwave"
+          },
+          {
+            "file": "audio/music/level7/Rain on the Neon Case.mp3",
+            "name": "Rain on the Neon Case",
+            "artist": "Neon Reaper",
+            "genre": "Synthwave"
+          }
+        ]
+      },
+      {
+        "levels": [
+          8
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level8/Assembly Line Suicide.mp3",
+            "name": "Assembly Line Suicide",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          },
+          {
+            "file": "audio/music/level8/Corrosion Gospel.mp3",
+            "name": "Corrosion Gospel",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          },
+          {
+            "file": "audio/music/level8/[8] Assembly Line Suicide.mp3",
+            "name": "Assembly Line Suicide (Alt)",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          },
+          {
+            "file": "audio/music/level8/[8] Bass Reactive.mp3",
+            "name": "Bass Reactive",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          },
+          {
+            "file": "audio/music/level8/[8] Hydraulic Rupture.mp3",
+            "name": "Hydraulic Rupture",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          },
+          {
+            "file": "audio/music/level8/[8] Rust Lung Pressure.mp3",
+            "name": "Rust Lung Pressure",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          },
+          {
+            "file": "audio/music/level8/[8] Rustwater Rapture.mp3",
+            "name": "Rustwater Rapture",
+            "artist": "The Augment",
+            "genre": "Drumstep"
+          }
+        ]
+      },
+      {
+        "levels": [
+          9
+        ],
+        "tracks": [
+          {
+            "file": "audio/music/level9/Back For A Sound Boy Burial.mp3",
+            "name": "Back For A Sound Boy Burial",
+            "artist": "MC Drop",
+            "genre": "Jungle"
+          },
+          {
+            "file": "audio/music/level9/Back For A Sound Boy Burial - Dirty Remix.mp3",
+            "name": "Back For A Sound Boy Burial (Dirty Remix)",
+            "artist": "MC Drop",
+            "genre": "Jungle"
+          },
+          {
+            "file": "audio/music/level9/Big An Bad Junglist.mp3",
+            "name": "Big An Bad Junglist",
+            "artist": "MC Drop",
+            "genre": "Jungle"
+          },
+          {
+            "file": "audio/music/level9/Big An Bad Junglist Remix.mp3",
+            "name": "Big An Bad Junglist (Remix)",
+            "artist": "MC Drop",
+            "genre": "Jungle"
+          },
+          {
+            "file": "audio/music/level9/Junglist Massive Pull Up.mp3",
+            "name": "Junglist Massive Pull Up",
+            "artist": "MC Drop",
+            "genre": "Jungle"
+          },
+          {
+            "file": "audio/music/level9/Junglist Massive Pull Up Dirty Mix.mp3",
+            "name": "Junglist Massive Pull Up (Dirty Mix)",
+            "artist": "MC Drop",
+            "genre": "Jungle"
           }
         ]
       }

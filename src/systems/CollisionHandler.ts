@@ -148,12 +148,25 @@ export class CollisionHandler {
       this.processElectricAOE(brick);
     }
 
+    // Roll for drops BEFORE applying damage (each damage point rolls independently)
+    const dropsToSpawn = brick.rollDropsForDamage(damage, false);
+
+    // Spawn power-ups from this damage event
+    if (dropsToSpawn > 0) {
+      const dropPos = brick.getPowerUpDropPosition();
+      for (let i = 0; i < dropsToSpawn; i++) {
+        // Spread horizontally to prevent stacking
+        const offsetX = (i - (dropsToSpawn - 1) / 2) * 15;
+        this.powerUpSystem.spawn(dropPos.x + offsetX, dropPos.y);
+      }
+    }
+
     // Apply damage to the brick
     const isDestroyed = brick.takeDamage(damage);
-    let droppedPowerUp = false;
+    const droppedPowerUp = dropsToSpawn > 0;
 
     if (isDestroyed) {
-      droppedPowerUp = this.processBrickDestroyed(brick, isFireball, ball.getFireballLevel());
+      this.processBrickDestroyed(brick, isFireball, ball.getFireballLevel());
     } else {
       this.processBrickHit();
     }
@@ -162,9 +175,10 @@ export class CollisionHandler {
   }
 
   /**
-   * Process a destroyed brick (audio, particles, power-up drop, level check)
+   * Process a destroyed brick (audio, particles, level check)
+   * Note: Power-up drops are now handled before takeDamage() in handleBallBrick()
    */
-  private processBrickDestroyed(brick: Brick, isFireball: boolean, fireballLevel: number): boolean {
+  private processBrickDestroyed(brick: Brick, isFireball: boolean, fireballLevel: number): void {
     // Audio
     this.audioManager.playSFX(AUDIO.SFX.HORN);
 
@@ -180,14 +194,6 @@ export class CollisionHandler {
     brick.setActive(false);
     brick.disableBody(true);
 
-    // Check for power-up drop
-    let droppedPowerUp = false;
-    if (brick.shouldDropPowerUp()) {
-      const dropPos = brick.getPowerUpDropPosition();
-      this.powerUpSystem.spawn(dropPos.x, dropPos.y);
-      droppedPowerUp = true;
-    }
-
     // Check if level is complete (before animation finishes)
     const levelComplete = this.getBrickCount() === 0;
 
@@ -197,8 +203,6 @@ export class CollisionHandler {
         this.onLevelComplete();
       }
     });
-
-    return droppedPowerUp;
   }
 
   /**
@@ -228,11 +232,16 @@ export class CollisionHandler {
         // Score for AOE hits (50% of normal value)
         this.onScoreChange(Math.floor(brick.getScoreValue() * 0.5));
 
+        // Roll for drop BEFORE damage (with AOE penalty via isAOE=true)
+        if (brick.shouldDropPowerUp(true)) {
+          const dropPos = brick.getPowerUpDropPosition();
+          this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+        }
+
         // Apply 1 damage to adjacent brick
         const isDestroyed = brick.takeDamage(1);
 
         if (isDestroyed) {
-          // Process destruction with reduced power-up drop chance
           this.processAOEBrickDestroyed(brick);
         } else {
           // Just play hit sound
@@ -243,7 +252,8 @@ export class CollisionHandler {
   }
 
   /**
-   * Process an AOE-destroyed brick (reduced power-up drop chance)
+   * Process an AOE-destroyed brick (audio, particles, level check)
+   * Note: Power-up drops are now handled before takeDamage() in processElectricAOE()
    */
   private processAOEBrickDestroyed(brick: Brick): void {
     // Audio
@@ -259,12 +269,6 @@ export class CollisionHandler {
     // Immediately deactivate
     brick.setActive(false);
     brick.disableBody(true);
-
-    // Check for power-up drop (50% reduced chance for AOE kills)
-    if (Math.random() < brick.getDropChance() * 0.5) {
-      const dropPos = brick.getPowerUpDropPosition();
-      this.powerUpSystem.spawn(dropPos.x, dropPos.y);
-    }
 
     // Check if level is complete
     const levelComplete = this.getBrickCount() === 0;

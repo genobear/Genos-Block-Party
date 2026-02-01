@@ -134,11 +134,29 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Check if brick should drop a power-up when destroyed.
+   * Check if brick should drop a power-up.
    * Uses getDropChance() as single source of truth for the calculation.
+   * @param isAOE If true, apply 50% AOE penalty
    */
-  shouldDropPowerUp(): boolean {
-    return Math.random() < this.getDropChance();
+  shouldDropPowerUp(isAOE: boolean = false): boolean {
+    return Math.random() < this.getDropChance(isAOE);
+  }
+
+  /**
+   * Roll for power-up drops for each damage point taken.
+   * Returns number of power-ups that should drop (0 to damageAmount).
+   * @param damageAmount Number of damage points (each rolls independently)
+   * @param isAOE If true, apply 50% AOE penalty
+   */
+  rollDropsForDamage(damageAmount: number, isAOE: boolean = false): number {
+    let drops = 0;
+    const chance = this.getDropChance(isAOE);
+    for (let i = 0; i < damageAmount; i++) {
+      if (Math.random() < chance) {
+        drops++;
+      }
+    }
+    return drops;
   }
 
   /**
@@ -202,9 +220,11 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Get the current calculated drop chance (for debug display)
+   * Get the current calculated drop chance.
+   * Single source of truth for drop probability calculation.
+   * @param isAOE If true, apply 50% AOE penalty
    */
-  getDropChance(): number {
+  getDropChance(isAOE: boolean = false): number {
     // Debug override takes absolute precedence
     if (Brick.debugDropChance !== null) {
       return Brick.debugDropChance;
@@ -216,6 +236,11 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
     // Apply Power Ball multiplier if active (double, cap at 100%)
     if (Brick.powerBallActive) {
       chance = Math.min(chance * 2, 1);
+    }
+
+    // Apply AOE penalty (50% reduction for Electric Ball chain damage)
+    if (isAOE) {
+      chance *= 0.5;
     }
 
     return chance;
