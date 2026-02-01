@@ -19,8 +19,8 @@ export class UIScene extends Phaser.Scene {
 
   // Power-up indicators (positioned in bottom UI border)
   private powerUpIndicators: Map<string, PowerUpIndicator> = new Map();
-  private indicatorStartX = 16;
-  private indicatorY = GAME_HEIGHT - 25; // Center of bottom 50px border
+  private indicatorStartX = 24;
+  private indicatorY = GAME_HEIGHT - 32; // Offset to keep timer bar (+28) within bounds
 
   // Pause button (for mobile)
   private pauseButton!: Phaser.GameObjects.Container;
@@ -332,7 +332,7 @@ export class UIScene extends Phaser.Scene {
 
     // Calculate position
     const index = this.powerUpIndicators.size;
-    const x = this.indicatorStartX + index * 50;
+    const x = this.indicatorStartX + index * 56;
 
     // Create container
     const container = this.add.container(x, this.indicatorY);
@@ -446,7 +446,7 @@ export class UIScene extends Phaser.Scene {
   private repositionIndicators(): void {
     let index = 0;
     this.powerUpIndicators.forEach((indicator) => {
-      const targetX = this.indicatorStartX + index * 50;
+      const targetX = this.indicatorStartX + index * 56;
       this.tweens.add({
         targets: indicator.container,
         x: targetX,

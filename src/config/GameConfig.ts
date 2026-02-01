@@ -16,8 +16,9 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   parent: 'game-container',
   transparent: true,
   scale: {
-    mode: Phaser.Scale.NONE,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    parent: 'game-container',
   },
   physics: {
     default: 'arcade',

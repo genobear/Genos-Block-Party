@@ -5,9 +5,11 @@ export const UI_BORDER_BOTTOM = 50; // Space for power-up indicators
 // Mobile touch zone (extra height below game for touch input)
 export const MOBILE_TOUCH_ZONE_HEIGHT = 150;
 
-// Detect touch device
+// Detect if primary input is touch (not just touch-capable)
+// pointer: coarse = finger/touch, pointer: fine = mouse/trackpad
+// This prevents touchscreen laptops from getting the mobile layout
 export const IS_TOUCH_DEVICE = typeof window !== 'undefined' &&
-  ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  window.matchMedia('(pointer: coarse)').matches;
 
 // Playable area dimensions (actual gameplay space)
 export const PLAYABLE_WIDTH = 800;

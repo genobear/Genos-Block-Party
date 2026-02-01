@@ -96,13 +96,13 @@
         transition: none !important;
       }
 
-      /* Frosted glass game container */
+      /* Frosted glass game container - aspect-ratio matches canvas dimensions */
       #game-container {
         position: relative;
         z-index: 1;
         width: 100%;
         max-width: 800px;
-        aspect-ratio: 800 / 900;
+        aspect-ratio: 800 / 900; /* Desktop: 800x900 canvas */
         background: rgba(0, 0, 0, 0.5);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
@@ -593,13 +593,18 @@
         transform: scale(1) translateY(0);
       }
 
-      /* Mobile: taller canvas for touch zone below paddle */
-      @media (pointer: coarse) {
-        #game-container {
-          aspect-ratio: 800 / 1050;
-        }
+      /* Mobile: taller aspect ratio for touch zone (synced with JS detection) */
+      .touch-device #game-container {
+        aspect-ratio: 800 / 1050;
       }
     </style>
+    <script>
+      // Sync touch detection between CSS and JS (matches Constants.ts IS_TOUCH_DEVICE)
+      // Uses pointer: coarse to detect primary touch input, not just touch capability
+      if (window.matchMedia('(pointer: coarse)').matches) {
+        document.documentElement.classList.add('touch-device');
+      }
+    </script>
   </head>
   <body>
     <!-- Loading Overlay - renders immediately before JS -->
