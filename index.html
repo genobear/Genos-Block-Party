@@ -125,8 +125,9 @@
 
       .now-playing-toast {
         position: fixed;
-        bottom: 140px;
-        right: -420px;
+        top: -100px;
+        left: 50%;
+        transform: translateX(-50%);
         z-index: 1000;
 
         /* Allow touch to pass through to game canvas below */
@@ -158,8 +159,8 @@
           0 8px 32px rgba(0, 0, 0, 0.5),
           inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
-        /* Slide animation */
-        transition: right 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        /* Slide animation - drops down from top */
+        transition: top 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 
         /* Subtle scanline overlay */
         overflow: hidden;
@@ -184,12 +185,12 @@
       }
 
       .now-playing-toast.visible {
-        right: 28px;
+        top: 20px;
       }
 
       .now-playing-toast.hiding {
-        right: -420px;
-        transition: right 0.4s ease-in;
+        top: -100px;
+        transition: top 0.4s ease-in;
       }
 
       /* Animated border glow pulse */
@@ -313,14 +314,16 @@
       /* Responsive adjustments */
       @media (max-width: 600px) {
         .now-playing-toast {
-          bottom: 120px;
-          right: -340px;
-          min-width: 240px;
-          max-width: 300px;
+          top: -80px;
+          left: 8px;
+          right: 8px;
+          transform: none;
+          min-width: auto;
+          max-width: none;
         }
 
         .now-playing-toast.visible {
-          right: 12px;
+          top: 12px;
         }
 
         .now-playing-eq {

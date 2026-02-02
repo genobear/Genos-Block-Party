@@ -294,7 +294,7 @@ export class UIScene extends Phaser.Scene {
     });
   }
 
-  private updateMultiplier(multiplier: number, _hitCount: number): void {
+  private updateMultiplier(multiplier: number): void {
     if (multiplier < MULTIPLIER.MIN_DISPLAY_THRESHOLD) {
       // Hide when low
       this.tweens.add({

@@ -64,7 +64,6 @@ export class GameScene extends Phaser.Scene {
   private isLevelTransitioning: boolean = false;
 
   // Multiplier state
-  private hitCount: number = 0;
   private multiplier: number = MULTIPLIER.BASE;
   private lastHitTime: number = 0;
 
@@ -82,7 +81,6 @@ export class GameScene extends Phaser.Scene {
     this.canLaunch = true;
 
     // Reset multiplier state
-    this.hitCount = 0;
     this.multiplier = MULTIPLIER.BASE;
     this.lastHitTime = 0;
 
@@ -199,7 +197,7 @@ export class GameScene extends Phaser.Scene {
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
     this.events.emit('levelUpdate', this.currentLevel.name);
-    this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
+    this.events.emit('multiplierUpdate', this.multiplier);
 
     // Input for launching ball
     this.input.on('pointerdown', this.handleClick, this);
@@ -587,13 +585,18 @@ export class GameScene extends Phaser.Scene {
    * Increment the score multiplier on each brick hit
    */
   private incrementMultiplier(): void {
-    this.hitCount++;
     this.lastHitTime = this.time.now;
+
+    // Diminishing increment: harder to grow at higher multipliers
+    // At 1.0x: +0.15, at 3.0x: +0.075, at 5.0x: +0.0375
+    const growthFactor = MULTIPLIER.BASE / this.multiplier;
+    const increment = 0.15 * growthFactor;
+
     this.multiplier = Math.min(
       MULTIPLIER.MAX_MULTIPLIER,
-      MULTIPLIER.BASE + Math.log(this.hitCount + 1) * MULTIPLIER.SCALE_FACTOR
+      this.multiplier + increment
     );
-    this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
+    this.events.emit('multiplierUpdate', this.multiplier);
   }
 
   /**
@@ -614,10 +617,7 @@ export class GameScene extends Phaser.Scene {
 
       const decay = effectiveDecayRate * (delta / 1000);
       this.multiplier = Math.max(MULTIPLIER.BASE, this.multiplier - decay);
-      if (this.multiplier <= MULTIPLIER.BASE) {
-        this.hitCount = 0;
-      }
-      this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
+      this.events.emit('multiplierUpdate', this.multiplier);
     }
   }
 
@@ -625,10 +625,9 @@ export class GameScene extends Phaser.Scene {
    * Reset the multiplier to base value
    */
   private resetMultiplier(): void {
-    this.hitCount = 0;
     this.multiplier = MULTIPLIER.BASE;
     this.lastHitTime = 0;
-    this.events.emit('multiplierUpdate', this.multiplier, this.hitCount);
+    this.events.emit('multiplierUpdate', this.multiplier);
   }
 
   /**

@@ -118,7 +118,6 @@ export const CURRENCY = {
 // Multiplier system settings
 export const MULTIPLIER = {
   BASE: 1.0,                    // Starting multiplier
-  SCALE_FACTOR: 0.5,            // Controls logarithmic growth rate
   MAX_MULTIPLIER: 5.0,          // Cap to prevent extreme scores
   DECAY_DELAY_MS: 1000,         // Grace period before decay starts (shorter since decay scales)
   DECAY_RATE: 0.5,              // Multiplier drop per second during decay (scales with level)

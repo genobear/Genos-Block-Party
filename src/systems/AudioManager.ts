@@ -34,6 +34,7 @@ export class AudioManager {
   private static instance: AudioManager | null = null;
 
   private scene: Phaser.Scene | null = null;
+  private musicScene: Phaser.Scene | null = null; // Dedicated music scene (never pauses)
   private settings: AudioSettings;
   private manifest: AudioManifest | null = null;
 
@@ -78,14 +79,35 @@ export class AudioManager {
   /**
    * Initialize the AudioManager with the current scene
    * Call this in scene.create() before using audio
+   *
+   * MusicScene is locked as the dedicated music scene on first init.
+   * Other scenes can still call init() for SFX, but music operations
+   * always use MusicScene (which never pauses).
    */
   init(scene: Phaser.Scene): void {
+    // Always update scene reference (used for SFX)
     this.scene = scene;
+
+    // Lock MusicScene as dedicated music scene (first init wins)
+    if (scene.scene.key === 'MusicScene' && !this.musicScene) {
+      this.musicScene = scene;
+    }
 
     // Apply current mute state to sound manager
     if (this.scene.sound) {
       this.scene.sound.mute = this.settings.muted;
     }
+  }
+
+  /**
+   * Get the scene to use for music operations.
+   * Prefers MusicScene (never pauses), falls back to current scene.
+   */
+  private getMusicScene(): Phaser.Scene | null {
+    if (this.musicScene?.scene.isActive()) {
+      return this.musicScene;
+    }
+    return this.scene;
   }
 
   /**
@@ -302,7 +324,8 @@ export class AudioManager {
    * - If forceLevelMusic is OFF: use selected station
    */
   private async rebuildPlaylistForStation(): Promise<void> {
-    if (!this.scene) return;
+    const musicScene = this.getMusicScene();
+    if (!musicScene) return;
 
     let tracks: { key: string; path: string; metadata: TrackMetadata }[];
 
@@ -329,8 +352,8 @@ export class AudioManager {
 
     // Load tracks if needed
     for (const track of tracks) {
-      if (!this.scene.cache.audio.exists(track.key)) {
-        this.scene.load.audio(track.key, track.path);
+      if (!musicScene.cache.audio.exists(track.key)) {
+        musicScene.load.audio(track.key, track.path);
       }
       this.trackMetadataMap.set(track.key, track.metadata);
     }
@@ -376,7 +399,8 @@ export class AudioManager {
    * @param key - The audio key
    */
   async playMusic(key: string): Promise<void> {
-    if (!this.scene?.sound) return;
+    const musicScene = this.getMusicScene();
+    if (!musicScene?.sound) return;
 
     // Check if already playing this track
     if (this.currentMusic?.key === key && (this.currentMusic as Phaser.Sound.BaseSound).isPlaying) {
@@ -398,7 +422,7 @@ export class AudioManager {
    * Stop current music with optional fade out
    */
   async stopMusic(fadeOut: boolean = true): Promise<void> {
-    if (!this.currentMusic || !this.scene) return;
+    if (!this.currentMusic || !this.getMusicScene()) return;
 
     if (fadeOut) {
       await this.fadeOut(this.currentMusic, AUDIO.CROSSFADE_DURATION);
@@ -455,7 +479,7 @@ export class AudioManager {
    * Use for graceful endings (game over, win) with longer fades
    */
   async fadeOutMusic(duration?: number): Promise<void> {
-    if (!this.currentMusic || !this.scene) return;
+    if (!this.currentMusic || !this.getMusicScene()) return;
 
     const fadeDuration = duration ?? AUDIO.CROSSFADE_DURATION;
     await this.fadeOut(this.currentMusic, fadeDuration);
@@ -469,7 +493,8 @@ export class AudioManager {
    * When forceLevelMusic is false, loads ALL tracks into the playlist
    */
   async loadLevelMusic(levelNumber: number): Promise<void> {
-    if (!this.scene) return;
+    const musicScene = this.getMusicScene();
+    if (!musicScene) return;
 
     // Don't reload if same level and already playing
     if (levelNumber === this.currentLevelNumber && this.currentPlaylist.length > 0) {
@@ -501,8 +526,8 @@ export class AudioManager {
 
     // Queue tracks for loading
     for (const track of tracks) {
-      if (!this.scene.cache.audio.exists(track.key)) {
-        this.scene.load.audio(track.key, track.path);
+      if (!musicScene.cache.audio.exists(track.key)) {
+        musicScene.load.audio(track.key, track.path);
       }
       // Store metadata mapping
       this.trackMetadataMap.set(track.key, track.metadata);
@@ -563,10 +588,11 @@ export class AudioManager {
    * Preserves tracks that are shared between levels
    */
   private cleanupOldTracks(oldKeys: Set<string>): void {
+    const musicScene = this.getMusicScene();
     oldKeys.forEach(key => {
       // Don't remove if it's in the current playlist (shared tracks between levels)
-      if (!this.currentPlaylist.includes(key) && this.scene?.cache.audio.exists(key)) {
-        this.scene.cache.audio.remove(key);
+      if (!this.currentPlaylist.includes(key) && musicScene?.cache.audio.exists(key)) {
+        musicScene.cache.audio.remove(key);
         this.loadedMusicKeys.delete(key);
       }
     });
@@ -674,7 +700,8 @@ export class AudioManager {
    * After this track completes, will resume normal playlist behavior
    */
   async playTrackByKey(trackInfo: TrackInfo): Promise<void> {
-    if (!this.scene) return;
+    const musicScene = this.getMusicScene();
+    if (!musicScene) return;
 
     // Guard against double-clicks or rapid selections during transition
     if (this.isTransitioning) return;
@@ -685,8 +712,8 @@ export class AudioManager {
     }
 
     // Load if not in cache
-    if (!this.scene.cache.audio.exists(trackInfo.key)) {
-      this.scene.load.audio(trackInfo.key, trackInfo.path);
+    if (!musicScene.cache.audio.exists(trackInfo.key)) {
+      musicScene.load.audio(trackInfo.key, trackInfo.path);
       await this.loadTracks([trackInfo.key]);
     }
 
@@ -698,34 +725,35 @@ export class AudioManager {
   }
 
   /**
-   * Load audio tracks
+   * Load audio tracks (uses MusicScene for consistent loading)
    */
   private loadTracks(keys: string[]): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.scene) {
+      const musicScene = this.getMusicScene();
+      if (!musicScene) {
         resolve();
         return;
       }
 
       // Check if all tracks are already loaded
-      const allLoaded = keys.every(key => this.scene!.cache.audio.exists(key));
+      const allLoaded = keys.every(key => musicScene.cache.audio.exists(key));
       if (allLoaded) {
         resolve();
         return;
       }
 
       // Wait for loading to complete
-      this.scene.load.once('complete', () => {
+      musicScene.load.once('complete', () => {
         // Track which keys were successfully loaded
         keys.forEach(key => {
-          if (this.scene!.cache.audio.exists(key)) {
+          if (musicScene.cache.audio.exists(key)) {
             this.loadedMusicKeys.add(key);
           }
         });
         resolve();
       });
 
-      this.scene.load.once('loaderror', (file: Phaser.Loader.File) => {
+      musicScene.load.once('loaderror', (file: Phaser.Loader.File) => {
         // Remove failed tracks from playlist
         const index = this.currentPlaylist.indexOf(file.key);
         if (index > -1) {
@@ -733,7 +761,7 @@ export class AudioManager {
         }
       });
 
-      this.scene.load.start();
+      musicScene.load.start();
     });
   }
 
@@ -741,11 +769,12 @@ export class AudioManager {
    * Play the next track in the playlist
    */
   private async playNextTrack(): Promise<void> {
-    if (this.currentPlaylist.length === 0 || !this.scene) return;
+    const musicScene = this.getMusicScene();
+    if (this.currentPlaylist.length === 0 || !musicScene) return;
 
     // Filter playlist to only include successfully loaded tracks
     const availableTracks = this.currentPlaylist.filter(key =>
-      this.scene!.cache.audio.exists(key)
+      musicScene.cache.audio.exists(key)
     );
 
     if (availableTracks.length === 0) {
@@ -765,12 +794,14 @@ export class AudioManager {
    * Crossfade from current track to a new track
    * Interruption-safe: can be called while another crossfade is in progress
    * Never loops individual tracks - playlist provides continuous playback
+   * Uses MusicScene for tweens to ensure fades work even when GameScene is paused
    */
   private async crossfadeTo(key: string): Promise<void> {
-    if (!this.scene?.sound) return;
+    const musicScene = this.getMusicScene();
+    if (!musicScene?.sound) return;
 
     // Check if audio exists
-    if (!this.scene.cache.audio.exists(key)) {
+    if (!musicScene.cache.audio.exists(key)) {
       console.warn(`Audio not found for crossfade: ${key}`);
       return;
     }
@@ -790,7 +821,7 @@ export class AudioManager {
     this.isTransitioning = true;
 
     // Create the new track at volume 0 (never loop - playlist handles continuity)
-    const newTrack = this.scene.sound.add(key, {
+    const newTrack = musicScene.sound.add(key, {
       volume: 0,
       loop: false,
     });
@@ -850,16 +881,18 @@ export class AudioManager {
 
   /**
    * Fade out a sound (used for stopMusic and fadeOutMusic)
+   * Uses MusicScene for tweens to ensure fades work even when GameScene is paused
    */
   private fadeOut(sound: Phaser.Sound.BaseSound, duration: number): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.scene?.tweens) {
+      const musicScene = this.getMusicScene();
+      if (!musicScene?.tweens) {
         // Scene or tweens not available - resolve immediately
         resolve();
         return;
       }
 
-      this.scene.tweens.add({
+      musicScene.tweens.add({
         targets: sound,
         volume: 0,
         duration,
@@ -870,6 +903,7 @@ export class AudioManager {
 
   /**
    * Fade in a sound with abort support
+   * Uses MusicScene for tweens to ensure fades work even when GameScene is paused
    * Rejects if aborted, allowing cleanup
    */
   private fadeInWithAbort(
@@ -878,7 +912,8 @@ export class AudioManager {
     signal: AbortSignal
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (!this.scene?.tweens) {
+      const musicScene = this.getMusicScene();
+      if (!musicScene?.tweens) {
         resolve();
         return;
       }
@@ -889,7 +924,7 @@ export class AudioManager {
         return;
       }
 
-      const tween = this.scene.tweens.add({
+      const tween = musicScene.tweens.add({
         targets: sound,
         volume: this.settings.musicVolume,
         duration,
@@ -909,6 +944,7 @@ export class AudioManager {
 
   /**
    * Fade out a sound with abort support
+   * Uses MusicScene for tweens to ensure fades work even when GameScene is paused
    * Rejects if aborted, allowing cleanup
    */
   private fadeOutWithAbort(
@@ -917,7 +953,8 @@ export class AudioManager {
     signal: AbortSignal
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (!this.scene?.tweens) {
+      const musicScene = this.getMusicScene();
+      if (!musicScene?.tweens) {
         resolve();
         return;
       }
@@ -928,7 +965,7 @@ export class AudioManager {
         return;
       }
 
-      const tween = this.scene.tweens.add({
+      const tween = musicScene.tweens.add({
         targets: sound,
         volume: 0,
         duration,
@@ -954,9 +991,10 @@ export class AudioManager {
     this.stopAllMusic();
 
     // Remove loaded music from cache
+    const musicScene = this.getMusicScene();
     this.loadedMusicKeys.forEach(key => {
-      if (this.scene?.cache.audio.exists(key)) {
-        this.scene.cache.audio.remove(key);
+      if (musicScene?.cache.audio.exists(key)) {
+        musicScene.cache.audio.remove(key);
       }
     });
 
@@ -969,7 +1007,8 @@ export class AudioManager {
    * Preload music for the next level (background loading)
    */
   preloadLevelMusic(levelNumber: number): void {
-    if (!this.scene) return;
+    const musicScene = this.getMusicScene();
+    if (!musicScene) return;
 
     // Get tracks from manifest
     const tracks = this.getTracksForLevel(levelNumber);
@@ -980,15 +1019,15 @@ export class AudioManager {
 
     // Silently preload tracks in background
     for (const track of tracks) {
-      if (!this.scene.cache.audio.exists(track.key)) {
-        this.scene.load.audio(track.key, track.path);
+      if (!musicScene.cache.audio.exists(track.key)) {
+        musicScene.load.audio(track.key, track.path);
       }
       // Store metadata mapping
       this.trackMetadataMap.set(track.key, track.metadata);
     }
 
     // Start loading without waiting
-    this.scene.load.start();
+    musicScene.load.start();
   }
 
   // =====================
