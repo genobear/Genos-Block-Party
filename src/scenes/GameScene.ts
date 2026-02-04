@@ -193,6 +193,12 @@ export class GameScene extends Phaser.Scene {
       this.powerUpFeedbackSystem.revealMystery(actualType);
     });
 
+    // Handle extra life from Party Favor power-up
+    this.powerUpSystem.events.on('grantExtraLife', () => {
+      this.lives++;
+      this.events.emit('livesUpdate', this.lives);
+    });
+
     // Emit initial state to UI
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
@@ -222,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('effectApplied');
     this.powerUpSystem?.events?.off('effectExpired');
     this.powerUpSystem?.events?.off('mysteryRevealed');
+    this.powerUpSystem?.events?.off('grantExtraLife');
 
     // Clean up input events
     this.input?.off('pointerdown', this.handleClick, this);
