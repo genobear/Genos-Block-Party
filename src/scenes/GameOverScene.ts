@@ -4,14 +4,14 @@ import { AudioManager } from '../systems/AudioManager';
 import { CurrencyManager } from '../systems/CurrencyManager';
 import { TransitionManager } from '../systems/TransitionManager';
 import { AUDIO } from '../config/Constants';
-
-interface HighScoreEntry {
-  initials: string;
-  score: number;
-}
-
-const STORAGE_KEY = 'genos-block-party-leaderboard';
-const MAX_LEADERBOARD_ENTRIES = 5;
+import {
+  getLeaderboard,
+  checkIsHighScore,
+  insertScore,
+  saveLeaderboard,
+  HighScoreEntry,
+  MAX_ENTRIES,
+} from '../utils/leaderboard';
 
 // Layout constants
 const PANEL_WIDTH = 320;
@@ -83,8 +83,8 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     // Check if this is a new high score (unless already entered on previous visit)
-    const leaderboard = this.getLeaderboard();
-    this.isNewHighScore = !this.highScoreAlreadyEntered && this.checkIsHighScore(this.finalScore, leaderboard);
+    const leaderboard = getLeaderboard(localStorage);
+    this.isNewHighScore = !this.highScoreAlreadyEntered && checkIsHighScore(this.finalScore, leaderboard);
 
     // Keep the level background (don't change it) - just set transparent camera
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
@@ -710,17 +710,14 @@ export class GameOverScene extends Phaser.Scene {
       this.cursorBlink.remove();
     }
 
-    // Save to leaderboard
-    const leaderboard = this.getLeaderboard();
-    leaderboard.push({
+    // Save to leaderboard using extracted functions
+    const leaderboard = getLeaderboard(localStorage);
+    const newEntry: HighScoreEntry = {
       initials: this.currentInitials,
       score: this.finalScore,
-    });
-
-    leaderboard.sort((a, b) => b.score - a.score);
-    leaderboard.splice(MAX_LEADERBOARD_ENTRIES);
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
+    };
+    const updatedLeaderboard = insertScore(newEntry, leaderboard, MAX_ENTRIES);
+    saveLeaderboard(updatedLeaderboard, localStorage);
 
     // Flash confirmation
     this.initialsTexts.forEach(text => text.setColor('#4ade80'));
@@ -756,7 +753,7 @@ export class GameOverScene extends Phaser.Scene {
         this.initialsTexts = [];
 
         // Get updated leaderboard and create the panel
-        const leaderboard = this.getLeaderboard();
+        const leaderboard = getLeaderboard(localStorage);
         this.createLeaderboardPanel(
           GAME_WIDTH / 2,
           this.leaderboardPanelY,
@@ -803,24 +800,6 @@ export class GameOverScene extends Phaser.Scene {
         delay: 3000,
       });
     }
-  }
-
-  private getLeaderboard(): HighScoreEntry[] {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        return JSON.parse(data) as HighScoreEntry[];
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return [];
-  }
-
-  private checkIsHighScore(score: number, leaderboard: HighScoreEntry[]): boolean {
-    if (score === 0) return false;
-    if (leaderboard.length < MAX_LEADERBOARD_ENTRIES) return true;
-    return score > leaderboard[leaderboard.length - 1].score;
   }
 
   private startGameWithTransition(): void {
