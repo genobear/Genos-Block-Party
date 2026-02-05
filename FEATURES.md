@@ -409,7 +409,6 @@ npm run test:watch # Run tests in watch mode (development)
 
 ### Partially Implemented
 - **Audio manifest `bpm` and `loopPoint` fields** are defined in the type system but never read or used — intended for future beat-sync effects and seamless loop points
-- **`powerUpDropChance` on LevelData** is defined per level but the actual drop system uses per-brick-type chances from `BRICK_DROP_CHANCES` instead — the level field is unused
 - **Mute toggle**: `AudioManager` has `setMuted()`/`toggleMute()` but there's no mute button in the UI (only volume sliders)
 
 ### Obvious Next Steps
