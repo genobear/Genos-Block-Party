@@ -117,9 +117,9 @@ describe('getTotalWeight', () => {
 
 describe('Power-up selection integration', () => {
   it('POWERUP_CONFIGS weights sum to expected total', () => {
-    // Currently 107: balloon(20) + cake(15) + drinks(15) + disco(10) + mystery(10) + 
-    // powerball(12) + fireball(10) + electricball(12) + partyfavor(3)
-    expect(getTotalDropWeight()).toBe(107);
+    // Currently 127: balloon(20) + cake(15) + drinks(15) + disco(10) + mystery(10) +
+    // powerball(12) + fireball(10) + electricball(12) + partypopper(10) + bouncehouse(10) + partyfavor(3)
+    expect(getTotalDropWeight()).toBe(127);
   });
 
   it('all power-up types have positive weights', () => {
