@@ -95,6 +95,7 @@ const brick = (obj1 instanceof Brick) ? obj1 : (obj2 instanceof Brick) ? obj2 : 
 | `src/scenes/GameScene.ts` | Core gameplay loop, collision handling |
 | `src/systems/PowerUpSystem.ts` | Power-up spawning, effects, and expiration |
 | `src/systems/AudioManager.ts` | Singleton for music streaming and SFX playback |
+| `src/systems/BallSpeedManager.ts` | Singleton for layered ball speed calculation |
 | `src/systems/TransitionManager.ts` | Scene transitions with coordinated animations |
 | `src/systems/ElectricArcSystem.ts` | Electric Ball AOE effects and lightning visuals |
 | `src/systems/PowerUpFeedbackSystem.ts` | Visual feedback on power-up collection |
@@ -124,6 +125,34 @@ To add custom level music:
 public/audio/music/level{N}/track{1-3}.mp3
 ```
 
+### Ball Speed System
+
+**BallSpeedManager** is a singleton that calculates ball speed using layered multipliers:
+
+```
+Effective Speed = BASE (400) × difficulty × level × effects
+```
+
+**Layers:**
+1. **Difficulty** (0.5-2.0): User setting, persisted to localStorage (future SettingsScene slider)
+2. **Level** (1.0, 1.05, 1.1...): From `LevelData.ballSpeedMultiplier`, set on level load
+3. **Effects**: Named slots for power-ups (`'balloon'` = 0.6x, `'electric'` = 1.5x)
+
+**Key methods:**
+- `getEffectiveSpeed()` - Returns speed with all multipliers (use for velocity calculations)
+- `getBaseSpeed()` - Returns speed without effects (use for spawning new balls)
+- `setLevelMultiplier(value)` - Called by GameScene on level load
+- `applyEffect(name, multiplier)` / `removeEffect(name)` - Called by PowerUpSystem
+
+**Effect stacking:** Multiplicative. Balloon (0.6) + Electric (1.5) = 0.9x effective.
+
+**Configuration** (`Constants.ts`):
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `BALL_SPEED_BASE` | 400 | Base speed in px/s |
+| `SPEED_EFFECTS.BALLOON` | 0.6 | Slow ball multiplier |
+| `SPEED_EFFECTS.ELECTRIC` | 1.5 | Fast ball multiplier |
+
 ### Power-Up System
 
 Eight power-ups with weighted drops (configured in `PowerUpTypes.ts`):
@@ -151,6 +180,36 @@ Eight power-ups with weighted drops (configured in `PowerUpTypes.ts`):
 - Lightning arc visuals with 100ms delay before damage
 
 Effects emit events to UIScene for visual indicators. Timed effects use `this.time.delayedCall()`.
+
+### Multiplier System
+
+Score multiplier rewards consecutive brick hits and decays when idle.
+
+**How it works:**
+- Each brick hit adds to the current multiplier (additive, not recalculated)
+- Increment uses diminishing returns: `+0.15 * (BASE / currentMultiplier)`
+  - At 1.0x: +0.15 per hit
+  - At 3.0x: +0.05 per hit
+  - At 5.0x: +0.03 per hit
+- After 1 second of no hits, decay begins
+- Decay rate scales with multiplier level (higher = faster decay)
+- Caps at 5.0x, floor at 1.0x
+
+**Configuration** (`Constants.ts` → `MULTIPLIER`):
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `BASE` | 1.0 | Starting/minimum multiplier |
+| `MAX_MULTIPLIER` | 5.0 | Cap to prevent extreme scores |
+| `DECAY_DELAY_MS` | 1000 | Grace period before decay starts |
+| `DECAY_RATE` | 0.5 | Base decay per second (scales with level) |
+| `MIN_DISPLAY_THRESHOLD` | 1.1 | Only show UI when above this |
+
+**Key methods** in `GameScene.ts`:
+- `incrementMultiplier()` - Called on each brick hit, adds to current value
+- `updateMultiplierDecay()` - Called each frame, applies scaled decay
+- `resetMultiplier()` - Resets to BASE (called on life loss)
+
+UIScene displays the multiplier with color coding: white (low), yellow (medium), red (high).
 
 ### Ball Effect System
 

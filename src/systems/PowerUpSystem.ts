@@ -7,6 +7,9 @@ import { Ball } from '../objects/Ball';
 import { Brick } from '../objects/Brick';
 import { PowerUpType, selectRandomPowerUpType, selectRandomEffectType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { BallEffectType } from '../effects/BallEffectTypes';
+import { SafetyNet } from '../objects/SafetyNet';
+import { BallSpeedManager } from './BallSpeedManager';
+import { SPEED_EFFECTS } from '../config/Constants';
 
 /**
  * Active effect tracking
@@ -42,7 +45,7 @@ export class PowerUpSystem {
   private ballPool: BallPool;
   private paddle: Paddle;
   private activeEffects: ActiveEffect[] = [];
-  private speedMultiplier: number = 1;
+  private speedManager: BallSpeedManager;
 
   // FireBall stacking state
   private fireballLevel: number = 0;
@@ -59,6 +62,9 @@ export class PowerUpSystem {
   // DJ Scratch (Magnet) state
   private magnetActive: boolean = false;
   private magnetTimer: Phaser.Time.TimerEvent | null = null;
+
+  // Bounce House safety net state
+  private safetyNet: SafetyNet | null = null;
 
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
@@ -85,6 +91,7 @@ export class PowerUpSystem {
     this.ballPool = ballPool;
     this.powerUpPool = new PowerUpPool(scene);
     this.events = new Phaser.Events.EventEmitter();
+    this.speedManager = BallSpeedManager.getInstance();
 
     // Initialize effect registry
     this.effectHandlers = new Map([
@@ -97,6 +104,8 @@ export class PowerUpSystem {
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
       [PowerUpType.DJ_SCRATCH, () => this.applyDjScratch()],
+      [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
+      [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
     ]);
 
     // Initialize effect propagation config
@@ -121,13 +130,6 @@ export class PowerUpSystem {
         isActive: () => this.balloonEndTime > this.scene.time.now,
       }],
     ]);
-  }
-
-  /**
-   * Set ball speed multiplier (for level progression)
-   */
-  setSpeedMultiplier(multiplier: number): void {
-    this.speedMultiplier = multiplier;
   }
 
   /**
@@ -185,7 +187,10 @@ export class PowerUpSystem {
       this.balloonTimer.destroy();
     }
 
-    // Apply to all active balls
+    // Apply speed effect through manager
+    this.speedManager.applyEffect('balloon', SPEED_EFFECTS.BALLOON);
+
+    // Apply to all active balls (for visual state tracking)
     this.ballPool.getActiveBalls().forEach((ball) => {
       this.applyBalloonToBall(ball);
     });
@@ -216,6 +221,10 @@ export class PowerUpSystem {
   private expireBalloon(): void {
     this.balloonEndTime = 0;
     this.balloonTimer = null;
+
+    // Remove speed effect from manager
+    this.speedManager.removeEffect('balloon');
+
     // Ball.setFloating already handles its own timer reset via scene.time.delayedCall
     // so we don't need to explicitly clear floating state here
 
@@ -265,8 +274,8 @@ export class PowerUpSystem {
       spawnY = this.paddle.y - 50;
     }
 
-    // Spawn new balls
-    const newBalls = this.ballPool.spawnBalls(2, spawnX, spawnY, this.speedMultiplier);
+    // Spawn new balls (speed is handled by BallSpeedManager)
+    const newBalls = this.ballPool.spawnBalls(2, spawnX, spawnY);
 
     // Apply disco sparkle to ALL balls when multi-ball is active
     const allBalls = this.ballPool.getActiveBalls();
@@ -317,7 +326,10 @@ export class PowerUpSystem {
       this.electricBallTimer.destroy();
     }
 
-    // Apply to all active balls
+    // Apply speed effect through manager
+    this.speedManager.applyEffect('electric', SPEED_EFFECTS.ELECTRIC);
+
+    // Apply to all active balls (for visual state tracking)
     this.ballPool.getActiveBalls().forEach((ball) => {
       this.applyElectricBallToBall(ball);
     });
@@ -347,6 +359,9 @@ export class PowerUpSystem {
   private expireElectricBall(): void {
     this.electricBallEndTime = 0;
     this.electricBallTimer = null;
+
+    // Remove speed effect from manager
+    this.speedManager.removeEffect('electric');
 
     // Clear from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
@@ -462,7 +477,7 @@ export class PowerUpSystem {
     // Auto-release any magneted balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (ball.isMagneted()) {
-        ball.releaseMagnet(this.speedMultiplier);
+        ball.releaseMagnet(this.speedManager.getBaseSpeed());
       }
     });
 
@@ -474,6 +489,66 @@ export class PowerUpSystem {
    */
   isMagnetActive(): boolean {
     return this.magnetActive;
+  }
+
+  /**
+   * Apply Bounce House effect — spawn a one-use safety net floor
+   */
+  private applyBounceHouse(): void {
+    // Clear existing safety net if any (refresh, don't stack)
+    this.clearSafetyNet(false);
+
+    // Create new safety net
+    this.safetyNet = new SafetyNet(this.scene);
+
+    // Emit event for GameScene to set up physics collider
+    this.events.emit('safetyNetCreated', this.safetyNet);
+
+    // Track as active effect with no auto-expiration (endTime = Infinity)
+    this.activeEffects = this.activeEffects.filter((e) => e.type !== PowerUpType.BOUNCE_HOUSE);
+    this.activeEffects.push({ type: PowerUpType.BOUNCE_HOUSE, endTime: Infinity });
+    this.events.emit('effectApplied', PowerUpType.BOUNCE_HOUSE, 0);
+  }
+
+  /**
+   * Consume the safety net (called from GameScene when ball hits it)
+   */
+  consumeSafetyNet(): void {
+    this.clearSafetyNet(true);
+  }
+
+  /**
+   * Clear the safety net
+   * @param animate Whether to play the destroy animation
+   */
+  private clearSafetyNet(animate: boolean = true): void {
+    if (!this.safetyNet) return;
+
+    const net = this.safetyNet;
+    this.safetyNet = null;
+
+    if (animate) {
+      net.playDestroyAnimation();
+    } else {
+      net.destroy();
+    }
+
+    // Remove from active effects
+    this.activeEffects = this.activeEffects.filter((e) => e.type !== PowerUpType.BOUNCE_HOUSE);
+    this.events.emit('safetyNetDestroyed');
+    this.events.emit('effectExpired', PowerUpType.BOUNCE_HOUSE);
+  }
+
+  /**
+   * Apply Party Favor effect (extra life)
+   * Instant effect - emits event for GameScene to handle lives
+   */
+  private applyPartyFavor(): void {
+    // Emit event for GameScene to grant extra life
+    this.events.emit('grantExtraLife');
+
+    // No duration tracking - instant effect
+    this.events.emit('effectApplied', PowerUpType.PARTY_FAVOR);
   }
 
   /**
@@ -541,6 +616,9 @@ export class PowerUpSystem {
     this.paddle.resetEffects();
     Brick.powerBallActive = false;
 
+    // Clear all speed effects from manager
+    this.speedManager.clearAllEffects();
+
     // Clear FireBall state
     if (this.fireballTimer) {
       this.fireballTimer.destroy();
@@ -572,9 +650,12 @@ export class PowerUpSystem {
     // Auto-release magneted balls before clearing
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (ball.isMagneted()) {
-        ball.releaseMagnet(this.speedMultiplier);
+        ball.releaseMagnet(this.speedManager.getBaseSpeed());
       }
     });
+
+    // Clear Bounce House safety net
+    this.clearSafetyNet(false);
 
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {

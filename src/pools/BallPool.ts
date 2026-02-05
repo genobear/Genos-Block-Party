@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Ball } from '../objects/Ball';
 import { Paddle } from '../objects/Paddle';
+import { BallSpeedManager } from '../systems/BallSpeedManager';
 
 const POOL_SIZE = 6; // Increased to account for initial ball being in pool
 
@@ -30,15 +31,16 @@ export class BallPool {
 
   /**
    * Spawn balls at a position, optionally attached to paddle
+   * Speed is calculated by BallSpeedManager (includes all multipliers)
    */
   spawnBalls(
     count: number,
     x: number,
     y: number,
-    speedMultiplier: number,
     attachToPaddle?: Paddle
   ): Ball[] {
     const spawned: Ball[] = [];
+    const speedManager = BallSpeedManager.getInstance();
 
     for (let i = 0; i < count; i++) {
       let ball = this.pool.find((b) => !b.active);
@@ -66,7 +68,8 @@ export class BallPool {
           baseAngle +
           Phaser.Math.DegToRad(angleOffset * (i % 2 === 0 ? 1 : -1));
 
-        const speed = 400 * speedMultiplier;
+        // Get speed from manager (includes all multipliers)
+        const speed = speedManager.getEffectiveSpeed();
         const velocityX = Math.cos(angle) * speed;
         const velocityY = Math.sin(angle) * speed;
 
@@ -87,7 +90,7 @@ export class BallPool {
    * Convenience method to spawn a single ball attached to paddle
    */
   spawnAttachedToPaddle(paddle: Paddle, x: number, y: number): Ball {
-    return this.spawnBalls(1, x, y, 1, paddle)[0];
+    return this.spawnBalls(1, x, y, paddle)[0];
   }
 
   /**

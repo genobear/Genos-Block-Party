@@ -13,7 +13,9 @@ import { AudioManager } from '../systems/AudioManager';
 import { NowPlayingToast } from '../systems/NowPlayingToast';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
+import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { PowerUpType } from '../types/PowerUpTypes';
+import { SafetyNet } from '../objects/SafetyNet';
 import { BallEffectType } from '../effects/BallEffectTypes';
 import { LEVELS, LevelData } from '../config/LevelData';
 import {
@@ -27,6 +29,7 @@ import {
   BRICK_ROWS_START_Y,
   BRICK_COLS,
   STARTING_LIVES,
+  BALL_SPEED_BASE,
   AUDIO,
   MULTIPLIER,
 } from '../config/Constants';
@@ -48,9 +51,15 @@ export class GameScene extends Phaser.Scene {
   private electricArcSystem!: ElectricArcSystem;
   private isInDanger: boolean = false;
 
+  // Bounce House safety net collider
+  private safetyNetCollider: Phaser.Physics.Arcade.Collider | null = null;
+
   // Audio
   private audioManager!: AudioManager;
   private unsubscribeTrackChange: (() => void) | null = null;
+
+  // Speed management
+  private speedManager!: BallSpeedManager;
 
   // Game state
   private score: number = 0;
@@ -139,6 +148,9 @@ export class GameScene extends Phaser.Scene {
     this.audioManager = AudioManager.getInstance();
     this.audioManager.init(this);
 
+    // Get speed manager instance
+    this.speedManager = BallSpeedManager.getInstance();
+
     // Wire up "Now Playing" toast notification
     const nowPlayingToast = NowPlayingToast.getInstance();
     this.unsubscribeTrackChange = this.audioManager.onTrackChange((metadata) => {
@@ -192,6 +204,16 @@ export class GameScene extends Phaser.Scene {
       this.powerUpFeedbackSystem.revealMystery(actualType);
     });
 
+    // Wire safety net events (Bounce House power-up)
+    this.powerUpSystem.events.on('safetyNetCreated', this.onSafetyNetCreated, this);
+    this.powerUpSystem.events.on('safetyNetDestroyed', this.onSafetyNetDestroyed, this);
+
+    // Handle extra life from Party Favor power-up
+    this.powerUpSystem.events.on('grantExtraLife', () => {
+      this.lives++;
+      this.events.emit('livesUpdate', this.lives);
+    });
+
     // Emit initial state to UI
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
@@ -221,6 +243,15 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('effectApplied');
     this.powerUpSystem?.events?.off('effectExpired');
     this.powerUpSystem?.events?.off('mysteryRevealed');
+    this.powerUpSystem?.events?.off('safetyNetCreated');
+    this.powerUpSystem?.events?.off('safetyNetDestroyed');
+    this.powerUpSystem?.events?.off('grantExtraLife');
+
+    // Clean up safety net collider
+    if (this.safetyNetCollider) {
+      this.safetyNetCollider.destroy();
+      this.safetyNetCollider = null;
+    }
 
     // Clean up input events
     this.input?.off('pointerdown', this.handleClick, this);
@@ -290,10 +321,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private launchBall(): void {
-    // Launch all unlaunched balls
+    // Launch all unlaunched balls (speed is handled by BallSpeedManager)
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (!ball.isLaunched()) {
-        ball.launch(this.currentLevel.ballSpeedMultiplier);
+        ball.launch();
       }
     });
     this.events.emit('ballLaunched');
@@ -374,10 +405,8 @@ export class GameScene extends Phaser.Scene {
     // Emit level update to UI
     this.events.emit('levelUpdate', this.currentLevel.name);
 
-    // Update power-up system with current level's speed multiplier
-    if (this.powerUpSystem) {
-      this.powerUpSystem.setSpeedMultiplier(this.currentLevel.ballSpeedMultiplier);
-    }
+    // Set level speed multiplier on speed manager
+    this.speedManager.setLevelMultiplier(this.currentLevel.ballSpeedMultiplier);
   }
 
   private setupCollisions(): void {
@@ -685,6 +714,57 @@ export class GameScene extends Phaser.Scene {
 
     // Ensure slow motion is disabled
     this.screenEffects.disableSlowMotion();
+  }
+
+  // ========== SAFETY NET (BOUNCE HOUSE) ==========
+
+  /**
+   * Handle safety net creation — set up physics collider with ball group
+   */
+  private onSafetyNetCreated(safetyNet: SafetyNet): void {
+    // Clean up existing collider if any
+    this.onSafetyNetDestroyed();
+
+    // Use collider - let physics handle the bounce naturally (like brick collisions)
+    this.safetyNetCollider = this.physics.add.collider(
+      this.ballPool.getGroup(),
+      safetyNet,
+      this.handleSafetyNetBounce.bind(this) as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+      undefined,
+      this
+    );
+  }
+
+  /**
+   * Clean up safety net collider
+   */
+  private onSafetyNetDestroyed(): void {
+    if (this.safetyNetCollider) {
+      this.safetyNetCollider.destroy();
+      this.safetyNetCollider = null;
+    }
+  }
+
+  /**
+   * Handle ball bouncing off the safety net
+   */
+  private handleSafetyNetBounce(
+    ballObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+    netObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+  ): void {
+    const net = netObj as SafetyNet;
+
+    // Guard: net may already have been consumed by another ball this frame
+    if (!net.active) return;
+
+    // Let physics handle the bounce naturally - don't modify velocity
+    // This matches how brick collisions work
+
+    // Play bounce SFX
+    this.audioManager.playSFX(AUDIO.SFX.BOUNCE);
+
+    // Consume the safety net (destroy with animation)
+    this.powerUpSystem.consumeSafetyNet();
   }
 
   // ========== DEBUG METHODS ==========

@@ -29,9 +29,9 @@ Add 5 new power-ups to Geno's Block Party. Each feature is implemented in its ow
 ## Features
 
 ### 1. 🎁 Party Favor (Extra Life)
-**Status**: `TODO`  
+**Status**: `IN_PROGRESS`  
 **Branch**: `feature/powerup-party-favor`  
-**PR**: —
+**PR**: https://github.com/genobear/Genos-Block-Party/pull/1
 
 **Description**: Drops a bonus life (+1). Rare but clutch.
 
