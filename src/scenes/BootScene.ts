@@ -88,6 +88,9 @@ export class BootScene extends Phaser.Scene {
     // Create power-up textures
     this.createPowerUpTextures();
 
+    // Create safety net texture
+    this.createSafetyNetTexture();
+
     // Create particle textures
     this.createParticleTextures();
   }
@@ -138,6 +141,9 @@ export class BootScene extends Phaser.Scene {
       { name: 'powerball', color: POWERUP_CONFIGS[PowerUpType.POWERBALL].color, symbol: 'P' },
       { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
       { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
+      { name: 'bouncehouse', color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color, symbol: 'N' },
+      { name: 'bassdrop', color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color, symbol: '♪' },
+      { name: 'partypopper', color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color, symbol: 'X' },
     ];
 
     const size = 24;
@@ -156,6 +162,29 @@ export class BootScene extends Phaser.Scene {
       g.generateTexture(`powerup-${name}`, size, size);
       g.destroy();
     });
+  }
+
+  private createSafetyNetTexture(): void {
+    // Import SafetyNet dimensions
+    const width = 760;  // PLAYABLE_WIDTH - 40
+    const height = 8;
+
+    const g = this.make.graphics({ x: 0, y: 0 });
+
+    // Main bar — bright green with slight gradient feel
+    g.fillStyle(0x90ee90, 0.9);
+    g.fillRoundedRect(0, 0, width, height, 3);
+
+    // Inner glow line
+    g.fillStyle(0x00ff00, 0.6);
+    g.fillRoundedRect(2, 2, width - 4, height - 4, 2);
+
+    // Border
+    g.lineStyle(1, 0xffffff, 0.5);
+    g.strokeRoundedRect(0, 0, width, height, 3);
+
+    g.generateTexture('safety-net', width, height);
+    g.destroy();
   }
 
   private createParticleTextures(): void {

@@ -9,7 +9,7 @@ import { PowerUpFeedbackSystem } from './PowerUpFeedbackSystem';
 import { AudioManager } from './AudioManager';
 import { ElectricArcSystem } from './ElectricArcSystem';
 import { BrickType } from '../types/BrickTypes';
-import { COLORS, AUDIO } from '../config/Constants';
+import { COLORS, AUDIO, BRICK_WIDTH, BRICK_HEIGHT, BRICK_PADDING, BRICK_COLS, BRICK_ROWS_START_Y, GAME_WIDTH } from '../config/Constants';
 
 /**
  * Collision callback result for brick hits
@@ -32,6 +32,10 @@ export class CollisionHandler {
   private powerUpFeedbackSystem: PowerUpFeedbackSystem;
   private audioManager: AudioManager;
   private electricArcSystem: ElectricArcSystem | null = null;
+  private bricks: Phaser.Physics.Arcade.StaticGroup | null = null;
+
+  // Grid offset calculation (for 3x3 bomb)
+  private gridOffsetX: number;
 
   // Callbacks for game state changes
   private onScoreChange: (points: number) => void;
@@ -61,6 +65,10 @@ export class CollisionHandler {
     this.onBrickHit = callbacks.onBrickHit;
     this.onLevelComplete = callbacks.onLevelComplete;
     this.getBrickCount = callbacks.getBrickCount;
+
+    // Calculate horizontal offset for grid alignment (same as ElectricArcSystem)
+    const totalWidth = BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING;
+    this.gridOffsetX = (GAME_WIDTH - totalWidth) / 2 + BRICK_WIDTH / 2;
   }
 
   /**
@@ -68,6 +76,13 @@ export class CollisionHandler {
    */
   setElectricArcSystem(system: ElectricArcSystem): void {
     this.electricArcSystem = system;
+  }
+
+  /**
+   * Set the brick group reference (for Party Popper 3x3 bomb)
+   */
+  setBricks(bricks: Phaser.Physics.Arcade.StaticGroup): void {
+    this.bricks = bricks;
   }
 
   /**
@@ -152,6 +167,12 @@ export class CollisionHandler {
     // Trigger Electric Ball AOE if active (triggers on every hit, not just destruction)
     if (ball.isElectricBallActive()) {
       this.processElectricAOE(brick);
+    }
+
+    // Party Popper bomb: explode 3x3 area around hit brick, then consume
+    if (ball.hasBomb()) {
+      this.processBombExplosion(brick);
+      ball.clearBomb();
     }
 
     // Roll for drops BEFORE applying damage (each damage point rolls independently)
@@ -288,6 +309,110 @@ export class CollisionHandler {
         this.onLevelComplete();
       }
     });
+  }
+
+  /**
+   * Process Party Popper bomb explosion - damage all bricks in a 3x3 grid around the hit brick
+   */
+  private processBombExplosion(sourceBrick: Brick): void {
+    if (!this.bricks) return;
+
+    const adjacentBricks = this.findBricksInRadius(sourceBrick, 1); // 3x3 = radius 1
+
+    // Screen shake for the explosion (strong)
+    this.scene.cameras.main.shake(200, 0.01);
+
+    // Create explosion particle burst at source brick
+    this.createExplosionParticles(sourceBrick.x, sourceBrick.y);
+
+    // Damage each adjacent brick (the source brick is handled normally by handleBallBrick)
+    adjacentBricks.forEach((brick) => {
+      // Small delay for cascade visual effect
+      this.scene.time.delayedCall(50, () => {
+        if (!brick || !brick.active) return;
+
+        // Increment multiplier for bomb hits
+        this.onBrickHit();
+
+        // Score for bomb hits (75% of normal value)
+        this.onScoreChange(Math.floor(brick.getScoreValue() * 0.75));
+
+        // Roll for drop BEFORE damage (with AOE penalty)
+        if (brick.shouldDropPowerUp(true)) {
+          const dropPos = brick.getPowerUpDropPosition();
+          this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+        }
+
+        // Apply 1 damage to adjacent brick
+        const isDestroyed = brick.takeDamage(1);
+
+        // Small explosion particles at each brick
+        this.createExplosionParticles(brick.x, brick.y);
+
+        if (isDestroyed) {
+          this.processAOEBrickDestroyed(brick);
+        } else {
+          this.audioManager.playSFX(AUDIO.SFX.POP);
+        }
+      });
+    });
+  }
+
+  /**
+   * Find all bricks within a grid radius of the source brick
+   * radius=1 gives a 3x3 area (8 surrounding bricks)
+   */
+  private findBricksInRadius(source: Brick, radius: number): Brick[] {
+    if (!this.bricks) return [];
+
+    const sourceGrid = this.worldToGrid(source.x, source.y);
+    const result: Brick[] = [];
+
+    this.bricks.children.iterate((child) => {
+      const brick = child as Brick;
+      if (!brick || !brick.active || brick === source) return true;
+
+      const brickGrid = this.worldToGrid(brick.x, brick.y);
+      const dx = Math.abs(brickGrid.x - sourceGrid.x);
+      const dy = Math.abs(brickGrid.y - sourceGrid.y);
+
+      if (dx <= radius && dy <= radius) {
+        result.push(brick);
+      }
+      return true;
+    });
+
+    return result;
+  }
+
+  /**
+   * Convert world coordinates to grid coordinates (same logic as ElectricArcSystem)
+   */
+  private worldToGrid(worldX: number, worldY: number): { x: number; y: number } {
+    const gridX = Math.round((worldX - this.gridOffsetX) / (BRICK_WIDTH + BRICK_PADDING));
+    const gridY = Math.round((worldY - BRICK_ROWS_START_Y) / (BRICK_HEIGHT + BRICK_PADDING));
+    return { x: gridX, y: gridY };
+  }
+
+  /**
+   * Create explosion particle burst for bomb detonation
+   */
+  private createExplosionParticles(x: number, y: number): void {
+    const particles = this.scene.add.particles(x, y, 'particle-flame', {
+      speed: { min: 100, max: 250 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.5, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 400,
+      quantity: 15,
+      tint: [0xff4500, 0xff6600, 0xffaa00, 0xffcc00, 0xffffff],
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false,
+    });
+
+    particles.explode();
+
+    this.scene.time.delayedCall(500, () => particles.destroy());
   }
 
   /**

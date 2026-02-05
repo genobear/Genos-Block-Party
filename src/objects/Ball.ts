@@ -17,6 +17,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private isElectricBall: boolean = false; // Electric Ball power-up
   private attachedPaddle: Paddle | null = null;
 
+  // Party Popper bomb state (one-shot)
+  private bomb: boolean = false;
+
   // FireBall power-up state (gameplay logic)
   private fireball: boolean = false;
   private fireballLevel: number = 0;
@@ -200,6 +203,29 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Set bomb mode (Party Popper power-up - one-shot 3x3 explosion)
+   */
+  setBomb(): void {
+    this.bomb = true;
+    this.effectManager?.applyEffect(BallEffectType.BOMB_GLOW);
+  }
+
+  /**
+   * Clear bomb mode (after detonation)
+   */
+  clearBomb(): void {
+    this.bomb = false;
+    this.effectManager?.removeEffect(BallEffectType.BOMB_GLOW);
+  }
+
+  /**
+   * Check if bomb mode is active
+   */
+  hasBomb(): boolean {
+    return this.bomb;
+  }
+
+  /**
    * Set ball speed (for level progression)
    */
   setSpeed(speed: number): void {
@@ -238,6 +264,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.attachedPaddle = null;
     this.fireball = false;
     this.fireballLevel = 0;
+    this.bomb = false;
     this.pendingVelocityRestore = false;
 
     // Clear all visual effects

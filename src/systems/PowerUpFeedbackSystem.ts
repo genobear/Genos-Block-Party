@@ -112,6 +112,41 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, alpha: 0.45 },
     },
   },
+  [PowerUpType.PARTY_POPPER]: {
+    displayName: '💣 PARTY POPPER!',
+    color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color,
+    particles: {
+      colors: [0xff4500, 0xff6600, 0xffaa00, 0xffcc00, 0xffffff],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color, alpha: 0.5 },
+      shake: { duration: 100, intensity: 0.005 },
+    },
+  },
+  [PowerUpType.BOUNCE_HOUSE]: {
+    displayName: 'BOUNCE HOUSE!',
+    color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color,
+    particles: {
+      colors: [0x90ee90, 0xffffff, 0x66ff66],
+      count: 10,
+    },
+    screenEffect: {
+      flash: { duration: 100, color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color, alpha: 0.3 },
+    },
+  },
+  [PowerUpType.BASS_DROP]: {
+    displayName: '🎵 BASS DROP! 🎵',
+    color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color,
+    particles: {
+      colors: [0x9400d3, 0xba55d3, 0xff00ff, 0x8b008b, 0xffffff],
+      count: 25,
+    },
+    screenEffect: {
+      flash: { duration: 300, color: 0x9400d3, alpha: 0.7 },
+      shake: { duration: 500, intensity: 0.02 },
+    },
+  },
 };
 
 /**

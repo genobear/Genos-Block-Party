@@ -5,6 +5,7 @@ import { BallPool } from '../pools/BallPool';
 import { Paddle } from '../objects/Paddle';
 import { Ball } from '../objects/Ball';
 import { Brick } from '../objects/Brick';
+import { SafetyNet } from '../objects/SafetyNet';
 import { PowerUpType, selectRandomPowerUpType, selectRandomEffectType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { BallEffectType } from '../effects/BallEffectTypes';
 
@@ -56,6 +57,9 @@ export class PowerUpSystem {
   private balloonEndTime: number = 0;
   private balloonTimer: Phaser.Time.TimerEvent | null = null;
 
+  // Bounce House (Safety Net) state
+  private activeSafetyNet: SafetyNet | null = null;
+
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
 
@@ -92,6 +96,9 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+      [PowerUpType.PARTY_POPPER, () => this.applyPartyPopper()],
+      [PowerUpType.BASS_DROP, () => this.applyBassDrop()],
+      [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
     ]);
 
     // Initialize effect propagation config
@@ -114,6 +121,12 @@ export class PowerUpSystem {
         applyToAllBalls: true,
         applyToBall: (ball: Ball) => this.applyBalloonToBall(ball),
         isActive: () => this.balloonEndTime > this.scene.time.now,
+      }],
+      [PowerUpType.PARTY_POPPER, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => ball.setBomb(),
+        isActive: () => this.ballPool.getActiveBalls().some((b) => b.hasBomb()),
       }],
     ]);
   }
@@ -345,6 +358,33 @@ export class PowerUpSystem {
   }
 
   /**
+   * Apply Party Popper effect (arm all balls with one-shot 3x3 bomb)
+   * No duration - consumed on next brick hit
+   */
+  private applyPartyPopper(): void {
+    // Apply bomb to all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.setBomb();
+    });
+
+    // No duration tracking - it's consumed on use, not timed
+    this.events.emit('effectApplied', PowerUpType.PARTY_POPPER);
+  }
+
+  /**
+   * Apply Bass Drop effect (instant 1 damage to ALL bricks)
+   * Emits 'bassDrop' event so GameScene can process all bricks
+   */
+  private applyBassDrop(): void {
+    // Emit event for GameScene to handle brick damage
+    // (brick group access stays in GameScene where it belongs)
+    this.events.emit('bassDrop');
+
+    // No duration tracking - instant effect
+    this.events.emit('effectApplied', PowerUpType.BASS_DROP);
+  }
+
+  /**
    * Apply Power Ball effect (double power-up drop chance)
    */
   private applyPowerBall(): void {
@@ -504,10 +544,58 @@ export class PowerUpSystem {
     }
     this.balloonEndTime = 0;
 
+    // Clear Safety Net
+    this.clearSafetyNet();
+
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
       ball.clearElectricBall();
+      ball.clearBomb();
     });
+  }
+
+  // ========== BOUNCE HOUSE (SAFETY NET) ==========
+
+  /**
+   * Apply Bounce House effect — spawn a safety net above the death zone
+   */
+  private applyBounceHouse(): void {
+    // If one already exists, destroy and replace (refresh, don't stack)
+    this.clearSafetyNet();
+
+    // Create new safety net
+    this.activeSafetyNet = new SafetyNet(this.scene);
+
+    // Emit event so GameScene can set up the physics collider
+    this.events.emit('safetyNetSpawned', this.activeSafetyNet);
+
+    // No duration tracking — lasts until used
+    this.events.emit('effectApplied', PowerUpType.BOUNCE_HOUSE);
+  }
+
+  /**
+   * Called when the safety net has been consumed by a ball hit
+   */
+  onSafetyNetConsumed(): void {
+    this.activeSafetyNet = null;
+    this.events.emit('effectExpired', PowerUpType.BOUNCE_HOUSE);
+  }
+
+  /**
+   * Get the active safety net (for collision setup in GameScene)
+   */
+  getActiveSafetyNet(): SafetyNet | null {
+    return this.activeSafetyNet;
+  }
+
+  /**
+   * Clean up the active safety net
+   */
+  private clearSafetyNet(): void {
+    if (this.activeSafetyNet) {
+      this.activeSafetyNet.destroy();
+      this.activeSafetyNet = null;
+    }
   }
 }
