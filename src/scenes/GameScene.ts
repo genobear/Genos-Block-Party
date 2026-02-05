@@ -316,7 +316,7 @@ export class GameScene extends Phaser.Scene {
     const magnetedBalls = this.ballPool.getActiveBalls().filter((b) => b.isMagneted());
     if (magnetedBalls.length > 0) {
       magnetedBalls.forEach((ball) => {
-        ball.releaseMagnet(this.currentLevel.ballSpeedMultiplier);
+        ball.releaseMagnet(this.speedManager.getEffectiveSpeed());
       });
       return;
     }
