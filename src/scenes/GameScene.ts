@@ -207,6 +207,9 @@ export class GameScene extends Phaser.Scene {
     // Wire Bass Drop event - screen nuke: 1 damage to all bricks
     this.powerUpSystem.events.on('bassDrop', this.handleBassDrop, this);
 
+    // Wire Confetti Cannon event - damage 5-8 random bricks
+    this.powerUpSystem.events.on('confettiCannon', this.handleConfettiCannon, this);
+
     // Wire safety net events (Bounce House power-up)
     this.powerUpSystem.events.on('safetyNetCreated', this.onSafetyNetCreated, this);
     this.powerUpSystem.events.on('safetyNetDestroyed', this.onSafetyNetDestroyed, this);
@@ -247,6 +250,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('effectExpired');
     this.powerUpSystem?.events?.off('mysteryRevealed');
     this.powerUpSystem?.events?.off('bassDrop', this.handleBassDrop, this);
+    this.powerUpSystem?.events?.off('confettiCannon', this.handleConfettiCannon, this);
     this.powerUpSystem?.events?.off('safetyNetCreated');
     this.powerUpSystem?.events?.off('safetyNetDestroyed');
     this.powerUpSystem?.events?.off('grantExtraLife');
@@ -752,6 +756,118 @@ export class GameScene extends Phaser.Scene {
     if (this.bricks.countActive() === 0) {
       this.handleLevelComplete();
     }
+  }
+
+  // ========== CONFETTI CANNON ==========
+
+  /**
+   * Handle Confetti Cannon power-up: fire confetti at 5-8 random bricks for 1 damage each
+   */
+  private handleConfettiCannon(): void {
+    // Collect all active bricks
+    const activeBricks: Brick[] = [];
+    this.bricks.children.iterate((child) => {
+      const brick = child as Brick;
+      if (brick && brick.active) {
+        activeBricks.push(brick);
+      }
+      return true;
+    });
+
+    // Shuffle and pick 5-8 random bricks
+    const targetCount = Phaser.Math.Between(5, 8);
+    Phaser.Utils.Array.Shuffle(activeBricks);
+    const targets = activeBricks.slice(0, Math.min(targetCount, activeBricks.length));
+
+    // Brief camera shake
+    this.cameras.main.shake(150, 0.01);
+
+    // Play party horn SFX
+    this.audioManager.playSFX(AUDIO.SFX.AIRHORN);
+
+    // Create confetti particle burst from paddle
+    this.createConfettiEffect();
+
+    // Apply 1 damage to each target brick
+    targets.forEach((brick) => {
+      this.incrementMultiplier();
+      const destroyed = brick.takeDamage(1);
+      if (destroyed) {
+        this.handleBrickDestroyed(brick);
+      } else {
+        // Visual flash on hit brick
+        this.tweens.add({
+          targets: brick,
+          alpha: { from: 0.3, to: 1 },
+          duration: 200,
+        });
+      }
+    });
+
+    // Check level completion after all bricks processed
+    if (this.bricks.countActive() === 0) {
+      this.handleLevelComplete();
+    }
+  }
+
+  /**
+   * Create colorful confetti burst effect from paddle position
+   */
+  private createConfettiEffect(): void {
+    const paddleX = this.paddle.x;
+    const paddleY = this.paddle.y;
+
+    // Colorful confetti colors
+    const colors = [0xff1493, 0x00ff00, 0xffff00, 0x00ffff, 0xff6600, 0xff00ff];
+
+    for (let i = 0; i < 30; i++) {
+      const confetti = this.add.rectangle(
+        paddleX + Phaser.Math.Between(-20, 20),
+        paddleY,
+        Phaser.Math.Between(4, 8),
+        Phaser.Math.Between(4, 8),
+        Phaser.Utils.Array.GetRandom(colors)
+      );
+
+      this.tweens.add({
+        targets: confetti,
+        x: confetti.x + Phaser.Math.Between(-100, 100),
+        y: confetti.y - Phaser.Math.Between(100, 300),
+        angle: Phaser.Math.Between(-180, 180),
+        alpha: { from: 1, to: 0 },
+        duration: Phaser.Math.Between(500, 1000),
+        ease: 'Quad.easeOut',
+        onComplete: () => confetti.destroy(),
+      });
+    }
+  }
+
+  /**
+   * Handle brick destruction for Confetti Cannon hits
+   */
+  private handleBrickDestroyed(brick: Brick): void {
+    // Score for destroyed brick
+    this.addScore(brick.getScoreValue());
+
+    // Roll for power-up drop
+    if (brick.shouldDropPowerUp(false)) {
+      const dropPos = brick.getPowerUpDropPosition();
+      this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+    }
+
+    // Audio for destroyed brick
+    this.audioManager.playSFX(AUDIO.SFX.HORN);
+
+    // Confetti burst
+    const brickColor = this.getBrickColorForParticles(brick.getType());
+    this.particleSystem.burstConfetti(brick.x, brick.y, brickColor);
+
+    // Immediately deactivate for countActive()
+    brick.setActive(false);
+    brick.disableBody(true);
+
+    // Play destroy animation
+    brick.playDestroyAnimation();
   }
 
   // ========== SAFETY NET (BOUNCE HOUSE) ==========

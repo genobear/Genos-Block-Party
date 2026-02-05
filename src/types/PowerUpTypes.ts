@@ -17,6 +17,7 @@ export enum PowerUpType {
   DJ_SCRATCH = 'djscratch', // Magnet paddle - ball sticks on contact (15s)
   BOUNCE_HOUSE = 'bouncehouse', // Safety net saves ball once
   PARTY_FAVOR = 'partyfavor', // Extra life (instant, very rare)
+  CONFETTI_CANNON = 'confetticannon', // Fires confetti at 5-8 random bricks
 }
 
 /**
@@ -124,6 +125,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 0,          // Instant effect
     dropWeight: 3,        // Very rare
     emoji: '🎁',
+  },
+  [PowerUpType.CONFETTI_CANNON]: {
+    type: PowerUpType.CONFETTI_CANNON,
+    color: 0xff1493,      // Deep pink
+    duration: 0,          // Instant effect
+    dropWeight: 10,
+    emoji: '🎊',
   },
 };
 

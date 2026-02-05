@@ -107,6 +107,7 @@
 | **Fireball** | 🔥 | 10s | 10 | Piercing ball with stacking damage (see below) |
 | **Electric Ball** | ⚡ | 8s | 12 | 1.5× speed + AOE damage to adjacent bricks |
 | **DJ Scratch** | 🧲 | 15s | 12 | Magnet paddle — ball sticks on contact, click to release |
+| **Confetti Cannon** | 🎊 | Instant | 10 | Fires confetti at 5-8 random bricks for 1 damage each |
 
 ### Fireball Stacking
 - Collecting multiple Fireballs during active duration **stacks the level** (1 → 2 → 3 → ...)

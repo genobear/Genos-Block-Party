@@ -169,6 +169,17 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 200, color: 0xffd700, alpha: 0.5 },
     },
   },
+  [PowerUpType.CONFETTI_CANNON]: {
+    displayName: 'CONFETTI CANNON!',
+    color: POWERUP_CONFIGS[PowerUpType.CONFETTI_CANNON].color,
+    particles: {
+      colors: [0xff1493, 0x00ff00, 0xffff00, 0x00ffff, 0xff6600, 0xff00ff],
+      count: 20,
+    },
+    screenEffect: {
+      flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.CONFETTI_CANNON].color, alpha: 0.4 },
+    },
+  },
 };
 
 /**

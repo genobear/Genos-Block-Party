@@ -108,6 +108,7 @@ export class PowerUpSystem {
       [PowerUpType.DJ_SCRATCH, () => this.applyDjScratch()],
       [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
       [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
+      [PowerUpType.CONFETTI_CANNON, () => this.applyConfettiCannon()],
     ]);
 
     // Initialize effect propagation config
@@ -687,5 +688,16 @@ export class PowerUpSystem {
 
   onBombDetonated(): void {
     this.events.emit('effectExpired', PowerUpType.PARTY_POPPER);
+  }
+
+  // ========== CONFETTI CANNON ==========
+
+  /**
+   * Apply Confetti Cannon effect — fires confetti at 5-8 random bricks for 1 damage each
+   * Emits 'confettiCannon' event for GameScene to handle brick iteration and visuals
+   */
+  private applyConfettiCannon(): void {
+    this.events.emit('confettiCannon');
+    this.events.emit('effectApplied', PowerUpType.CONFETTI_CANNON);
   }
 }
