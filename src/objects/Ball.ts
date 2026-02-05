@@ -8,6 +8,7 @@ import {
 import { Paddle } from './Paddle';
 import { BallEffectManager } from '../effects/BallEffectManager';
 import { BallEffectType } from '../effects/BallEffectTypes';
+import { ShopManager } from '../systems/ShopManager';
 import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { calculateLaunchVelocity } from '../utils/ballLaunch';
 
@@ -421,5 +422,11 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.initializePhysics();
 
     this.reset();
+
+    // Apply cosmetic trail if one is equipped
+    const trail = ShopManager.getInstance().getEquippedBallTrail();
+    if (trail) {
+      this.applyEffect(BallEffectType.COSMETIC_TRAIL);
+    }
   }
 }

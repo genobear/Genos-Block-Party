@@ -4,6 +4,7 @@ import { AudioManager } from '../systems/AudioManager';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
+import { CurrencyManager } from '../systems/CurrencyManager';
 
 export class MenuScene extends Phaser.Scene {
   // Track menu elements for transition animation
@@ -111,12 +112,48 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch('SettingsScene', { returnTo: 'MenuScene' });
     });
 
+    // Party Shop button (gold/yellow to stand out)
+    const shopButton = this.add.rectangle(centerX, centerY + 200, 200, 50, 0xdaa520)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(shopButton);
+
+    const shopText = this.add.text(centerX, centerY + 200, 'PARTY SHOP', {
+      font: 'bold 20px Arial',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.menuElements.push(shopText);
+
+    // Currency balance next to the shop button
+    const currency = CurrencyManager.getInstance().getTotalCurrency();
+    const currencyDisplay = this.add.text(centerX, centerY + 230, `¢ ${currency}`, {
+      font: '14px Arial',
+      color: '#ffd700',
+    }).setOrigin(0.5);
+    this.menuElements.push(currencyDisplay);
+
+    shopButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      shopButton.setScale(1.05);
+      shopText.setScale(1.05);
+    });
+
+    shopButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      shopButton.setScale(1);
+      shopText.setScale(1);
+    });
+
+    shopButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('ShopScene');
+    });
+
     // Music Player button (vintage brown)
-    const musicPlayerButton = this.add.rectangle(centerX, centerY + 200, 200, 50, 0x8b4513)
+    const musicPlayerButton = this.add.rectangle(centerX, centerY + 280, 200, 50, 0x8b4513)
       .setInteractive({ useHandCursor: true });
     this.menuElements.push(musicPlayerButton);
 
-    const musicPlayerText = this.add.text(centerX, centerY + 200, 'MUSIC PLAYER', {
+    const musicPlayerText = this.add.text(centerX, centerY + 280, 'MUSIC PLAYER', {
       font: 'bold 20px Arial',
       color: '#f5e6c8',
     }).setOrigin(0.5);

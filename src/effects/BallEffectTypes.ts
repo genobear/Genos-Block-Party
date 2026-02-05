@@ -14,6 +14,7 @@ export enum BallEffectType {
   ELECTRIC_TRAIL = 'electric_trail',
   BALLOON_TRAIL = 'balloon_trail',
   BOMB_GLOW = 'bomb_glow',
+  COSMETIC_TRAIL = 'cosmetic_trail',
   // Future effects:
   // ICE_TRAIL = 'ice_trail',
 }
