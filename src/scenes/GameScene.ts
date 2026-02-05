@@ -28,6 +28,7 @@ import {
   BRICK_ROWS_START_Y,
   BRICK_COLS,
   STARTING_LIVES,
+  BALL_SPEED_BASE,
   AUDIO,
   MULTIPLIER,
 } from '../config/Constants';
@@ -701,7 +702,7 @@ export class GameScene extends Phaser.Scene {
     // Clean up existing collider if any
     this.onSafetyNetDestroyed();
 
-    // Use collider so physics naturally bounces the ball off the static net
+    // Use collider - let physics handle the bounce naturally (like brick collisions)
     this.safetyNetCollider = this.physics.add.collider(
       this.ballPool.getGroup(),
       safetyNet,
@@ -733,16 +734,8 @@ export class GameScene extends Phaser.Scene {
     // Guard: net may already have been consumed by another ball this frame
     if (!net.active) return;
 
-    const ball = ballObj as Ball;
-    const body = ball.body as Phaser.Physics.Arcade.Body;
-
-    // Ensure ball is heading upward after bounce
-    body.velocity.y = -Math.abs(body.velocity.y);
-
-    // Guarantee minimum upward speed
-    if (Math.abs(body.velocity.y) < 200) {
-      body.velocity.y = -300;
-    }
+    // Let physics handle the bounce naturally - don't modify velocity
+    // This matches how brick collisions work
 
     // Play bounce SFX
     this.audioManager.playSFX(AUDIO.SFX.BOUNCE);

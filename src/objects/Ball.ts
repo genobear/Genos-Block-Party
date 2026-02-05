@@ -23,6 +23,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private preCollisionVelocity: Phaser.Math.Vector2 = new Phaser.Math.Vector2();
   private pendingVelocityRestore: boolean = false;
 
+  // Collision cooldown to prevent velocity modifications right after collision
+  private collisionCooldown: number = 0;
+
   // Visual effects manager (handles all particle effects)
   private effectManager: BallEffectManager | null = null;
 
@@ -100,28 +103,39 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       body.velocity.copy(this.preCollisionVelocity);
     }
 
-    // Ensure ball maintains minimum speed if launched
-    if (this.launched) {
+    // Decrement collision cooldown
+    if (this.collisionCooldown > 0) {
+      this.collisionCooldown--;
+    }
+
+    // Ensure ball maintains minimum speed if launched (skip during collision cooldown)
+    if (this.launched && this.collisionCooldown === 0) {
       const body = this.body as Phaser.Physics.Arcade.Body;
       const velocity = body.velocity;
       const currentMagnitude = velocity.length();
 
-      // Prevent ball from going too slow (adjust for active effects)
-      const minSpeed = this.isFloating
-        ? this.currentSpeed * 0.5
-        : this.isElectricBall
-          ? this.currentSpeed * 1.2
-          : this.currentSpeed * 0.8;
-      if (currentMagnitude < minSpeed && currentMagnitude > 0) {
-        velocity.normalize().scale(minSpeed);
-      }
-
-      // Prevent near-horizontal movement (boring loops)
+      // Prevent near-horizontal movement (boring loops) while preserving speed
       const minYVelocity = this.currentSpeed * 0.2;
-      if (Math.abs(velocity.y) < minYVelocity) {
-        velocity.y = velocity.y >= 0 ? minYVelocity : -minYVelocity;
+      if (Math.abs(velocity.y) < minYVelocity && currentMagnitude > 0) {
+        // Preserve magnitude while adding vertical component
+        const targetY = velocity.y >= 0 ? minYVelocity : -minYVelocity;
+        velocity.y = targetY;
+
+        // Recalculate X to maintain total magnitude
+        const newMagnitude = velocity.length();
+        if (newMagnitude > 0) {
+          velocity.scale(currentMagnitude / newMagnitude);
+        }
       }
     }
+  }
+
+  /**
+   * Register a collision to start cooldown period
+   * Call this from collision handlers to prevent immediate velocity modifications
+   */
+  registerCollision(): void {
+    this.collisionCooldown = 3; // Skip velocity adjustments for 3 frames after collision
   }
 
   /**
