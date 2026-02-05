@@ -1,5 +1,7 @@
 # Geno's Block Party
 
+[![CI](https://github.com/genobear/Genos-Block-Party/actions/workflows/ci.yml/badge.svg)](https://github.com/genobear/Genos-Block-Party/actions/workflows/ci.yml)
+
 A party-themed Breakout clone built with Phaser 3, TypeScript, and Vite.
 
 ## Quick Start

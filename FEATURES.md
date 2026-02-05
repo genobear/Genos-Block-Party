@@ -366,7 +366,36 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 
 ---
 
-## 8. TODO / Known Gaps
+## 8. CI / Testing
+
+### Continuous Integration
+- **GitHub Actions** workflow runs on every push to `master` and on pull requests targeting `master`
+- Pipeline steps: `npm ci` → `npm run build` (TypeScript + Vite) → `npm run test:ci` (Vitest)
+- Badge displayed in README for at-a-glance build status
+
+### Test Framework
+- **Vitest** — fast, Vite-native test runner with TypeScript support out of the box
+- Browser API mocks (window, matchMedia, localStorage) provided via setup file
+- Globals enabled (`describe`, `it`, `expect` available without imports)
+
+### Smoke Test Coverage
+| Test Suite | What It Validates |
+|------------|-------------------|
+| **Level Data** | All 10 levels have required fields, sequential IDs, positive speed multipliers, valid brick types/health/positions, no duplicate positions |
+| **Power-Up Configs** | Every `PowerUpType` enum value has a matching `POWERUP_CONFIGS` entry with correct type, color, duration, dropWeight, and emoji |
+| **Currency Conversion** | `CurrencyManager.calculateCurrencyFromScore()` returns correct values across all tier thresholds (0, 100, 1K, 5K, 10K, 25K scores) |
+| **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
+
+### Commands
+```bash
+npm test          # Run all tests once
+npm run test:ci   # Run tests with verbose reporter (CI)
+npm run test:watch # Run tests in watch mode (development)
+```
+
+---
+
+## 9. TODO / Known Gaps
 
 ### Unused Systems
 - **Currency system exists but has no shop**: `CurrencyManager` has `spendCurrency()`, `canAfford()`, and `resetCurrency()` methods, but there is no shop scene or purchasable items. Coins accumulate with no way to spend them.
