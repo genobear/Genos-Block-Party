@@ -250,6 +250,27 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Recalculate velocity magnitude based on current speed settings
+   * Preserves direction, adjusts magnitude to match speedManager.getEffectiveSpeed()
+   * Call this when speed effects change mid-flight
+   */
+  recalculateVelocity(): void {
+    if (!this.launched || this.magneted) return; // Skip if not in flight or magneted
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const currentVelocity = body.velocity;
+    const currentMagnitude = currentVelocity.length();
+
+    if (currentMagnitude === 0) return; // Ball not moving
+
+    const targetSpeed = this.speedManager.getEffectiveSpeed();
+
+    // Scale velocity to new speed while preserving direction
+    const scale = targetSpeed / currentMagnitude;
+    body.velocity.scale(scale);
+  }
+
+  /**
    * Apply floating effect (Balloon power-up - slower ball)
    * Speed reduction is handled by BallSpeedManager effect multiplier
    * Re-applying resets the duration timer
@@ -268,8 +289,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.effectManager?.applyEffect(BallEffectType.BALLOON_TRAIL);
     }
 
-    // Speed change is handled by BallSpeedManager - velocity will adjust
-    // on next paddle bounce or via update() min speed enforcement
+    // IMMEDIATELY recalculate velocity to apply speed change
+    this.recalculateVelocity();
 
     // Reset after duration (new timer replaces old one)
     this.floatingTimer = this.scene.time.delayedCall(duration, () => {
@@ -286,6 +307,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isFloating = false;
     this.floatingTimer = null;
     this.effectManager?.removeEffect(BallEffectType.BALLOON_TRAIL);
+
+    // Restore speed after effect ends
+    this.recalculateVelocity();
   }
 
   /**
@@ -307,8 +331,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.effectManager?.applyEffect(BallEffectType.ELECTRIC_TRAIL);
     }
 
-    // Speed change is handled by BallSpeedManager - velocity will adjust
-    // on next paddle bounce or via update() min speed enforcement
+    // IMMEDIATELY recalculate velocity to apply speed change
+    this.recalculateVelocity();
 
     // Reset after duration (new timer replaces old one)
     this.electricBallTimer = this.scene.time.delayedCall(duration, () => {
@@ -325,6 +349,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isElectricBall = false;
     this.electricBallTimer = null;
     this.effectManager?.removeEffect(BallEffectType.ELECTRIC_TRAIL);
+
+    // Restore speed after effect ends
+    this.recalculateVelocity();
   }
 
   /**

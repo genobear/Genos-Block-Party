@@ -98,7 +98,7 @@
 
 | Power-Up | Emoji | Duration | Weight | Effect |
 |----------|-------|----------|--------|--------|
-| **Balloon** | 🎈 | 10s | 20 | Slow ball — velocity scaled to 60%, min speed halved |
+| **Balloon** | 🎈 | 10s | 20 | Slow ball — velocity scaled to 60% **immediately**, min speed halved |
 | **Cake** | 🎂 | 15s | 15 | Wide paddle — 1.5× width for duration |
 | **Drinks** | 🍹 | 8s | 15 | Wobbly paddle — sinusoidal offset (debuff!) |
 | **Disco** | 🪩 | Instant | 10 | Multi-ball — spawns 2 extra balls at current ball's position |
@@ -118,7 +118,7 @@
 - Visual intensity caps at level 3 (3 tiers of flame particle effects + smoke trail)
 
 ### Electric Ball Details
-- Ball speed boosted 1.5×
+- Ball speed boosted 1.5× — **applies immediately on collection** (velocity recalculated mid-flight)
 - On every brick hit (not just destruction), damages all **cardinal-adjacent** bricks (N/S/E/W)
 - AOE hits deal 1 damage each, give 50% score, and have 50% reduced drop chance
 - Lightning arc visual drawn to each adjacent brick with jagged bolt + particle impact
