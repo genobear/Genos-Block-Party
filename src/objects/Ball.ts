@@ -9,6 +9,7 @@ import { Paddle } from './Paddle';
 import { BallEffectManager } from '../effects/BallEffectManager';
 import { BallEffectType } from '../effects/BallEffectTypes';
 import { BallSpeedManager } from '../systems/BallSpeedManager';
+import { calculateLaunchVelocity } from '../utils/ballLaunch';
 
 export class Ball extends Phaser.Physics.Arcade.Sprite {
   private launched: boolean = false;
@@ -21,6 +22,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private fireballLevel: number = 0;
   private preCollisionVelocity: Phaser.Math.Vector2 = new Phaser.Math.Vector2();
   private pendingVelocityRestore: boolean = false;
+
+  // Collision cooldown to prevent velocity modifications right after collision
+  private collisionCooldown: number = 0;
 
   // Visual effects manager (handles all particle effects)
   private effectManager: BallEffectManager | null = null;
@@ -84,11 +88,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     // Get speed from manager (includes all multipliers)
     const speed = this.speedManager.getEffectiveSpeed();
 
-    // Random launch angle between -60 and -120 degrees (upward)
-    const angle = Phaser.Math.DegToRad(Phaser.Math.Between(-120, -60));
-
-    const velocityX = Math.cos(angle) * speed;
-    const velocityY = Math.sin(angle) * speed;
+    // Calculate random launch velocity (angle between -120 and -60 degrees, upward)
+    const { velocityX, velocityY } = calculateLaunchVelocity(speed);
 
     (this.body as Phaser.Physics.Arcade.Body).setVelocity(velocityX, velocityY);
   }
@@ -107,8 +108,13 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       body.velocity.copy(this.preCollisionVelocity);
     }
 
-    // Ensure ball maintains minimum speed if launched
-    if (this.launched) {
+    // Decrement collision cooldown
+    if (this.collisionCooldown > 0) {
+      this.collisionCooldown--;
+    }
+
+    // Ensure ball maintains minimum speed if launched (skip during collision cooldown)
+    if (this.launched && this.collisionCooldown === 0) {
       const body = this.body as Phaser.Physics.Arcade.Body;
       const velocity = body.velocity;
       const currentMagnitude = velocity.length();
@@ -116,18 +122,28 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       // Get effective speed from manager (includes all multipliers)
       const effectiveSpeed = this.speedManager.getEffectiveSpeed();
 
-      // Prevent ball from going too slow (80% of effective speed)
-      const minSpeed = effectiveSpeed * 0.8;
-      if (currentMagnitude < minSpeed && currentMagnitude > 0) {
-        velocity.normalize().scale(minSpeed);
-      }
-
-      // Prevent near-horizontal movement (boring loops)
+      // Prevent near-horizontal movement (boring loops) while preserving speed
       const minYVelocity = effectiveSpeed * 0.2;
-      if (Math.abs(velocity.y) < minYVelocity) {
-        velocity.y = velocity.y >= 0 ? minYVelocity : -minYVelocity;
+      if (Math.abs(velocity.y) < minYVelocity && currentMagnitude > 0) {
+        // Preserve magnitude while adding vertical component
+        const targetY = velocity.y >= 0 ? minYVelocity : -minYVelocity;
+        velocity.y = targetY;
+
+        // Recalculate X to maintain total magnitude
+        const newMagnitude = velocity.length();
+        if (newMagnitude > 0) {
+          velocity.scale(currentMagnitude / newMagnitude);
+        }
       }
     }
+  }
+
+  /**
+   * Register a collision to start cooldown period
+   * Call this from collision handlers to prevent immediate velocity modifications
+   */
+  registerCollision(): void {
+    this.collisionCooldown = 3; // Skip velocity adjustments for 3 frames after collision
   }
 
   /**
