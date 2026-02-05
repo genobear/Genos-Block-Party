@@ -51,9 +51,9 @@ Add 5 new power-ups to Geno's Block Party. Each feature is implemented in its ow
 ---
 
 ### 2. 🧲 DJ Scratch (Magnet Paddle)
-**Status**: `TODO`  
+**Status**: `IN_PROGRESS`  
 **Branch**: `feature/powerup-dj-scratch`  
-**PR**: —
+**PR**: https://github.com/genobear/Genos-Block-Party/pull/2
 
 **Description**: Ball sticks to paddle on contact. Click/tap to release with aim.
 
