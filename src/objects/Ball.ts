@@ -268,13 +268,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   /**
    * Release magneted ball (launches upward)
    */
-  releaseMagnet(speedMultiplier: number = 1): void {
+  releaseMagnet(speed: number): void {
     if (!this.magneted) return;
     this.magneted = false;
     this.magnetPaddle = null;
 
     // Launch at random upward angle (same as normal launch)
-    const speed = this.currentSpeed * speedMultiplier;
     const angle = Phaser.Math.DegToRad(Phaser.Math.Between(-120, -60));
     const velocityX = Math.cos(angle) * speed;
     const velocityY = Math.sin(angle) * speed;
