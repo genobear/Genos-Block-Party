@@ -19,6 +19,7 @@ export enum PowerUpType {
   PARTY_FAVOR = 'partyfavor', // Extra life (instant, very rare)
   CONFETTI_CANNON = 'confetticannon', // Fires confetti at 5-8 random bricks
   CONGA_LINE = 'congaline', // Trailing ghost balls deal damage (8s)
+  SPOTLIGHT = 'spotlight', // Gentle homing toward nearest brick (8s)
 }
 
 /**
@@ -140,6 +141,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 8000,       // 8 seconds
     dropWeight: 8,
     emoji: '💃',
+  },
+  [PowerUpType.SPOTLIGHT]: {
+    type: PowerUpType.SPOTLIGHT,
+    color: 0xffd700,      // Golden/yellow
+    duration: 8000,       // 8 seconds
+    dropWeight: 8,
+    emoji: '🔦',
   },
 };
 

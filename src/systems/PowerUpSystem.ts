@@ -70,6 +70,13 @@ export class PowerUpSystem {
   private congaLineEndTime: number = 0;
   private congaLineTimer: Phaser.Time.TimerEvent | null = null;
 
+  // Spotlight global timer state
+  private spotlightEndTime: number = 0;
+  private spotlightTimer: Phaser.Time.TimerEvent | null = null;
+
+  // Callback to get active brick positions (set by GameScene)
+  private getBricksCallback: (() => Array<{ x: number; y: number }>) | null = null;
+
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
 
@@ -114,6 +121,7 @@ export class PowerUpSystem {
       [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
       [PowerUpType.CONFETTI_CANNON, () => this.applyConfettiCannon()],
       [PowerUpType.CONGA_LINE, () => this.applyCongaLine()],
+      [PowerUpType.SPOTLIGHT, () => this.applySpotlight()],
     ]);
 
     // Initialize effect propagation config
@@ -142,6 +150,12 @@ export class PowerUpSystem {
         applyToAllBalls: true,
         applyToBall: (ball: Ball) => this.applyCongaLineToBall(ball),
         isActive: () => this.congaLineEndTime > this.scene.time.now,
+      }],
+      [PowerUpType.SPOTLIGHT, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => this.applySpotlightToBall(ball),
+        isActive: () => this.spotlightEndTime > this.scene.time.now,
       }],
     ]);
   }
@@ -687,12 +701,20 @@ export class PowerUpSystem {
     }
     this.congaLineEndTime = 0;
 
+    // Clear Spotlight state
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+      this.spotlightTimer = null;
+    }
+    this.spotlightEndTime = 0;
+
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
       ball.clearElectricBall();
       ball.clearBomb();
       ball.clearCongaLine();
+      ball.clearSpotlight();
     });
   }
 
@@ -772,5 +794,67 @@ export class PowerUpSystem {
     });
 
     this.events.emit('effectExpired', PowerUpType.CONGA_LINE);
+  }
+
+  // ========== SPOTLIGHT ==========
+
+  /**
+   * Set the callback to get active brick positions
+   * Called by GameScene during setup
+   */
+  setBricksCallback(callback: () => Array<{ x: number; y: number }>): void {
+    this.getBricksCallback = callback;
+  }
+
+  /**
+   * Apply Spotlight effect — gentle homing toward nearest brick
+   * Uses global timer so all balls expire at the same time
+   */
+  private applySpotlight(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].duration;
+    this.spotlightEndTime = this.scene.time.now + duration;
+
+    // Cancel existing timer if refreshing effect
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+    }
+
+    // Apply to all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      this.applySpotlightToBall(ball);
+    });
+
+    // Global expiration timer
+    this.spotlightTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireSpotlight();
+    });
+
+    this.trackEffect(PowerUpType.SPOTLIGHT, duration);
+  }
+
+  /**
+   * Apply Spotlight effect to a single ball with remaining duration
+   * Used by propagation config when new balls spawn mid-effect
+   */
+  private applySpotlightToBall(ball: Ball): void {
+    const remaining = Math.max(0, this.spotlightEndTime - this.scene.time.now);
+    if (remaining > 0 && this.getBricksCallback) {
+      ball.setSpotlight(remaining, this.getBricksCallback);
+    }
+  }
+
+  /**
+   * Expire Spotlight effect from all balls
+   */
+  private expireSpotlight(): void {
+    this.spotlightEndTime = 0;
+    this.spotlightTimer = null;
+
+    // Clear from all balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearSpotlight();
+    });
+
+    this.events.emit('effectExpired', PowerUpType.SPOTLIGHT);
   }
 }

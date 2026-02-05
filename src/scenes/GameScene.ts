@@ -119,6 +119,9 @@ export class GameScene extends Phaser.Scene {
     // Create power-up system (no longer needs primary ball reference)
     this.powerUpSystem = new PowerUpSystem(this, this.paddle, this.ballPool);
 
+    // Provide brick position callback for Spotlight power-up
+    this.powerUpSystem.setBricksCallback(() => this.getActiveBrickPositions());
+
     // Expose Brick class for debug console: window.Brick.debugDropChance = 1
     (window as unknown as { Brick: typeof Brick }).Brick = Brick;
 
@@ -1016,6 +1019,21 @@ export class GameScene extends Phaser.Scene {
 
     // Consume the safety net (destroy with animation)
     this.powerUpSystem.consumeSafetyNet();
+  }
+
+  /**
+   * Get positions of all active bricks (for Spotlight homing)
+   */
+  private getActiveBrickPositions(): Array<{ x: number; y: number }> {
+    const positions: Array<{ x: number; y: number }> = [];
+    this.bricks.children.iterate((child) => {
+      const brick = child as Brick;
+      if (brick && brick.active) {
+        positions.push({ x: brick.x, y: brick.y });
+      }
+      return true;
+    });
+    return positions;
   }
 
   /**

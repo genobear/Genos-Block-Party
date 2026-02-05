@@ -109,6 +109,7 @@
 | **DJ Scratch** | 🧲 | 15s | 12 | Magnet paddle — ball sticks on contact, click to release |
 | **Confetti Cannon** | 🎊 | Instant | 10 | Fires confetti at 5-8 random bricks for 1 damage each |
 | **Conga Line** | 💃 | 8s | 8 | Trailing ghost balls deal damage to bricks |
+| **Spotlight** | 🔦 | 8s | 8 | Gentle homing toward nearest brick |
 
 ### Fireball Stacking
 - Collecting multiple Fireballs during active duration **stacks the level** (1 → 2 → 3 → ...)
@@ -146,6 +147,19 @@
 - Ball lost: clears that ball's ghosts immediately
 - Timer refreshes if collected again while active
 
+### Spotlight Details
+- Ball gently curves toward the nearest brick while the effect is active
+- **Steering algorithm**: On each frame, calculates angle to nearest brick and adjusts velocity by max ~2.8° per frame
+- Subtle homing — player still has control over general direction, but ball "drifts" toward bricks
+- **Visual effects**:
+  - Golden glow and tint on ball (0xffd700)
+  - Light cone/beam emanating from ball in its direction of travel
+  - Trailing golden particles with sparkle effects
+- Effect lasts 8 seconds
+- Works with multi-ball — each ball independently homes toward its nearest brick
+- Propagates to new balls spawned during the effect (via Disco)
+- Timer refreshes if collected again while active
+
 ### Mystery Power-Up
 - Shows "???" feedback on collection
 - After 300ms delay, reveals the actual effect with its proper popup text
@@ -156,6 +170,7 @@
 - **Electric Ball**: propagates to new balls AND applies to all existing balls
 - **Balloon**: applies to all existing balls but does NOT propagate to newly spawned ones
 - **Conga Line**: propagates to new balls AND applies to all existing balls
+- **Spotlight**: propagates to new balls AND applies to all existing balls
 - Disco spawns get the Disco Sparkle visual effect on all active balls
 
 ### Visual Feedback System

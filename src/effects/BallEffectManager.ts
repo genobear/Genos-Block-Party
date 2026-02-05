@@ -9,6 +9,7 @@ import { DangerSparksEffectHandler } from './handlers/DangerSparksEffectHandler'
 import { BalloonTrailEffectHandler } from './handlers/BalloonTrailEffectHandler';
 import { BombGlowEffectHandler } from './handlers/BombGlowEffectHandler';
 import { CosmeticTrailHandler } from './handlers/CosmeticTrailHandler';
+import { SpotlightBeamEffectHandler } from './handlers/SpotlightBeamEffectHandler';
 import { ShopManager } from '../systems/ShopManager';
 
 /**
@@ -49,6 +50,7 @@ export class BallEffectManager {
         if (!trail) return null;
         return new CosmeticTrailHandler(this.scene, trail);
       }],
+      [BallEffectType.SPOTLIGHT_BEAM, () => new SpotlightBeamEffectHandler(this.scene)],
     ]);
   }
 

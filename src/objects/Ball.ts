@@ -44,6 +44,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private static readonly CONGA_INTERVAL_MS = 300; // 300ms between each ghost
   private static readonly CONGA_HISTORY_MS = 1000; // Keep 1 second of history
 
+  // Spotlight power-up state
+  private isSpotlight: boolean = false;
+  private spotlightTimer: Phaser.Time.TimerEvent | null = null;
+  private spotlightGraphics: Phaser.GameObjects.Graphics | null = null;
+  private getBricksCallback: (() => Array<{ x: number; y: number }>) | null = null;
+
   // Collision cooldown to prevent velocity modifications right after collision
   private collisionCooldown: number = 0;
 
@@ -162,6 +168,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
           velocity.scale(currentMagnitude / newMagnitude);
         }
       }
+    }
+
+    // Spotlight homing: gently steer toward nearest brick
+    if (this.isSpotlight && this.launched && !this.magneted && this.getBricksCallback) {
+      this.updateSpotlightSteering();
+      this.updateSpotlightGraphics();
     }
 
     // Update conga line ghost positions
@@ -361,6 +373,165 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     return this.isElectricBall;
   }
 
+  // ========== SPOTLIGHT POWER-UP ==========
+
+  /**
+   * Apply spotlight effect (gentle homing toward nearest brick)
+   * Re-applying resets the duration timer
+   * @param duration Duration in milliseconds
+   * @param getBricks Callback to get active brick positions
+   */
+  setSpotlight(duration: number, getBricks: () => Array<{ x: number; y: number }>): void {
+    // Cancel existing timer if re-applying (reset duration)
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+      this.spotlightTimer = null;
+    }
+
+    // Store the brick getter callback
+    this.getBricksCallback = getBricks;
+
+    // Create spotlight graphics if not already active
+    if (!this.isSpotlight) {
+      this.isSpotlight = true;
+
+      // Create graphics object for light cone
+      this.spotlightGraphics = this.scene.add.graphics();
+      this.spotlightGraphics.setDepth(this.depth - 1); // Behind the ball
+
+      // Apply spotlight beam visual effect
+      this.effectManager?.applyEffect(BallEffectType.SPOTLIGHT_BEAM);
+    }
+
+    // Reset timer with new duration
+    this.spotlightTimer = this.scene.time.delayedCall(duration, () => {
+      this.clearSpotlight();
+    });
+  }
+
+  /**
+   * Clear spotlight effect
+   */
+  clearSpotlight(): void {
+    if (!this.isSpotlight) return;
+
+    this.isSpotlight = false;
+    this.spotlightTimer = null;
+    this.getBricksCallback = null;
+
+    // Destroy light cone graphics
+    if (this.spotlightGraphics) {
+      this.spotlightGraphics.destroy();
+      this.spotlightGraphics = null;
+    }
+
+    // Remove visual effect
+    this.effectManager?.removeEffect(BallEffectType.SPOTLIGHT_BEAM);
+  }
+
+  /**
+   * Check if spotlight is active
+   */
+  isSpotlightActive(): boolean {
+    return this.isSpotlight;
+  }
+
+  /**
+   * Apply gentle steering toward the nearest brick
+   * Called each frame when spotlight is active
+   */
+  private updateSpotlightSteering(): void {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (!body || body.velocity.length() === 0) return;
+
+    // Find nearest brick
+    const nearestBrick = this.findNearestBrick();
+    if (!nearestBrick) return;
+
+    // Calculate angle to target
+    const angleToTarget = Phaser.Math.Angle.Between(this.x, this.y, nearestBrick.x, nearestBrick.y);
+    const currentAngle = Math.atan2(body.velocity.y, body.velocity.x);
+
+    // Calculate angle difference (wrapped to -PI to PI)
+    const angleDiff = Phaser.Math.Angle.Wrap(angleToTarget - currentAngle);
+
+    // Gentle steering: max ~2.8 degrees per frame (0.05 radians)
+    const steerAmount = Phaser.Math.Clamp(angleDiff, -0.05, 0.05);
+    const newAngle = currentAngle + steerAmount;
+
+    // Apply new velocity maintaining current speed
+    const speed = body.velocity.length();
+    body.setVelocity(
+      Math.cos(newAngle) * speed,
+      Math.sin(newAngle) * speed
+    );
+  }
+
+  /**
+   * Find the nearest brick from the callback's returned positions
+   */
+  private findNearestBrick(): { x: number; y: number } | null {
+    if (!this.getBricksCallback) return null;
+
+    const bricks = this.getBricksCallback();
+    if (bricks.length === 0) return null;
+
+    let nearest: { x: number; y: number } | null = null;
+    let nearestDist = Infinity;
+
+    for (const brick of bricks) {
+      const dist = Phaser.Math.Distance.Between(this.x, this.y, brick.x, brick.y);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = brick;
+      }
+    }
+
+    return nearest;
+  }
+
+  /**
+   * Update the light cone graphics based on ball velocity direction
+   */
+  private updateSpotlightGraphics(): void {
+    if (!this.spotlightGraphics) return;
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (!body || body.velocity.length() === 0) return;
+
+    this.spotlightGraphics.clear();
+
+    // Get velocity angle for cone direction
+    const angle = Math.atan2(body.velocity.y, body.velocity.x);
+
+    // Draw light cone (triangular beam)
+    const coneLength = 80;
+    const coneWidth = 0.4; // radians (~23 degrees half-angle)
+
+    // Golden/yellow gradient effect using multiple triangles
+    const colors = [0xffd700, 0xffec8b, 0xfffacd];
+    const alphas = [0.3, 0.2, 0.1];
+
+    for (let i = colors.length - 1; i >= 0; i--) {
+      const len = coneLength * (1 - i * 0.2);
+      const width = coneWidth * (1 + i * 0.3);
+
+      this.spotlightGraphics.fillStyle(colors[i], alphas[i]);
+      this.spotlightGraphics.beginPath();
+      this.spotlightGraphics.moveTo(this.x, this.y);
+      this.spotlightGraphics.lineTo(
+        this.x + Math.cos(angle - width) * len,
+        this.y + Math.sin(angle - width) * len
+      );
+      this.spotlightGraphics.lineTo(
+        this.x + Math.cos(angle + width) * len,
+        this.y + Math.sin(angle + width) * len
+      );
+      this.spotlightGraphics.closePath();
+      this.spotlightGraphics.fillPath();
+    }
+  }
+
   /**
    * Apply conga line effect (trailing ghost balls that deal damage)
    * Re-applying resets the duration timer
@@ -548,6 +719,18 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.positionHistory = [];
     this.congaGhosts.forEach((ghost) => ghost.destroy());
     this.congaGhosts = [];
+
+    // Clear spotlight (destroy graphics immediately without animation)
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+      this.spotlightTimer = null;
+    }
+    this.isSpotlight = false;
+    this.getBricksCallback = null;
+    if (this.spotlightGraphics) {
+      this.spotlightGraphics.destroy();
+      this.spotlightGraphics = null;
+    }
 
     // Clear all visual effects
     this.effectManager?.clearAll();

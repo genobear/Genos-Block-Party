@@ -191,6 +191,17 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.CONGA_LINE].color, alpha: 0.4 },
     },
   },
+  [PowerUpType.SPOTLIGHT]: {
+    displayName: 'SPOTLIGHT!',
+    color: POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].color,
+    particles: {
+      colors: [0xffd700, 0xffec8b, 0xffffff, 0xfffacd, 0xffe135],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].color, alpha: 0.4 },
+    },
+  },
 };
 
 /**
