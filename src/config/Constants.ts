@@ -35,6 +35,12 @@ export const BALL_RADIUS = 10;
 export const BALL_SPEED_BASE = 400;
 export const BALL_SPEED_INCREMENT = 0.05; // Speed increase per level
 
+// Ball speed effect multipliers (used by BallSpeedManager)
+export const SPEED_EFFECTS = {
+  BALLOON: 0.6, // Slow ball (60% of normal)
+  ELECTRIC: 1.5, // Fast ball (150% of normal)
+} as const;
+
 // Brick settings
 export const BRICK_WIDTH = 64;
 export const BRICK_HEIGHT = 28;
