@@ -35,6 +35,15 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private preCollisionVelocity: Phaser.Math.Vector2 = new Phaser.Math.Vector2();
   private pendingVelocityRestore: boolean = false;
 
+  // Conga Line power-up state
+  private isCongaLine: boolean = false;
+  private congaGhosts: Phaser.GameObjects.Sprite[] = [];
+  private positionHistory: Array<{ x: number; y: number; time: number }> = [];
+  private congaLineTimer: Phaser.Time.TimerEvent | null = null;
+  private static readonly CONGA_GHOST_COUNT = 3;
+  private static readonly CONGA_INTERVAL_MS = 300; // 300ms between each ghost
+  private static readonly CONGA_HISTORY_MS = 1000; // Keep 1 second of history
+
   // Collision cooldown to prevent velocity modifications right after collision
   private collisionCooldown: number = 0;
 
@@ -154,6 +163,67 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
         }
       }
     }
+
+    // Update conga line ghost positions
+    if (this.isCongaLine && this.launched) {
+      const now = this.scene.time.now;
+
+      // Record current position
+      this.positionHistory.push({ x: this.x, y: this.y, time: now });
+
+      // Trim history to keep only last CONGA_HISTORY_MS worth
+      const cutoff = now - Ball.CONGA_HISTORY_MS;
+      while (this.positionHistory.length > 0 && this.positionHistory[0].time < cutoff) {
+        this.positionHistory.shift();
+      }
+
+      // Update ghost positions from history (300ms, 600ms, 900ms behind)
+      for (let i = 0; i < this.congaGhosts.length; i++) {
+        const ghost = this.congaGhosts[i];
+        const targetTime = now - (i + 1) * Ball.CONGA_INTERVAL_MS;
+
+        // Find the position from history closest to targetTime
+        const pos = this.getPositionAtTime(targetTime);
+        if (pos) {
+          ghost.setPosition(pos.x, pos.y);
+          ghost.setVisible(true);
+        } else {
+          // Not enough history yet, hide this ghost
+          ghost.setVisible(false);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get interpolated position from history at a given time
+   */
+  private getPositionAtTime(targetTime: number): { x: number; y: number } | null {
+    if (this.positionHistory.length === 0) return null;
+
+    // If target time is before our history, return null
+    if (targetTime < this.positionHistory[0].time) return null;
+
+    // If target time is after our latest entry, return latest
+    const latest = this.positionHistory[this.positionHistory.length - 1];
+    if (targetTime >= latest.time) {
+      return { x: latest.x, y: latest.y };
+    }
+
+    // Find the two entries bracketing targetTime and interpolate
+    for (let i = 0; i < this.positionHistory.length - 1; i++) {
+      const curr = this.positionHistory[i];
+      const next = this.positionHistory[i + 1];
+      if (targetTime >= curr.time && targetTime <= next.time) {
+        const t = (targetTime - curr.time) / (next.time - curr.time);
+        return {
+          x: curr.x + (next.x - curr.x) * t,
+          y: curr.y + (next.y - curr.y) * t,
+        };
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -264,6 +334,77 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     return this.isElectricBall;
   }
 
+  /**
+   * Apply conga line effect (trailing ghost balls that deal damage)
+   * Re-applying resets the duration timer
+   */
+  setCongaLine(duration: number): void {
+    // Cancel existing timer if re-applying (reset duration)
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+      this.congaLineTimer = null;
+    }
+
+    // Create ghosts if not already active
+    if (!this.isCongaLine) {
+      this.isCongaLine = true;
+      this.positionHistory = [];
+
+      // Create ghost sprites (semi-transparent copies of ball)
+      for (let i = 0; i < Ball.CONGA_GHOST_COUNT; i++) {
+        const ghost = this.scene.add.sprite(this.x, this.y, 'ball');
+        ghost.setAlpha(0.5 - i * 0.1); // 0.5, 0.4, 0.3 for decreasing opacity
+        ghost.setTint(0xe040fb); // Magenta tint to match power-up color
+        ghost.setDepth(this.depth - 1 - i); // Behind the main ball
+        ghost.setVisible(false); // Initially hidden until we have position history
+        this.congaGhosts.push(ghost);
+      }
+    }
+
+    // Reset timer with new duration
+    this.congaLineTimer = this.scene.time.delayedCall(duration, () => {
+      this.clearCongaLine();
+    });
+  }
+
+  /**
+   * Clear conga line effect
+   */
+  clearCongaLine(): void {
+    if (!this.isCongaLine) return;
+
+    this.isCongaLine = false;
+    this.congaLineTimer = null;
+    this.positionHistory = [];
+
+    // Fade out and destroy ghosts
+    this.congaGhosts.forEach((ghost) => {
+      this.scene.tweens.add({
+        targets: ghost,
+        alpha: 0,
+        duration: 300,
+        ease: 'Power2',
+        onComplete: () => {
+          ghost.destroy();
+        },
+      });
+    });
+    this.congaGhosts = [];
+  }
+
+  /**
+   * Get conga line ghost sprites (for collision detection by GameScene)
+   */
+  getCongaGhosts(): Phaser.GameObjects.Sprite[] {
+    return this.congaGhosts;
+  }
+
+  /**
+   * Check if conga line is active
+   */
+  isCongaLineActive(): boolean {
+    return this.isCongaLine;
+  }
 
   /**
    * Arm bomb (Party Popper power-up — next brick hit explodes 3x3 area)
@@ -371,6 +512,16 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.electricBallTimer = null;
     }
 
+    // Clear conga line (destroy ghosts immediately without animation)
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+      this.congaLineTimer = null;
+    }
+    this.isCongaLine = false;
+    this.positionHistory = [];
+    this.congaGhosts.forEach((ghost) => ghost.destroy());
+    this.congaGhosts = [];
+
     // Clear all visual effects
     this.effectManager?.clearAll();
 
@@ -449,6 +600,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
    * Deactivate ball (return to pool)
    */
   deactivate(): void {
+    // Explicitly clear conga line ghosts before reset (in case reset is called elsewhere)
+    this.clearCongaLine();
     this.reset();
     this.setActive(false);
     this.setVisible(false);

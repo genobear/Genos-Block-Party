@@ -18,6 +18,7 @@ export enum PowerUpType {
   BOUNCE_HOUSE = 'bouncehouse', // Safety net saves ball once
   PARTY_FAVOR = 'partyfavor', // Extra life (instant, very rare)
   CONFETTI_CANNON = 'confetticannon', // Fires confetti at 5-8 random bricks
+  CONGA_LINE = 'congaline', // Trailing ghost balls deal damage (8s)
 }
 
 /**
@@ -132,6 +133,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 0,          // Instant effect
     dropWeight: 10,
     emoji: '🎊',
+  },
+  [PowerUpType.CONGA_LINE]: {
+    type: PowerUpType.CONGA_LINE,
+    color: 0xe040fb,      // Vibrant magenta/purple
+    duration: 8000,       // 8 seconds
+    dropWeight: 8,
+    emoji: '💃',
   },
 };
 

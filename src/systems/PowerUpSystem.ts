@@ -66,6 +66,10 @@ export class PowerUpSystem {
   // Bounce House safety net state
   private safetyNet: SafetyNet | null = null;
 
+  // Conga Line global timer state
+  private congaLineEndTime: number = 0;
+  private congaLineTimer: Phaser.Time.TimerEvent | null = null;
+
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
 
@@ -109,6 +113,7 @@ export class PowerUpSystem {
       [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
       [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
       [PowerUpType.CONFETTI_CANNON, () => this.applyConfettiCannon()],
+      [PowerUpType.CONGA_LINE, () => this.applyCongaLine()],
     ]);
 
     // Initialize effect propagation config
@@ -131,6 +136,12 @@ export class PowerUpSystem {
         applyToAllBalls: true,
         applyToBall: (ball: Ball) => this.applyBalloonToBall(ball),
         isActive: () => this.balloonEndTime > this.scene.time.now,
+      }],
+      [PowerUpType.CONGA_LINE, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => this.applyCongaLineToBall(ball),
+        isActive: () => this.congaLineEndTime > this.scene.time.now,
       }],
     ]);
   }
@@ -669,11 +680,19 @@ export class PowerUpSystem {
     // Clear Bounce House safety net
     this.clearSafetyNet(false);
 
+    // Clear Conga Line state
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+      this.congaLineTimer = null;
+    }
+    this.congaLineEndTime = 0;
+
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
       ball.clearElectricBall();
       ball.clearBomb();
+      ball.clearCongaLine();
     });
   }
 
@@ -699,5 +718,59 @@ export class PowerUpSystem {
   private applyConfettiCannon(): void {
     this.events.emit('confettiCannon');
     this.events.emit('effectApplied', PowerUpType.CONFETTI_CANNON);
+  }
+
+  // ========== CONGA LINE ==========
+
+  /**
+   * Apply Conga Line effect — trailing ghost balls that deal damage to bricks
+   * Uses global timer so all balls expire at the same time
+   */
+  private applyCongaLine(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.CONGA_LINE].duration;
+    this.congaLineEndTime = this.scene.time.now + duration;
+
+    // Cancel existing timer if refreshing effect
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+    }
+
+    // Apply to all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      this.applyCongaLineToBall(ball);
+    });
+
+    // Global expiration timer
+    this.congaLineTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireCongaLine();
+    });
+
+    this.trackEffect(PowerUpType.CONGA_LINE, duration);
+  }
+
+  /**
+   * Apply Conga Line effect to a single ball with remaining duration
+   * Used by propagation config when new balls spawn mid-effect
+   */
+  private applyCongaLineToBall(ball: Ball): void {
+    const remaining = Math.max(0, this.congaLineEndTime - this.scene.time.now);
+    if (remaining > 0) {
+      ball.setCongaLine(remaining);
+    }
+  }
+
+  /**
+   * Expire Conga Line effect from all balls
+   */
+  private expireCongaLine(): void {
+    this.congaLineEndTime = 0;
+    this.congaLineTimer = null;
+
+    // Clear from all balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearCongaLine();
+    });
+
+    this.events.emit('effectExpired', PowerUpType.CONGA_LINE);
   }
 }

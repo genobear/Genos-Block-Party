@@ -108,6 +108,7 @@
 | **Electric Ball** | ⚡ | 8s | 12 | 1.5× speed + AOE damage to adjacent bricks |
 | **DJ Scratch** | 🧲 | 15s | 12 | Magnet paddle — ball sticks on contact, click to release |
 | **Confetti Cannon** | 🎊 | Instant | 10 | Fires confetti at 5-8 random bricks for 1 damage each |
+| **Conga Line** | 💃 | 8s | 8 | Trailing ghost balls deal damage to bricks |
 
 ### Fireball Stacking
 - Collecting multiple Fireballs during active duration **stacks the level** (1 → 2 → 3 → ...)
@@ -133,6 +134,18 @@
 - Timer refreshes if collected again while active
 - Uses existing Scratch SFX on ball catch
 
+### Conga Line Details
+- Ball spawns 3 trailing ghost copies at 300ms intervals (positions from 300ms, 600ms, 900ms ago)
+- Ghost balls are semi-transparent (alpha 0.5→0.3) with magenta tint
+- Ghosts track the ball's position history and follow its path with delay
+- When a ghost overlaps a brick, it deals 1 damage (ghosts pass through, don't bounce)
+- Damage triggers score, multiplier increment, and power-up drop rolls
+- Effect lasts 8 seconds, then ghosts fade out gracefully (300ms fade)
+- Works with multi-ball — each ball gets its own set of ghosts
+- Propagates to new balls spawned during the effect (via Disco)
+- Ball lost: clears that ball's ghosts immediately
+- Timer refreshes if collected again while active
+
 ### Mystery Power-Up
 - Shows "???" feedback on collection
 - After 300ms delay, reveals the actual effect with its proper popup text
@@ -142,6 +155,7 @@
 - **Fireball**: propagates to newly spawned balls AND applies to all existing balls
 - **Electric Ball**: propagates to new balls AND applies to all existing balls
 - **Balloon**: applies to all existing balls but does NOT propagate to newly spawned ones
+- **Conga Line**: propagates to new balls AND applies to all existing balls
 - Disco spawns get the Disco Sparkle visual effect on all active balls
 
 ### Visual Feedback System

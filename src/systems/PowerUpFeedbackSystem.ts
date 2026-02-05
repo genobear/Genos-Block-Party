@@ -180,6 +180,17 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.CONFETTI_CANNON].color, alpha: 0.4 },
     },
   },
+  [PowerUpType.CONGA_LINE]: {
+    displayName: 'CONGA LINE!',
+    color: POWERUP_CONFIGS[PowerUpType.CONGA_LINE].color,
+    particles: {
+      colors: [0xe040fb, 0xff00ff, 0xda70d6, 0xffffff, 0xba55d3],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.CONGA_LINE].color, alpha: 0.4 },
+    },
+  },
 };
 
 /**
