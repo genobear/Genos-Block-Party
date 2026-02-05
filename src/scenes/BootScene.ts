@@ -4,6 +4,7 @@ import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
+import { PADDLE_SKINS } from '../types/ShopTypes';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -88,8 +89,29 @@ export class BootScene extends Phaser.Scene {
     // Create power-up textures
     this.createPowerUpTextures();
 
+    // Create paddle skin textures for the Party Shop
+    this.createPaddleSkinTextures();
+
     // Create particle textures
     this.createParticleTextures();
+  }
+
+  /**
+   * Generate paddle textures for each shop skin variant
+   * Same structure as the default paddle texture but with skin colors
+   */
+  private createPaddleSkinTextures(): void {
+    for (const skin of PADDLE_SKINS) {
+      const g = this.make.graphics({ x: 0, y: 0 });
+      g.fillStyle(skin.color);
+      g.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 8);
+      // Accent circles (DJ deck look)
+      g.fillStyle(skin.accentColor);
+      g.fillCircle(20, PADDLE_HEIGHT / 2, 6);
+      g.fillCircle(PADDLE_WIDTH - 20, PADDLE_HEIGHT / 2, 6);
+      g.generateTexture(`paddle-skin-${skin.id}`, PADDLE_WIDTH, PADDLE_HEIGHT);
+      g.destroy();
+    }
   }
 
   private createBrickTextures(): void {

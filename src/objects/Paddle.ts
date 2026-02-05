@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_Y_OFFSET, PADDLE_SPEED, GAME_WIDTH, PLAY_AREA_Y, PLAYABLE_HEIGHT } from '../config/Constants';
+import { ShopManager } from '../systems/ShopManager';
 
 export class Paddle extends Phaser.Physics.Arcade.Sprite {
   private baseWidth: number = PADDLE_WIDTH;
@@ -9,6 +10,7 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
   private wobbleTime: number = 0;
   private wobbleIntensity: number = 50;
   private wobbleSpeed: number = 0.01;
+  private rainbowTween: Phaser.Tweens.Tween | null = null;
 
   constructor(scene: Phaser.Scene) {
     const x = GAME_WIDTH / 2;
@@ -27,6 +29,9 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
 
     // Initialize target position
     this.targetX = x;
+
+    // Apply equipped paddle skin
+    this.applySkin();
   }
 
   update(_time: number, delta: number): void {
@@ -128,6 +133,47 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
   resetEffects(): void {
     this.resetWidth();
     this.isWobbly = false;
+    this.applySkin();
+  }
+
+  /**
+   * Apply the currently equipped paddle skin from the shop
+   */
+  private applySkin(): void {
+    const skin = ShopManager.getInstance().getEquippedPaddleSkin();
+    this.setTexture(`paddle-skin-${skin.id}`);
+
+    // Apply alpha for invisible skin
+    if (skin.alpha !== undefined) {
+      this.setAlpha(skin.alpha);
+    } else {
+      this.setAlpha(1);
+    }
+
+    // Stop existing rainbow tween if any
+    if (this.rainbowTween) {
+      this.rainbowTween.stop();
+      this.rainbowTween = null;
+      this.clearTint();
+    }
+
+    // Rainbow skin: color cycle tween
+    if (skin.id === 'rainbow') {
+      const rainbowColors = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0xff00ff];
+      let colorIndex = 0;
+
+      this.rainbowTween = this.scene.tweens.addCounter({
+        from: 0,
+        to: 100,
+        duration: 400,
+        repeat: -1,
+        onRepeat: () => {
+          colorIndex = (colorIndex + 1) % rainbowColors.length;
+          this.setTint(rainbowColors[colorIndex]);
+        },
+      });
+      this.setTint(rainbowColors[0]);
+    }
   }
 
   /**
