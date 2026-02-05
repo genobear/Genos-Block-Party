@@ -7,6 +7,7 @@ import { Ball } from '../objects/Ball';
 import { Brick } from '../objects/Brick';
 import { PowerUpType, selectRandomPowerUpType, selectRandomEffectType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { BallEffectType } from '../effects/BallEffectTypes';
+import { SafetyNet } from '../objects/SafetyNet';
 
 /**
  * Active effect tracking
@@ -56,6 +57,9 @@ export class PowerUpSystem {
   private balloonEndTime: number = 0;
   private balloonTimer: Phaser.Time.TimerEvent | null = null;
 
+  // Bounce House safety net state
+  private safetyNet: SafetyNet | null = null;
+
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
 
@@ -92,6 +96,7 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+      [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
     ]);
 
     // Initialize effect propagation config
@@ -426,6 +431,54 @@ export class PowerUpSystem {
   }
 
   /**
+   * Apply Bounce House effect — spawn a one-use safety net floor
+   */
+  private applyBounceHouse(): void {
+    // Clear existing safety net if any (refresh, don't stack)
+    this.clearSafetyNet(false);
+
+    // Create new safety net
+    this.safetyNet = new SafetyNet(this.scene);
+
+    // Emit event for GameScene to set up physics collider
+    this.events.emit('safetyNetCreated', this.safetyNet);
+
+    // Track as active effect with no auto-expiration (endTime = Infinity)
+    this.activeEffects = this.activeEffects.filter((e) => e.type !== PowerUpType.BOUNCE_HOUSE);
+    this.activeEffects.push({ type: PowerUpType.BOUNCE_HOUSE, endTime: Infinity });
+    this.events.emit('effectApplied', PowerUpType.BOUNCE_HOUSE, 0);
+  }
+
+  /**
+   * Consume the safety net (called from GameScene when ball hits it)
+   */
+  consumeSafetyNet(): void {
+    this.clearSafetyNet(true);
+  }
+
+  /**
+   * Clear the safety net
+   * @param animate Whether to play the destroy animation
+   */
+  private clearSafetyNet(animate: boolean = true): void {
+    if (!this.safetyNet) return;
+
+    const net = this.safetyNet;
+    this.safetyNet = null;
+
+    if (animate) {
+      net.playDestroyAnimation();
+    } else {
+      net.destroy();
+    }
+
+    // Remove from active effects
+    this.activeEffects = this.activeEffects.filter((e) => e.type !== PowerUpType.BOUNCE_HOUSE);
+    this.events.emit('safetyNetDestroyed');
+    this.events.emit('effectExpired', PowerUpType.BOUNCE_HOUSE);
+  }
+
+  /**
    * Track active effect for UI display
    */
   private trackEffect(type: PowerUpType, duration: number): void {
@@ -510,6 +563,9 @@ export class PowerUpSystem {
       this.balloonTimer = null;
     }
     this.balloonEndTime = 0;
+
+    // Clear Bounce House safety net
+    this.clearSafetyNet(false);
 
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
