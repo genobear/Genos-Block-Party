@@ -139,6 +139,9 @@ export class CollisionHandler {
       return { destroyed: false, droppedPowerUp: false };
     }
 
+    // Register collision to prevent immediate velocity modifications
+    ball.registerCollision();
+
     // Calculate damage based on fireball level
     const isFireball = ball.isFireballActive();
     const damage = isFireball ? ball.getFireballLevel() : 1;

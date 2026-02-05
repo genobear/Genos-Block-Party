@@ -1,3 +1,5 @@
+import { weightedSelect, WeightedItem } from '../utils/weightedSelection';
+
 /**
  * Power-up types in Geno's Block Party
  */
@@ -10,6 +12,7 @@ export enum PowerUpType {
   POWERBALL = 'powerball', // Double power-up drop chance (12s)
   FIREBALL = 'fireball', // Piercing ball with stacking damage (10s)
   ELECTRICBALL = 'electricball', // Electric ball with AOE damage (8s)
+  BOUNCE_HOUSE = 'bouncehouse', // Safety net saves ball once
   PARTY_FAVOR = 'partyfavor', // Extra life (instant, very rare)
 }
 
@@ -84,6 +87,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     dropWeight: 12,
     emoji: '⚡',
   },
+  [PowerUpType.BOUNCE_HOUSE]: {
+    type: PowerUpType.BOUNCE_HOUSE,
+    color: 0x90ee90,      // Light green
+    duration: 0,          // Until used (one-shot)
+    dropWeight: 10,
+    emoji: '🛡️',
+  },
   [PowerUpType.PARTY_FAVOR]: {
     type: PowerUpType.PARTY_FAVOR,
     color: 0xff69b4,      // Hot pink
@@ -94,9 +104,19 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
 };
 
 /**
- * Get total weight for probability calculation
+ * Get weighted items for power-up selection
  */
-function getTotalDropWeight(): number {
+function getPowerUpWeightedItems(): WeightedItem<PowerUpType>[] {
+  return Object.values(POWERUP_CONFIGS).map(config => ({
+    value: config.type,
+    weight: config.dropWeight,
+  }));
+}
+
+/**
+ * Get total weight for probability calculation (exported for testing)
+ */
+export function getTotalDropWeight(): number {
   return Object.values(POWERUP_CONFIGS).reduce((sum, config) => sum + config.dropWeight, 0);
 }
 
@@ -104,18 +124,8 @@ function getTotalDropWeight(): number {
  * Select a random power-up type based on weighted drop chances
  */
 export function selectRandomPowerUpType(): PowerUpType {
-  const totalWeight = getTotalDropWeight();
-  let random = Math.random() * totalWeight;
-
-  for (const config of Object.values(POWERUP_CONFIGS)) {
-    random -= config.dropWeight;
-    if (random <= 0) {
-      return config.type;
-    }
-  }
-
-  // Fallback
-  return PowerUpType.BALLOON;
+  const result = weightedSelect(getPowerUpWeightedItems(), Math.random());
+  return result ?? PowerUpType.BALLOON; // Fallback
 }
 
 /**
