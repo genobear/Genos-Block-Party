@@ -29,7 +29,6 @@ import {
   BRICK_ROWS_START_Y,
   BRICK_COLS,
   STARTING_LIVES,
-  BALL_SPEED_BASE,
   AUDIO,
   MULTIPLIER,
 } from '../config/Constants';
@@ -739,7 +738,7 @@ export class GameScene extends Phaser.Scene {
    * Handle ball bouncing off the safety net
    */
   private handleSafetyNetBounce(
-    ballObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+    _ballObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
     netObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
   ): void {
     const net = netObj as SafetyNet;
