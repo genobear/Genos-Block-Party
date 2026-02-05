@@ -13,6 +13,7 @@ import { AudioManager } from '../systems/AudioManager';
 import { NowPlayingToast } from '../systems/NowPlayingToast';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
+import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { PowerUpType } from '../types/PowerUpTypes';
 import { SafetyNet } from '../objects/SafetyNet';
 import { BallEffectType } from '../effects/BallEffectTypes';
@@ -56,6 +57,9 @@ export class GameScene extends Phaser.Scene {
   // Audio
   private audioManager!: AudioManager;
   private unsubscribeTrackChange: (() => void) | null = null;
+
+  // Speed management
+  private speedManager!: BallSpeedManager;
 
   // Game state
   private score: number = 0;
@@ -144,6 +148,9 @@ export class GameScene extends Phaser.Scene {
     this.audioManager = AudioManager.getInstance();
     this.audioManager.init(this);
 
+    // Get speed manager instance
+    this.speedManager = BallSpeedManager.getInstance();
+
     // Wire up "Now Playing" toast notification
     const nowPlayingToast = NowPlayingToast.getInstance();
     this.unsubscribeTrackChange = this.audioManager.onTrackChange((metadata) => {
@@ -201,6 +208,12 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem.events.on('safetyNetCreated', this.onSafetyNetCreated, this);
     this.powerUpSystem.events.on('safetyNetDestroyed', this.onSafetyNetDestroyed, this);
 
+    // Handle extra life from Party Favor power-up
+    this.powerUpSystem.events.on('grantExtraLife', () => {
+      this.lives++;
+      this.events.emit('livesUpdate', this.lives);
+    });
+
     // Emit initial state to UI
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
@@ -232,6 +245,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('mysteryRevealed');
     this.powerUpSystem?.events?.off('safetyNetCreated');
     this.powerUpSystem?.events?.off('safetyNetDestroyed');
+    this.powerUpSystem?.events?.off('grantExtraLife');
 
     // Clean up safety net collider
     if (this.safetyNetCollider) {
@@ -296,10 +310,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private launchBall(): void {
-    // Launch all unlaunched balls
+    // Launch all unlaunched balls (speed is handled by BallSpeedManager)
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (!ball.isLaunched()) {
-        ball.launch(this.currentLevel.ballSpeedMultiplier);
+        ball.launch();
       }
     });
     this.events.emit('ballLaunched');
@@ -380,10 +394,8 @@ export class GameScene extends Phaser.Scene {
     // Emit level update to UI
     this.events.emit('levelUpdate', this.currentLevel.name);
 
-    // Update power-up system with current level's speed multiplier
-    if (this.powerUpSystem) {
-      this.powerUpSystem.setSpeedMultiplier(this.currentLevel.ballSpeedMultiplier);
-    }
+    // Set level speed multiplier on speed manager
+    this.speedManager.setLevelMultiplier(this.currentLevel.ballSpeedMultiplier);
   }
 
   private setupCollisions(): void {

@@ -370,6 +370,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 
 ### Continuous Integration
 - **GitHub Actions** workflow runs on every push to `master` and on pull requests targeting `master`
+- **Node 22** (LTS) — pinned in CI to satisfy Vite 7's engine requirements
 - Pipeline steps: `npm ci` → `npm run build` (TypeScript + Vite) → `npm run test:ci` (Vitest)
 - Badge displayed in README for at-a-glance build status
 
@@ -385,6 +386,13 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Power-Up Configs** | Every `PowerUpType` enum value has a matching `POWERUP_CONFIGS` entry with correct type, color, duration, dropWeight, and emoji |
 | **Currency Conversion** | `CurrencyManager.calculateCurrencyFromScore()` returns correct values across all tier thresholds (0, 100, 1K, 5K, 10K, 25K scores) |
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
+| **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |
+| **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
+
+### Utility Functions
+| Module | Function | Description |
+|--------|----------|-------------|
+| `utils/ballLaunch.ts` | `calculateLaunchVelocity(speed, minAngle?, maxAngle?)` | Pure function to calculate ball launch velocity. Extracted from `Ball.ts` for unit testing. Returns `{velocityX, velocityY, angleDeg}` with random angle in specified range (default: -120° to -60°). |
 
 ### Commands
 ```bash

@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import {
   BALL_RADIUS,
-  BALL_SPEED_BASE,
   PLAY_AREA_Y,
   PLAYABLE_HEIGHT,
   PADDLE_HEIGHT,
@@ -9,9 +8,10 @@ import {
 import { Paddle } from './Paddle';
 import { BallEffectManager } from '../effects/BallEffectManager';
 import { BallEffectType } from '../effects/BallEffectTypes';
+import { BallSpeedManager } from '../systems/BallSpeedManager';
+import { calculateLaunchVelocity } from '../utils/ballLaunch';
 
 export class Ball extends Phaser.Physics.Arcade.Sprite {
-  private currentSpeed: number = BALL_SPEED_BASE;
   private launched: boolean = false;
   private isFloating: boolean = false; // Balloon power-up
   private isElectricBall: boolean = false; // Electric Ball power-up
@@ -61,6 +61,13 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Get the speed manager instance
+   */
+  private get speedManager(): BallSpeedManager {
+    return BallSpeedManager.getInstance();
+  }
+
+  /**
    * Attach ball to paddle before launch
    */
   attachToPaddle(paddle: Paddle): void {
@@ -70,21 +77,19 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Launch the ball from the paddle
+   * Speed is calculated by BallSpeedManager (base × difficulty × level × effects)
    */
-  launch(speedMultiplier: number = 1): void {
+  launch(): void {
     if (this.launched) return;
 
     this.launched = true;
     this.attachedPaddle = null;
 
-    // Calculate launch speed
-    const speed = this.currentSpeed * speedMultiplier;
+    // Get speed from manager (includes all multipliers)
+    const speed = this.speedManager.getEffectiveSpeed();
 
-    // Random launch angle between -60 and -120 degrees (upward)
-    const angle = Phaser.Math.DegToRad(Phaser.Math.Between(-120, -60));
-
-    const velocityX = Math.cos(angle) * speed;
-    const velocityY = Math.sin(angle) * speed;
+    // Calculate random launch velocity (angle between -120 and -60 degrees, upward)
+    const { velocityX, velocityY } = calculateLaunchVelocity(speed);
 
     (this.body as Phaser.Physics.Arcade.Body).setVelocity(velocityX, velocityY);
   }
@@ -114,8 +119,11 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       const velocity = body.velocity;
       const currentMagnitude = velocity.length();
 
+      // Get effective speed from manager (includes all multipliers)
+      const effectiveSpeed = this.speedManager.getEffectiveSpeed();
+
       // Prevent near-horizontal movement (boring loops) while preserving speed
-      const minYVelocity = this.currentSpeed * 0.2;
+      const minYVelocity = effectiveSpeed * 0.2;
       if (Math.abs(velocity.y) < minYVelocity && currentMagnitude > 0) {
         // Preserve magnitude while adding vertical component
         const targetY = velocity.y >= 0 ? minYVelocity : -minYVelocity;
@@ -140,14 +148,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Handle bounce off paddle with angle calculation
+   * Speed is calculated by BallSpeedManager (includes all effect multipliers)
    */
   bounceOffPaddle(paddle: Paddle): void {
     const angle = paddle.getCollisionAngle(this.x);
-    const speed = this.isFloating
-      ? this.currentSpeed * 0.6
-      : this.isElectricBall
-        ? this.currentSpeed * 1.5
-        : this.currentSpeed;
+    // Get speed from manager (already includes balloon/electric multipliers)
+    const speed = this.speedManager.getEffectiveSpeed();
 
     const velocityX = Math.cos(angle) * speed;
     const velocityY = Math.sin(angle) * speed;
@@ -157,16 +163,16 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Apply floating effect (Balloon power-up - slower ball)
+   * Speed reduction is handled by BallSpeedManager effect multiplier
    */
   setFloating(duration: number): void {
-    // Guard against re-application to prevent velocity stacking
+    // Guard against re-application
     if (this.isFloating) return;
 
     this.isFloating = true;
 
-    // Slow down current velocity
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    body.velocity.scale(0.6);
+    // Speed change is handled by BallSpeedManager - velocity will adjust
+    // on next paddle bounce or via update() min speed enforcement
 
     // Reset after duration
     this.scene.time.delayedCall(duration, () => {
@@ -176,16 +182,16 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
   /**
    * Apply electric ball effect (Electric Ball power-up - faster ball with AOE damage)
+   * Speed boost is handled by BallSpeedManager effect multiplier
    */
   setElectricBall(duration: number): void {
-    // Guard against re-application to prevent velocity stacking
+    // Guard against re-application
     if (this.isElectricBall) return;
 
     this.isElectricBall = true;
 
-    // Speed up current velocity by 50%
-    const body = this.body as Phaser.Physics.Arcade.Body;
-    body.velocity.scale(1.5);
+    // Speed change is handled by BallSpeedManager - velocity will adjust
+    // on next paddle bounce or via update() min speed enforcement
 
     // Apply electric speed trail visual effect
     this.effectManager?.applyEffect(BallEffectType.ELECTRIC_TRAIL);
@@ -211,13 +217,6 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
    */
   isElectricBallActive(): boolean {
     return this.isElectricBall;
-  }
-
-  /**
-   * Set ball speed (for level progression)
-   */
-  setSpeed(speed: number): void {
-    this.currentSpeed = speed;
   }
 
   /**
