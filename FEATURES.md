@@ -411,6 +411,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Drop Roll Probability** | Pure drop logic functions (`calculateDropChance`, `rollDrop`, `rollDropsForDamage`): base chances per brick type, Power Ball bonus (2× capped at 100%), AOE penalty (50%), debug override precedence, edge cases |
 | **Paddle Collision** | Center/edge/clamped angle calculations return correct radian values |
 | **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
+| **Fireball Stacking** | `FireballState` functions: `reset()` initializes level 0, `incrementLevel()` increases by 1 (immutable), `isActive()` returns false at 0/true at 1+, `getDamage()` equals level, `getVisualTier()` maps levels to 4 tiers (0/1/2/3), `canPierce()` returns level ≥ brickHP, integration test covers full gameplay flow |
 
 ### Utility Functions
 | Module | Function | Description |
@@ -424,6 +425,12 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | `utils/leaderboard.ts` | `checkIsHighScore(score, leaderboard, maxEntries?)` | Checks if a score qualifies for the leaderboard (score > 0 AND either room available OR beats lowest). |
 | `utils/leaderboard.ts` | `insertScore(entry, leaderboard, maxEntries?)` | Inserts entry into leaderboard, maintains descending sort, caps at maxEntries. Returns new array (immutable). |
 | `utils/leaderboard.ts` | `saveLeaderboard(leaderboard, storage, key?)` | Saves leaderboard to localStorage as JSON. |
+| `utils/fireball.ts` | `reset()` | Returns initial fireball state with level 0. |
+| `utils/fireball.ts` | `incrementLevel(state)` | Increments fireball level by 1. Returns new state (immutable). |
+| `utils/fireball.ts` | `isActive(state)` | Returns true if fireball level > 0. |
+| `utils/fireball.ts` | `getDamage(state)` | Returns damage per hit (equals current level). |
+| `utils/fireball.ts` | `getVisualTier(state)` | Returns visual tier (0-3) based on level: 0→0, 1-2→1, 3-4→2, 5+→3. |
+| `utils/fireball.ts` | `canPierce(state, brickHP)` | Returns true if fireball level ≥ brickHP (ball passes through brick). |
 
 ### Commands
 ```bash
