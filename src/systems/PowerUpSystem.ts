@@ -95,6 +95,7 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+      [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
     ]);
 
     // Initialize effect propagation config
@@ -432,6 +433,18 @@ export class PowerUpSystem {
    */
   getFireballLevel(): number {
     return this.fireballLevel;
+  }
+
+  /**
+   * Apply Party Favor effect (extra life)
+   * Instant effect - emits event for GameScene to handle lives
+   */
+  private applyPartyFavor(): void {
+    // Emit event for GameScene to grant extra life
+    this.events.emit('grantExtraLife');
+
+    // No duration tracking - instant effect
+    this.events.emit('effectApplied', PowerUpType.PARTY_FAVOR);
   }
 
   /**
