@@ -46,7 +46,6 @@ export class GameScene extends Phaser.Scene {
   private powerUpFeedbackSystem!: PowerUpFeedbackSystem;
   private collisionHandler!: CollisionHandler;
   private electricArcSystem!: ElectricArcSystem;
-  private dangerSparkEmitters: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
   private isInDanger: boolean = false;
 
   // Audio
@@ -650,8 +649,7 @@ export class GameScene extends Phaser.Scene {
 
     // Add spark trail to all active balls
     this.ballPool.getActiveBalls().forEach((ball) => {
-      const sparks = this.particleSystem.dangerSparks(ball);
-      if (sparks) this.dangerSparkEmitters.push(sparks);
+      ball.applyEffect(BallEffectType.DANGER_SPARKS);
     });
 
     // Enable slow-motion briefly when entering danger
@@ -669,11 +667,10 @@ export class GameScene extends Phaser.Scene {
     // Hide danger indicator
     this.screenEffects.hideDangerIndicator();
 
-    // Stop all danger spark emitters
-    this.dangerSparkEmitters.forEach((emitter) => {
-      this.particleSystem.stopDangerSparks(emitter);
+    // Stop all danger spark effects
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.removeEffect(BallEffectType.DANGER_SPARKS);
     });
-    this.dangerSparkEmitters = [];
 
     // Ensure slow motion is disabled
     this.screenEffects.disableSlowMotion();

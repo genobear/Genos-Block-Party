@@ -201,6 +201,7 @@ export class PowerUpSystem {
     const remaining = Math.max(0, this.balloonEndTime - this.scene.time.now);
     if (remaining > 0) {
       ball.setFloating(remaining);
+      ball.applyEffect(BallEffectType.BALLOON_TRAIL);
     }
   }
 
@@ -212,6 +213,12 @@ export class PowerUpSystem {
     this.balloonTimer = null;
     // Ball.setFloating already handles its own timer reset via scene.time.delayedCall
     // so we don't need to explicitly clear floating state here
+
+    // Remove balloon trail from all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.removeEffect(BallEffectType.BALLOON_TRAIL);
+    });
+
     this.events.emit('effectExpired', PowerUpType.BALLOON);
   }
 
