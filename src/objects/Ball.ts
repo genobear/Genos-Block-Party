@@ -17,6 +17,10 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private isElectricBall: boolean = false; // Electric Ball power-up
   private attachedPaddle: Paddle | null = null;
 
+  // DJ Scratch (Magnet) state
+  private magneted: boolean = false;
+  private magnetPaddle: Paddle | null = null;
+
   // FireBall power-up state (gameplay logic)
   private fireball: boolean = false;
   private fireballLevel: number = 0;
@@ -91,6 +95,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     if (!this.launched && this.attachedPaddle) {
       this.x = this.attachedPaddle.x;
       this.y = this.attachedPaddle.y - PADDLE_HEIGHT / 2 - BALL_RADIUS - 5;
+    }
+
+    // Follow paddle if magneted (DJ Scratch)
+    if (this.magneted && this.magnetPaddle) {
+      this.x = this.magnetPaddle.x;
+      this.y = this.magnetPaddle.y - PADDLE_HEIGHT / 2 - BALL_RADIUS - 5;
     }
 
     // FireBall piercing: restore velocity after physics has resolved
@@ -229,6 +239,43 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Magnetize ball to paddle (DJ Scratch power-up)
+   * Ball stops moving and follows paddle until released
+   */
+  magnetToPaddle(paddle: Paddle): void {
+    this.magneted = true;
+    this.magnetPaddle = paddle;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(0, 0);
+    // Snap to paddle position
+    this.x = paddle.x;
+    this.y = paddle.y - PADDLE_HEIGHT / 2 - BALL_RADIUS - 5;
+  }
+
+  /**
+   * Release magneted ball (launches upward)
+   */
+  releaseMagnet(speedMultiplier: number = 1): void {
+    if (!this.magneted) return;
+    this.magneted = false;
+    this.magnetPaddle = null;
+
+    // Launch at random upward angle (same as normal launch)
+    const speed = this.currentSpeed * speedMultiplier;
+    const angle = Phaser.Math.DegToRad(Phaser.Math.Between(-120, -60));
+    const velocityX = Math.cos(angle) * speed;
+    const velocityY = Math.sin(angle) * speed;
+    (this.body as Phaser.Physics.Arcade.Body).setVelocity(velocityX, velocityY);
+  }
+
+  /**
+   * Check if ball is magneted to paddle
+   */
+  isMagneted(): boolean {
+    return this.magneted;
+  }
+
+  /**
    * Reset ball state
    */
   reset(): void {
@@ -236,6 +283,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isFloating = false;
     this.isElectricBall = false;
     this.attachedPaddle = null;
+    this.magneted = false;
+    this.magnetPaddle = null;
     this.fireball = false;
     this.fireballLevel = 0;
     this.pendingVelocityRestore = false;

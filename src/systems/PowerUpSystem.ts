@@ -56,6 +56,10 @@ export class PowerUpSystem {
   private balloonEndTime: number = 0;
   private balloonTimer: Phaser.Time.TimerEvent | null = null;
 
+  // DJ Scratch (Magnet) state
+  private magnetActive: boolean = false;
+  private magnetTimer: Phaser.Time.TimerEvent | null = null;
+
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
 
@@ -92,6 +96,7 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+      [PowerUpType.DJ_SCRATCH, () => this.applyDjScratch()],
     ]);
 
     // Initialize effect propagation config
@@ -426,6 +431,52 @@ export class PowerUpSystem {
   }
 
   /**
+   * Apply DJ Scratch effect (magnet paddle)
+   * Duration-based: balls stick to paddle on contact for the duration
+   */
+  private applyDjScratch(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].duration;
+
+    this.magnetActive = true;
+
+    // Cancel existing timer if refreshing effect
+    if (this.magnetTimer) {
+      this.magnetTimer.destroy();
+    }
+
+    // Schedule expiration
+    this.magnetTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireDjScratch();
+    });
+
+    this.trackEffect(PowerUpType.DJ_SCRATCH, duration);
+  }
+
+  /**
+   * Expire DJ Scratch - deactivate magnet and auto-release any stuck balls
+   */
+  private expireDjScratch(): void {
+    this.magnetActive = false;
+    this.magnetTimer = null;
+
+    // Auto-release any magneted balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball.isMagneted()) {
+        ball.releaseMagnet(this.speedMultiplier);
+      }
+    });
+
+    this.events.emit('effectExpired', PowerUpType.DJ_SCRATCH);
+  }
+
+  /**
+   * Check if magnet (DJ Scratch) is active
+   */
+  isMagnetActive(): boolean {
+    return this.magnetActive;
+  }
+
+  /**
    * Track active effect for UI display
    */
   private trackEffect(type: PowerUpType, duration: number): void {
@@ -510,6 +561,20 @@ export class PowerUpSystem {
       this.balloonTimer = null;
     }
     this.balloonEndTime = 0;
+
+    // Clear DJ Scratch (Magnet) state
+    if (this.magnetTimer) {
+      this.magnetTimer.destroy();
+      this.magnetTimer = null;
+    }
+    this.magnetActive = false;
+
+    // Auto-release magneted balls before clearing
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball.isMagneted()) {
+        ball.releaseMagnet(this.speedMultiplier);
+      }
+    });
 
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {

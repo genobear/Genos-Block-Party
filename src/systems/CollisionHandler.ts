@@ -87,6 +87,14 @@ export class CollisionHandler {
     // Only process if ball is moving downward (toward paddle)
     if (ballBody.velocity.y <= 0) return;
 
+    // DJ Scratch (Magnet): stick ball to paddle instead of bouncing
+    if (this.powerUpSystem.isMagnetActive() && !ball.isMagneted()) {
+      ball.magnetToPaddle(paddle);
+      this.audioManager.playSFX(AUDIO.SFX.SCRATCH);
+      this.scene.cameras.main.shake(30, 0.002);
+      return;
+    }
+
     // Ensure ball is above paddle to prevent sticking
     ball.y = paddle.y - paddle.displayHeight / 2 - ballBody.halfHeight - 1;
 
