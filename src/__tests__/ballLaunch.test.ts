@@ -4,6 +4,7 @@ import { calculateLaunchVelocity } from '../utils/ballLaunch';
 describe('calculateLaunchVelocity', () => {
   describe('angle validation', () => {
     it('angle should be within -120 to -60 degrees (default range)', () => {
+      // Run multiple times due to randomness
       for (let i = 0; i < 100; i++) {
         const result = calculateLaunchVelocity(300);
         expect(result.angleDeg).toBeGreaterThanOrEqual(-120);
