@@ -5,7 +5,6 @@ export interface LevelData {
   name: string;
   subtitle: string;
   ballSpeedMultiplier: number;
-  powerUpDropChance: number;
   backgroundColor: number;
   bricks: BrickConfig[];
 }
@@ -89,7 +88,6 @@ export const LEVELS: LevelData[] = [
     name: "The Warm-Up",
     subtitle: "Let's get this party started!",
     ballSpeedMultiplier: 1.0,
-    powerUpDropChance: 0.35, // Generous drops for learning
     backgroundColor: 0x1a1a2e,
     bricks: [
       // Bricks at y=6-8, much closer to paddle
@@ -108,7 +106,6 @@ export const LEVELS: LevelData[] = [
     name: "Dance Floor",
     subtitle: "Show us your moves!",
     ballSpeedMultiplier: 1.0,
-    powerUpDropChance: 0.32,
     backgroundColor: 0x16213e,
     bricks: [
       // Checkerboard starting at y=4
@@ -128,7 +125,6 @@ export const LEVELS: LevelData[] = [
     name: "Gift Wrapped",
     subtitle: "Presents for everyone!",
     ballSpeedMultiplier: 1.05,
-    powerUpDropChance: 0.30,
     backgroundColor: 0x1f4037,
     bricks: [
       // Inverted pyramid - wider at top, closer to paddle
@@ -149,7 +145,6 @@ export const LEVELS: LevelData[] = [
     name: "Balloon Bonanza",
     subtitle: "Pop 'em all!",
     ballSpeedMultiplier: 1.08,
-    powerUpDropChance: 0.30,
     backgroundColor: 0x0f3460,
     bricks: [
       // Upper section
@@ -172,7 +167,6 @@ export const LEVELS: LevelData[] = [
     name: "Piñata Panic",
     subtitle: "Swing harder!",
     ballSpeedMultiplier: 1.12,
-    powerUpDropChance: 0.28,
     backgroundColor: 0x533483,
     bricks: [
       // Dense piñatas with vertical channels at x=3 and x=6
@@ -195,7 +189,6 @@ export const LEVELS: LevelData[] = [
     name: "The Maze",
     subtitle: "Find your way!",
     ballSpeedMultiplier: 1.15,
-    powerUpDropChance: 0.28,
     backgroundColor: 0x2c3e50,
     bricks: [
       // Top walls with center gap
@@ -224,7 +217,6 @@ export const LEVELS: LevelData[] = [
     name: "Disco Fever",
     subtitle: "Lights, camera, action!",
     ballSpeedMultiplier: 1.18,
-    powerUpDropChance: 0.38, // Party time - lots of power-ups!
     backgroundColor: 0x4a0080,
     bricks: [
       // Top section - sparse but tough
@@ -249,7 +241,6 @@ export const LEVELS: LevelData[] = [
     name: "Sugar Rush",
     subtitle: "Too much cake!",
     ballSpeedMultiplier: 1.22,
-    powerUpDropChance: 0.35,
     backgroundColor: 0xff6b6b,
     bricks: [
       // Top scattered bricks
@@ -281,7 +272,6 @@ export const LEVELS: LevelData[] = [
     name: "Last Call",
     subtitle: "The party's almost over!",
     ballSpeedMultiplier: 1.28,
-    powerUpDropChance: 0.32,
     backgroundColor: 0x2d132c,
     bricks: [
       // Outer shell (lower HP)
@@ -313,7 +303,6 @@ export const LEVELS: LevelData[] = [
     name: "Grand Finale",
     subtitle: "Give it everything you've got!",
     ballSpeedMultiplier: 1.35,
-    powerUpDropChance: 0.40, // Maximum power-up madness for the finale
     backgroundColor: 0x000000,
     bricks: [
       // TOP SECTION - The Crown (HP 3)
