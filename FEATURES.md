@@ -412,7 +412,18 @@ npm run test:watch # Run tests in watch mode (development)
 
 ---
 
-## 9. TODO / Known Gaps
+## 9. Utilities
+
+### Weighted Random Selection
+- **`src/utils/weightedSelection.ts`** — Pure, testable utility for weighted random selection
+- `weightedSelect<T>(items, randomValue)` — Selects item based on weights and a provided random value (0-1)
+- `getTotalWeight<T>(items)` — Convenience helper to sum item weights
+- **Power-up selection** uses this utility with weights from `POWERUP_CONFIGS`
+- Supports edge cases: zero weights, negative weights (treated as zero), empty arrays
+
+---
+
+## 10. TODO / Known Gaps
 
 ### Unused Systems
 - **Currency system exists but has no shop**: `CurrencyManager` has `spendCurrency()`, `canAfford()`, and `resetCurrency()` methods, but there is no shop scene or purchasable items. Coins accumulate with no way to spend them.
