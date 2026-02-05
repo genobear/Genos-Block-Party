@@ -370,6 +370,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 
 ### Continuous Integration
 - **GitHub Actions** workflow runs on every push to `master` and on pull requests targeting `master`
+- **Node 22** (LTS) — pinned in CI to satisfy Vite 7's engine requirements
 - Pipeline steps: `npm ci` → `npm run build` (TypeScript + Vite) → `npm run test:ci` (Vitest)
 - Badge displayed in README for at-a-glance build status
 
