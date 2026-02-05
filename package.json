@@ -18,7 +18,7 @@
     "typescript"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "dependencies": {
     "phaser": "^3.80.0"
   },
