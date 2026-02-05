@@ -5,7 +5,6 @@ import type { AudioManifest, TrackMetadata } from '../types/AudioManifest';
 interface AudioSettings {
   musicVolume: number;
   sfxVolume: number;
-  muted: boolean;
   forceLevelMusic: boolean;
   forceTrackChangeOnTransition: boolean;
 }
@@ -27,7 +26,7 @@ export interface TrackInfo {
  * - SFX playback with Web Audio (low latency)
  * - Level music streaming with HTML5 Audio (on-demand loading)
  * - Shuffled playlist per level with crossfade transitions
- * - Volume/mute controls persisted to localStorage
+ * - Volume controls persisted to localStorage
  * - Generated placeholder SFX for development
  */
 export class AudioManager {
@@ -93,10 +92,6 @@ export class AudioManager {
       this.musicScene = scene;
     }
 
-    // Apply current mute state to sound manager
-    if (this.scene.sound) {
-      this.scene.sound.mute = this.settings.muted;
-    }
   }
 
   /**
@@ -169,7 +164,6 @@ export class AudioManager {
         return {
           musicVolume: parsed.musicVolume ?? AUDIO.DEFAULT_MUSIC_VOLUME,
           sfxVolume: parsed.sfxVolume ?? AUDIO.DEFAULT_SFX_VOLUME,
-          muted: parsed.muted ?? false,
           forceLevelMusic: parsed.forceLevelMusic ?? true,
           forceTrackChangeOnTransition: parsed.forceTrackChangeOnTransition ?? true,
         };
@@ -180,7 +174,6 @@ export class AudioManager {
     return {
       musicVolume: AUDIO.DEFAULT_MUSIC_VOLUME,
       sfxVolume: AUDIO.DEFAULT_SFX_VOLUME,
-      muted: false,
       forceLevelMusic: true,
       forceTrackChangeOnTransition: true,
     };
@@ -198,7 +191,7 @@ export class AudioManager {
   }
 
   // =====================
-  // Volume & Mute Controls
+  // Volume Controls
   // =====================
 
   getMusicVolume(): number {
@@ -222,24 +215,6 @@ export class AudioManager {
   setSfxVolume(volume: number): void {
     this.settings.sfxVolume = Math.max(0, Math.min(1, volume));
     this.saveSettings();
-  }
-
-  isMuted(): boolean {
-    return this.settings.muted;
-  }
-
-  setMuted(muted: boolean): void {
-    this.settings.muted = muted;
-    this.saveSettings();
-
-    if (this.scene?.sound) {
-      this.scene.sound.mute = muted;
-    }
-  }
-
-  toggleMute(): boolean {
-    this.setMuted(!this.settings.muted);
-    return this.settings.muted;
   }
 
   /**
