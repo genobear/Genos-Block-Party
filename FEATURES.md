@@ -394,11 +394,13 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
 | **Multiplier System** | `MultiplierSystem` initialization, increment with diminishing returns, max cap enforcement, decay mechanics (grace period, scaling), reset behavior, and score application |
 | **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |
+| **Paddle Collision** | Center/edge/clamped angle calculations return correct radian values |
 | **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
 
 ### Utility Functions
 | Module | Function | Description |
 |--------|----------|-------------|
+| `utils/paddleAngle.ts` | `calculatePaddleBounceAngle(relativeHitX, paddleWidth, minAngle?, maxAngle?)` | Pure function for paddle collision angle calculation. Returns angle in radians. Handles center hits (straight up), edge hits (steep angles), and clamping. |
 | `utils/ballLaunch.ts` | `calculateLaunchVelocity(speed, minAngle?, maxAngle?)` | Pure function to calculate ball launch velocity. Extracted from `Ball.ts` for unit testing. Returns `{velocityX, velocityY, angleDeg}` with random angle in specified range (default: -120° to -60°). |
 
 ### Commands
