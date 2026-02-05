@@ -9,6 +9,7 @@ import { Paddle } from './Paddle';
 import { BallEffectManager } from '../effects/BallEffectManager';
 import { BallEffectType } from '../effects/BallEffectTypes';
 import { BallSpeedManager } from '../systems/BallSpeedManager';
+import { calculateLaunchVelocity } from '../utils/ballLaunch';
 
 export class Ball extends Phaser.Physics.Arcade.Sprite {
   private launched: boolean = false;
@@ -84,11 +85,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     // Get speed from manager (includes all multipliers)
     const speed = this.speedManager.getEffectiveSpeed();
 
-    // Random launch angle between -60 and -120 degrees (upward)
-    const angle = Phaser.Math.DegToRad(Phaser.Math.Between(-120, -60));
-
-    const velocityX = Math.cos(angle) * speed;
-    const velocityY = Math.sin(angle) * speed;
+    // Calculate random launch velocity (angle between -120 and -60 degrees, upward)
+    const { velocityX, velocityY } = calculateLaunchVelocity(speed);
 
     (this.body as Phaser.Physics.Arcade.Body).setVelocity(velocityX, velocityY);
   }
