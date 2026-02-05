@@ -165,6 +165,7 @@ Each power-up has per-type feedback on collection:
 - Minimum 1 coin for any positive score
 - Awarded on Game Over screen (animated count-up), or on quit-to-menu from pause
 - Has `spendCurrency()` and `canAfford()` methods — **no shop exists yet** (see TODO)
+- **Testability**: `CurrencyManager.resetInstance()` allows resetting the singleton between tests for proper localStorage integration testing
 
 ### High Score Leaderboard
 - Top 5 scores stored locally in localStorage
@@ -405,6 +406,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Level Data** | All 10 levels have required fields, sequential IDs, positive speed multipliers, valid brick types/health/positions, no duplicate positions |
 | **Power-Up Configs** | Every `PowerUpType` enum value has a matching `POWERUP_CONFIGS` entry with correct type, color, duration, dropWeight, and emoji |
 | **Currency Conversion** | `CurrencyManager.calculateCurrencyFromScore()` returns correct values across all tier thresholds (0, 100, 1K, 5K, 10K, 25K scores) |
+| **Currency Persistence** | `CurrencyManager` localStorage integration: loads on init, handles corrupted/negative values, saves after transactions, cross-session persistence, `resetCurrency()` behavior |
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
 | **Multiplier System** | `MultiplierSystem` initialization, increment with diminishing returns, max cap enforcement, decay mechanics (grace period, scaling), reset behavior, and score application |
 | **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |

@@ -27,6 +27,13 @@ export class CurrencyManager {
   }
 
   /**
+   * Reset singleton instance (for testing only)
+   */
+  static resetInstance(): void {
+    CurrencyManager.instance = null;
+  }
+
+  /**
    * Get the player's total currency
    */
   getTotalCurrency(): number {
