@@ -13,6 +13,7 @@ import { AudioManager } from '../systems/AudioManager';
 import { NowPlayingToast } from '../systems/NowPlayingToast';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
+import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { PowerUpType } from '../types/PowerUpTypes';
 import { BallEffectType } from '../effects/BallEffectTypes';
 import { LEVELS, LevelData } from '../config/LevelData';
@@ -51,6 +52,9 @@ export class GameScene extends Phaser.Scene {
   // Audio
   private audioManager!: AudioManager;
   private unsubscribeTrackChange: (() => void) | null = null;
+
+  // Speed management
+  private speedManager!: BallSpeedManager;
 
   // Game state
   private score: number = 0;
@@ -138,6 +142,9 @@ export class GameScene extends Phaser.Scene {
     // Get audio manager instance and initialize with this scene
     this.audioManager = AudioManager.getInstance();
     this.audioManager.init(this);
+
+    // Get speed manager instance
+    this.speedManager = BallSpeedManager.getInstance();
 
     // Wire up "Now Playing" toast notification
     const nowPlayingToast = NowPlayingToast.getInstance();
@@ -279,10 +286,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private launchBall(): void {
-    // Launch all unlaunched balls
+    // Launch all unlaunched balls (speed is handled by BallSpeedManager)
     this.ballPool.getActiveBalls().forEach((ball) => {
       if (!ball.isLaunched()) {
-        ball.launch(this.currentLevel.ballSpeedMultiplier);
+        ball.launch();
       }
     });
     this.events.emit('ballLaunched');
@@ -363,10 +370,8 @@ export class GameScene extends Phaser.Scene {
     // Emit level update to UI
     this.events.emit('levelUpdate', this.currentLevel.name);
 
-    // Update power-up system with current level's speed multiplier
-    if (this.powerUpSystem) {
-      this.powerUpSystem.setSpeedMultiplier(this.currentLevel.ballSpeedMultiplier);
-    }
+    // Set level speed multiplier on speed manager
+    this.speedManager.setLevelMultiplier(this.currentLevel.ballSpeedMultiplier);
   }
 
   private setupCollisions(): void {
