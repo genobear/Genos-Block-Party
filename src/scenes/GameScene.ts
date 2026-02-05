@@ -193,6 +193,12 @@ export class GameScene extends Phaser.Scene {
       this.powerUpFeedbackSystem.revealMystery(actualType);
     });
 
+    // Handle extra life from Party Favor power-up
+    this.powerUpSystem.events.on('grantExtraLife', () => {
+      this.lives++;
+      this.events.emit('livesUpdate', this.lives);
+    });
+
     // Emit initial state to UI
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
@@ -222,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('effectApplied');
     this.powerUpSystem?.events?.off('effectExpired');
     this.powerUpSystem?.events?.off('mysteryRevealed');
+    this.powerUpSystem?.events?.off('grantExtraLife');
 
     // Clean up input events
     this.input?.off('pointerdown', this.handleClick, this);
@@ -272,9 +279,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleClick(): void {
+    if (this.isGameOver) return;
+
+    // Release any magneted balls first (DJ Scratch)
+    const magnetedBalls = this.ballPool.getActiveBalls().filter((b) => b.isMagneted());
+    if (magnetedBalls.length > 0) {
+      magnetedBalls.forEach((ball) => {
+        ball.releaseMagnet(this.currentLevel.ballSpeedMultiplier);
+      });
+      return;
+    }
+
     // Can launch if there are any unlaunched balls
     const hasUnlaunchedBall = this.ballPool.getActiveBalls().some((b) => !b.isLaunched());
-    if (hasUnlaunchedBall && this.canLaunch && !this.isGameOver) {
+    if (hasUnlaunchedBall && this.canLaunch) {
       this.launchBall();
     }
   }

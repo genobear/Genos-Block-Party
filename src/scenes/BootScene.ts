@@ -138,6 +138,8 @@ export class BootScene extends Phaser.Scene {
       { name: 'powerball', color: POWERUP_CONFIGS[PowerUpType.POWERBALL].color, symbol: 'P' },
       { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
       { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
+      { name: 'partyfavor', color: POWERUP_CONFIGS[PowerUpType.PARTY_FAVOR].color, symbol: '+' },
+      { name: 'djscratch', color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color, symbol: 'S' },
     ];
 
     const size = 24;

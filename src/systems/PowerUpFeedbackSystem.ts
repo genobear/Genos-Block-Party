@@ -112,6 +112,28 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, alpha: 0.45 },
     },
   },
+  [PowerUpType.PARTY_FAVOR]: {
+    displayName: 'EXTRA LIFE!',
+    color: POWERUP_CONFIGS[PowerUpType.PARTY_FAVOR].color,
+    particles: {
+      colors: [0xff69b4, 0xffd700, 0xffffff, 0xff1493],
+      count: 20,
+    },
+    screenEffect: {
+      flash: { duration: 200, color: 0xffd700, alpha: 0.5 },
+    },
+  },
+  [PowerUpType.DJ_SCRATCH]: {
+    displayName: 'MAGNET PADDLE!',
+    color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color,
+    particles: {
+      colors: [0x00ffff, 0x00e5ff, 0xffffff, 0x40ffff],
+      count: 12,
+    },
+    screenEffect: {
+      flash: { duration: 100, color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color, alpha: 0.35 },
+    },
+  },
 };
 
 /**
