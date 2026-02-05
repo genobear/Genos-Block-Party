@@ -62,9 +62,15 @@
 
 ### Score System & Multiplier
 - Points earned per brick hit (not per brick destroyed) — **10 / 15 / 20** depending on type
-- **Multiplier system** (1.0× to 5.0× cap):
-  - Each brick hit increments the multiplier with diminishing returns: `+0.15 × (1 / currentMultiplier)`
-  - Decays after 1 second of no hits
+- **MultiplierSystem** (`src/systems/MultiplierSystem.ts`) — extracted for testability:
+  - `getValue()` — current multiplier value
+  - `increment(currentTime)` — called on brick hit, uses diminishing returns: `+0.15 × (1 / currentMultiplier)`
+  - `update(currentTime, deltaMs)` — handles time-based decay
+  - `reset()` — returns to base value (called on life loss or level transition)
+  - `applyToScore(points)` — multiplies and floors points
+- **Multiplier mechanics** (1.0× to 5.0× cap):
+  - Each brick hit increments the multiplier with diminishing returns
+  - Decays after 1 second of no hits (`DECAY_DELAY_MS`)
   - Decay rate scales with multiplier level (low multiplier decays slowly, high decays fast)
   - Resets to 1.0× on life loss or level transition
   - UI shows multiplier when ≥ 1.1× with color coding: yellow → orange → red
@@ -386,6 +392,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Power-Up Configs** | Every `PowerUpType` enum value has a matching `POWERUP_CONFIGS` entry with correct type, color, duration, dropWeight, and emoji |
 | **Currency Conversion** | `CurrencyManager.calculateCurrencyFromScore()` returns correct values across all tier thresholds (0, 100, 1K, 5K, 10K, 25K scores) |
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
+| **Multiplier System** | `MultiplierSystem` initialization, increment with diminishing returns, max cap enforcement, decay mechanics (grace period, scaling), reset behavior, and score application |
 | **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |
 | **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
 
