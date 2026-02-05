@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PADDLE_WIDTH, PADDLE_HEIGHT, PADDLE_Y_OFFSET, PADDLE_SPEED, GAME_WIDTH, PLAY_AREA_Y, PLAYABLE_HEIGHT } from '../config/Constants';
+import { calculatePaddleBounceAngle } from '../utils/paddleAngle';
 
 export class Paddle extends Phaser.Physics.Arcade.Sprite {
   private baseWidth: number = PADDLE_WIDTH;
@@ -65,23 +66,7 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
    * Returns angle in radians (negative = upward)
    */
   getCollisionAngle(ballX: number): number {
-    const paddleCenter = this.x;
-    const paddleHalfWidth = this.currentWidth / 2;
-
-    // -1 to 1 based on hit position
-    const hitPosition = (ballX - paddleCenter) / paddleHalfWidth;
-
-    // Clamp hit position
-    const clampedHit = Phaser.Math.Clamp(hitPosition, -1, 1);
-
-    // Map to angle range: -150 to -30 degrees (upward arc)
-    // Center = -90 (straight up), edges = steeper angles
-    const minAngle = -150; // Left edge
-    const maxAngle = -30;  // Right edge
-
-    const angleDeg = Phaser.Math.Linear(minAngle, maxAngle, (clampedHit + 1) / 2);
-
-    return Phaser.Math.DegToRad(angleDeg);
+    return calculatePaddleBounceAngle(ballX, this.x, this.currentWidth / 2);
   }
 
   /**
