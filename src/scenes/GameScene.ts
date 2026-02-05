@@ -166,6 +166,7 @@ export class GameScene extends Phaser.Scene {
     // Create electric arc system for Electric Ball AOE
     this.electricArcSystem = new ElectricArcSystem(this, this.bricks);
     this.collisionHandler.setElectricArcSystem(this.electricArcSystem);
+    this.collisionHandler.setBricksGroup(this.bricks);
 
     // Load first level
     this.loadLevel(0);
@@ -190,6 +191,11 @@ export class GameScene extends Phaser.Scene {
     // Wire mystery reveal to feedback system
     this.powerUpSystem.events.on('mysteryRevealed', (actualType: PowerUpType) => {
       this.powerUpFeedbackSystem.revealMystery(actualType);
+    });
+
+    // Wire bass drop event — GameScene handles brick iteration
+    this.powerUpSystem.events.on('bassDrop', () => {
+      this.handleBassDrop();
     });
 
     // Emit initial state to UI
@@ -221,6 +227,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('effectApplied');
     this.powerUpSystem?.events?.off('effectExpired');
     this.powerUpSystem?.events?.off('mysteryRevealed');
+    this.powerUpSystem?.events?.off('bassDrop');
 
     // Clean up input events
     this.input?.off('pointerdown', this.handleClick, this);
@@ -674,6 +681,64 @@ export class GameScene extends Phaser.Scene {
 
     // Ensure slow motion is disabled
     this.screenEffects.disableSlowMotion();
+  }
+
+  // ========== BASS DROP (SCREEN NUKE) ==========
+
+  /**
+   * Handle Bass Drop power-up: apply 1 damage to ALL active bricks.
+   * Follows the same brick processing pattern as CollisionHandler.processAOEBrickDestroyed:
+   *   roll for drops → apply damage → handle destruction → check level complete.
+   */
+  private handleBassDrop(): void {
+    // Play whoosh SFX for the bass drop impact
+    this.audioManager.playSFX(AUDIO.SFX.WHOOSH);
+
+    // Snapshot all active bricks before iterating (avoids mutation during loop)
+    const activeBricks: Brick[] = [];
+    this.bricks.children.iterate((child) => {
+      const brick = child as Brick;
+      if (brick && brick.active) {
+        activeBricks.push(brick);
+      }
+      return true;
+    });
+
+    // Process each brick: roll for drops, apply 1 damage, handle destruction
+    activeBricks.forEach((brick) => {
+      if (!brick.active) return; // Safety: may have been deactivated earlier
+
+      // Score for bass drop hits (50% of normal, same as AOE)
+      this.addScore(Math.floor(brick.getScoreValue() * 0.5));
+      this.incrementMultiplier();
+
+      // Roll for power-up drop BEFORE applying damage (with AOE penalty)
+      if (brick.shouldDropPowerUp(true)) {
+        const dropPos = brick.getPowerUpDropPosition();
+        this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+      }
+
+      // Apply 1 damage
+      const isDestroyed = brick.takeDamage(1);
+
+      if (isDestroyed) {
+        // Purple confetti burst at brick position (bass drop color)
+        this.particleSystem.burstConfetti(brick.x, brick.y, 0x9400d3);
+
+        // Immediately deactivate so countActive() is accurate
+        brick.setActive(false);
+        brick.disableBody(true);
+
+        // Play destroy animation (no per-brick level-complete callback;
+        // we check completion once after all bricks are processed)
+        brick.playDestroyAnimation();
+      }
+    });
+
+    // Check level completion after all bricks are processed
+    if (this.bricks.countActive() === 0) {
+      this.handleLevelComplete();
+    }
   }
 
   // ========== DEBUG METHODS ==========

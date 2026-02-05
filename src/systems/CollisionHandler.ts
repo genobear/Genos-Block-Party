@@ -9,7 +9,16 @@ import { PowerUpFeedbackSystem } from './PowerUpFeedbackSystem';
 import { AudioManager } from './AudioManager';
 import { ElectricArcSystem } from './ElectricArcSystem';
 import { BrickType } from '../types/BrickTypes';
-import { COLORS, AUDIO } from '../config/Constants';
+import {
+  COLORS,
+  AUDIO,
+  BRICK_WIDTH,
+  BRICK_HEIGHT,
+  BRICK_PADDING,
+  BRICK_COLS,
+  BRICK_ROWS_START_Y,
+  GAME_WIDTH,
+} from '../config/Constants';
 
 /**
  * Collision callback result for brick hits
@@ -32,6 +41,8 @@ export class CollisionHandler {
   private powerUpFeedbackSystem: PowerUpFeedbackSystem;
   private audioManager: AudioManager;
   private electricArcSystem: ElectricArcSystem | null = null;
+  private bricks: Phaser.Physics.Arcade.StaticGroup | null = null;
+  private gridOffsetX: number = 0;
 
   // Callbacks for game state changes
   private onScoreChange: (points: number) => void;
@@ -68,6 +79,15 @@ export class CollisionHandler {
    */
   setElectricArcSystem(system: ElectricArcSystem): void {
     this.electricArcSystem = system;
+  }
+
+  /**
+   * Set the bricks group (needed for bomb 3x3 lookup)
+   */
+  setBricksGroup(bricks: Phaser.Physics.Arcade.StaticGroup): void {
+    this.bricks = bricks;
+    const totalWidth = BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING;
+    this.gridOffsetX = (GAME_WIDTH - totalWidth) / 2 + BRICK_WIDTH / 2;
   }
 
   /**
@@ -152,6 +172,13 @@ export class CollisionHandler {
     // Trigger Electric Ball AOE if active (triggers on every hit, not just destruction)
     if (ball.isElectricBallActive()) {
       this.processElectricAOE(brick);
+    }
+
+    // Trigger Party Popper 3x3 explosion if armed (one-shot, consumed on use)
+    if (ball.hasBomb()) {
+      this.processBombExplosion(brick);
+      ball.clearBomb();
+      this.powerUpSystem.onBombDetonated();
     }
 
     // Roll for drops BEFORE applying damage (each damage point rolls independently)
@@ -314,6 +341,110 @@ export class CollisionHandler {
 
     // Collect the power-up (applies game effect)
     this.powerUpSystem.collect(powerUp);
+  }
+
+  // ========== PARTY POPPER (3x3 BOMB) ==========
+
+  /**
+   * Process 3x3 bomb explosion centred on the hit brick.
+   */
+  private processBombExplosion(sourceBrick: Brick): void {
+    const adjacentBricks = this.findBricks3x3(sourceBrick);
+
+    // Heavy screen shake
+    this.scene.cameras.main.shake(150, 0.012);
+
+    // Explosion particles at source
+    this.createExplosionParticles(sourceBrick.x, sourceBrick.y);
+
+    // Damage each adjacent brick with slight cascade delay
+    adjacentBricks.forEach((brick, index) => {
+      this.scene.time.delayedCall(index * 30, () => {
+        if (!brick || !brick.active) return;
+
+        this.onBrickHit();
+        this.onScoreChange(Math.floor(brick.getScoreValue() * 0.75));
+
+        if (brick.shouldDropPowerUp(true)) {
+          const dropPos = brick.getPowerUpDropPosition();
+          this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+        }
+
+        const isDestroyed = brick.takeDamage(1);
+        this.particleSystem.burstConfetti(brick.x, brick.y, this.getBrickColor(brick.getType()));
+
+        if (isDestroyed) {
+          this.processAOEBrickDestroyed(brick);
+        } else {
+          this.audioManager.playSFX(AUDIO.SFX.POP);
+        }
+      });
+    });
+  }
+
+  /**
+   * Find bricks in a 3x3 grid around the source (excluding source itself).
+   */
+  private findBricks3x3(source: Brick): Brick[] {
+    if (!this.bricks) return [];
+
+    const sourceGrid = this.worldToGrid(source.x, source.y);
+    const offsets: { dx: number; dy: number }[] = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        offsets.push({ dx, dy });
+      }
+    }
+
+    const result: Brick[] = [];
+    this.bricks.children.iterate((child: Phaser.GameObjects.GameObject) => {
+      const brick = child as Brick;
+      if (!brick || !brick.active || brick === source) return true;
+
+      const brickGrid = this.worldToGrid(brick.x, brick.y);
+      for (const offset of offsets) {
+        if (
+          brickGrid.x === sourceGrid.x + offset.dx &&
+          brickGrid.y === sourceGrid.y + offset.dy
+        ) {
+          result.push(brick);
+          break;
+        }
+      }
+      return true;
+    });
+
+    return result;
+  }
+
+  /**
+   * Convert world coordinates to grid coordinates.
+   */
+  private worldToGrid(worldX: number, worldY: number): { x: number; y: number } {
+    const gridX = Math.round((worldX - this.gridOffsetX) / (BRICK_WIDTH + BRICK_PADDING));
+    const gridY = Math.round((worldY - BRICK_ROWS_START_Y) / (BRICK_HEIGHT + BRICK_PADDING));
+    return { x: gridX, y: gridY };
+  }
+
+  /**
+   * Create explosion particles at position.
+   */
+  private createExplosionParticles(x: number, y: number): void {
+    const particles = this.scene.add.particles(x, y, 'particle-flame', {
+      speed: { min: 100, max: 300 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.5, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 500,
+      quantity: 20,
+      tint: [0xff4500, 0xff6600, 0xffaa00, 0xffcc00, 0xffffff],
+      blendMode: Phaser.BlendModes.ADD,
+      emitting: false,
+    });
+
+    particles.explode();
+    this.scene.time.delayedCall(600, () => particles.destroy());
   }
 
   /**
