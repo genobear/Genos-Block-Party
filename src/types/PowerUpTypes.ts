@@ -13,6 +13,7 @@ export enum PowerUpType {
   FIREBALL = 'fireball', // Piercing ball with stacking damage (10s)
   ELECTRICBALL = 'electricball', // Electric ball with AOE damage (8s)
   PARTY_POPPER = 'partypopper', // 3x3 bomb explosion on next brick hit (one-shot)
+  BASS_DROP = 'bassdrop',       // Screen nuke - 1 damage to ALL bricks (instant)
   BOUNCE_HOUSE = 'bouncehouse', // Safety net saves ball once
   PARTY_FAVOR = 'partyfavor', // Extra life (instant, very rare)
 }
@@ -94,6 +95,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 0,
     dropWeight: 10,
     emoji: '💣',
+  },
+  [PowerUpType.BASS_DROP]: {
+    type: PowerUpType.BASS_DROP,
+    color: 0x9400d3,      // Dark violet
+    duration: 0,          // Instant effect
+    dropWeight: 8,
+    emoji: '🎵',
   },
   [PowerUpType.BOUNCE_HOUSE]: {
     type: PowerUpType.BOUNCE_HOUSE,

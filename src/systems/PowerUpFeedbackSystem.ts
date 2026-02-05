@@ -124,6 +124,18 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       shake: { duration: 100, intensity: 0.005 },
     },
   },
+  [PowerUpType.BASS_DROP]: {
+    displayName: '🎵 BASS DROP! 🎵',
+    color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color,
+    particles: {
+      colors: [0x9400d3, 0xba55d3, 0xff00ff, 0x7b00ff, 0xffffff],
+      count: 25,
+    },
+    screenEffect: {
+      flash: { duration: 300, color: 0x9400d3, alpha: 0.6 },
+      shake: { duration: 400, intensity: 0.02 },
+    },
+  },
   [PowerUpType.BOUNCE_HOUSE]: {
     displayName: 'SAFETY NET!',
     color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color,
