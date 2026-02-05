@@ -17,6 +17,10 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private isElectricBall: boolean = false; // Electric Ball power-up
   private attachedPaddle: Paddle | null = null;
 
+  // Effect duration timers (for resetting on re-application)
+  private floatingTimer: Phaser.Time.TimerEvent | null = null;
+  private electricBallTimer: Phaser.Time.TimerEvent | null = null;
+
   // FireBall power-up state (gameplay logic)
   private fireball: boolean = false;
   private fireballLevel: number = 0;
@@ -164,40 +168,66 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   /**
    * Apply floating effect (Balloon power-up - slower ball)
    * Speed reduction is handled by BallSpeedManager effect multiplier
+   * Re-applying resets the duration timer
    */
   setFloating(duration: number): void {
-    // Guard against re-application
-    if (this.isFloating) return;
+    // Cancel existing timer if re-applying (reset duration)
+    if (this.floatingTimer) {
+      this.floatingTimer.destroy();
+      this.floatingTimer = null;
+    }
 
-    this.isFloating = true;
+    // Apply effect if not already active
+    if (!this.isFloating) {
+      this.isFloating = true;
+      // Apply balloon trail visual effect
+      this.effectManager?.applyEffect(BallEffectType.BALLOON_TRAIL);
+    }
 
     // Speed change is handled by BallSpeedManager - velocity will adjust
     // on next paddle bounce or via update() min speed enforcement
 
-    // Reset after duration
-    this.scene.time.delayedCall(duration, () => {
-      this.isFloating = false;
+    // Reset after duration (new timer replaces old one)
+    this.floatingTimer = this.scene.time.delayedCall(duration, () => {
+      this.clearFloating();
     });
+  }
+
+  /**
+   * Clear floating effect
+   */
+  clearFloating(): void {
+    if (!this.isFloating) return;
+
+    this.isFloating = false;
+    this.floatingTimer = null;
+    this.effectManager?.removeEffect(BallEffectType.BALLOON_TRAIL);
   }
 
   /**
    * Apply electric ball effect (Electric Ball power-up - faster ball with AOE damage)
    * Speed boost is handled by BallSpeedManager effect multiplier
+   * Re-applying resets the duration timer
    */
   setElectricBall(duration: number): void {
-    // Guard against re-application
-    if (this.isElectricBall) return;
+    // Cancel existing timer if re-applying (reset duration)
+    if (this.electricBallTimer) {
+      this.electricBallTimer.destroy();
+      this.electricBallTimer = null;
+    }
 
-    this.isElectricBall = true;
+    // Apply effect if not already active
+    if (!this.isElectricBall) {
+      this.isElectricBall = true;
+      // Apply electric speed trail visual effect
+      this.effectManager?.applyEffect(BallEffectType.ELECTRIC_TRAIL);
+    }
 
     // Speed change is handled by BallSpeedManager - velocity will adjust
     // on next paddle bounce or via update() min speed enforcement
 
-    // Apply electric speed trail visual effect
-    this.effectManager?.applyEffect(BallEffectType.ELECTRIC_TRAIL);
-
-    // Reset after duration
-    this.scene.time.delayedCall(duration, () => {
+    // Reset after duration (new timer replaces old one)
+    this.electricBallTimer = this.scene.time.delayedCall(duration, () => {
       this.clearElectricBall();
     });
   }
@@ -209,6 +239,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     if (!this.isElectricBall) return;
 
     this.isElectricBall = false;
+    this.electricBallTimer = null;
     this.effectManager?.removeEffect(BallEffectType.ELECTRIC_TRAIL);
   }
 
@@ -252,6 +283,16 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.fireball = false;
     this.fireballLevel = 0;
     this.pendingVelocityRestore = false;
+
+    // Clear effect timers
+    if (this.floatingTimer) {
+      this.floatingTimer.destroy();
+      this.floatingTimer = null;
+    }
+    if (this.electricBallTimer) {
+      this.electricBallTimer.destroy();
+      this.electricBallTimer = null;
+    }
 
     // Clear all visual effects
     this.effectManager?.clearAll();
