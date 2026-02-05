@@ -106,6 +106,7 @@
 | **Power Ball** | 💪 | 12s | 12 | Doubles power-up drop chance from all bricks |
 | **Fireball** | 🔥 | 10s | 10 | Piercing ball with stacking damage (see below) |
 | **Electric Ball** | ⚡ | 8s | 12 | 1.5× speed + AOE damage to adjacent bricks |
+| **DJ Scratch** | 🧲 | 15s | 12 | Magnet paddle — ball sticks on contact, click to release |
 
 ### Fireball Stacking
 - Collecting multiple Fireballs during active duration **stacks the level** (1 → 2 → 3 → ...)
@@ -120,6 +121,16 @@
 - AOE hits deal 1 damage each, give 50% score, and have 50% reduced drop chance
 - Lightning arc visual drawn to each adjacent brick with jagged bolt + particle impact
 - Propagates to new balls spawned during the effect (via Disco)
+
+### DJ Scratch (Magnet Paddle) Details
+- Collecting activates magnetic paddle for 15 seconds
+- On paddle collision while active, ball stops and sticks to paddle surface
+- Ball follows paddle horizontally while stuck
+- Click/tap to release all stuck balls (launches at random upward angle)
+- Works with multi-ball — each ball sticks individually on contact
+- When effect expires, any remaining stuck balls auto-release
+- Timer refreshes if collected again while active
+- Uses existing Scratch SFX on ball catch
 
 ### Mystery Power-Up
 - Shows "???" feedback on collection
@@ -356,7 +367,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 |---------|-------------|
 | `GameDebug.skipToLevel(n)` | Jump to level n (0-indexed). Clears effects, resets ball |
 | `GameDebug.completeLevel()` | Instantly destroys all bricks, triggers level completion |
-| `GameDebug.spawnPowerUp(type, x?, y?)` | Force-spawn a power-up. e.g. `GameDebug.spawnPowerUp('fireball', 400, 300)` |
+| `GameDebug.spawnPowerUp(type, x?, y?)` | Force-spawn a power-up. e.g. `GameDebug.spawnPowerUp('fireball', 400, 300)` or `'djscratch'` |
 | `GameDebug.getState()` | Returns `{level, levelName, lives, score, activeBalls, canLaunch}` |
 
 **`Brick` class** (available at `window.Brick`):
@@ -449,5 +460,5 @@ npm run test:watch # Run tests in watch mode (development)
 - **Custom art assets**: All graphics are currently generated programmatically in BootScene — real sprite sheets would elevate the visual quality
 - **Beat-sync effects**: BPM data exists in manifest for future rhythm-based visual effects
 - **Leaderboard online**: Currently localStorage only — could integrate with a backend for global scores
-- **More power-up types**: Effect system is registry-based and designed for easy extension
+- **More power-up types**: Effect system is registry-based and designed for easy extension (DJ Scratch added as latest example)
 - **Accessibility**: No colorblind mode, no screen reader support beyond the "Now Playing" toast ARIA attributes

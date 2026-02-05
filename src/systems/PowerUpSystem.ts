@@ -59,6 +59,10 @@ export class PowerUpSystem {
   private balloonEndTime: number = 0;
   private balloonTimer: Phaser.Time.TimerEvent | null = null;
 
+  // DJ Scratch (Magnet) state
+  private magnetActive: boolean = false;
+  private magnetTimer: Phaser.Time.TimerEvent | null = null;
+
   // Bounce House safety net state
   private safetyNet: SafetyNet | null = null;
 
@@ -101,6 +105,7 @@ export class PowerUpSystem {
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
       [PowerUpType.PARTY_POPPER, () => this.applyPartyPopper()],
       [PowerUpType.BASS_DROP, () => this.applyBassDrop()],
+      [PowerUpType.DJ_SCRATCH, () => this.applyDjScratch()],
       [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
       [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
     ]);
@@ -452,6 +457,52 @@ export class PowerUpSystem {
   }
 
   /**
+   * Apply DJ Scratch effect (magnet paddle)
+   * Duration-based: balls stick to paddle on contact for the duration
+   */
+  private applyDjScratch(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].duration;
+
+    this.magnetActive = true;
+
+    // Cancel existing timer if refreshing effect
+    if (this.magnetTimer) {
+      this.magnetTimer.destroy();
+    }
+
+    // Schedule expiration
+    this.magnetTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireDjScratch();
+    });
+
+    this.trackEffect(PowerUpType.DJ_SCRATCH, duration);
+  }
+
+  /**
+   * Expire DJ Scratch - deactivate magnet and auto-release any stuck balls
+   */
+  private expireDjScratch(): void {
+    this.magnetActive = false;
+    this.magnetTimer = null;
+
+    // Auto-release any magneted balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball.isMagneted()) {
+        ball.releaseMagnet(this.speedManager.getBaseSpeed());
+      }
+    });
+
+    this.events.emit('effectExpired', PowerUpType.DJ_SCRATCH);
+  }
+
+  /**
+   * Check if magnet (DJ Scratch) is active
+   */
+  isMagnetActive(): boolean {
+    return this.magnetActive;
+  }
+
+  /**
    * Apply Bounce House effect — spawn a one-use safety net floor
    */
   private applyBounceHouse(): void {
@@ -599,6 +650,20 @@ export class PowerUpSystem {
       this.balloonTimer = null;
     }
     this.balloonEndTime = 0;
+
+    // Clear DJ Scratch (Magnet) state
+    if (this.magnetTimer) {
+      this.magnetTimer.destroy();
+      this.magnetTimer = null;
+    }
+    this.magnetActive = false;
+
+    // Auto-release magneted balls before clearing
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball.isMagneted()) {
+        ball.releaseMagnet(this.speedManager.getBaseSpeed());
+      }
+    });
 
     // Clear Bounce House safety net
     this.clearSafetyNet(false);
