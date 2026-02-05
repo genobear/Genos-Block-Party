@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, AUDIO } from '../config/Constants';
+import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
@@ -90,6 +90,9 @@ export class BootScene extends Phaser.Scene {
 
     // Create particle textures
     this.createParticleTextures();
+
+    // Create safety net texture (Bounce House power-up)
+    this.createSafetyNetTexture();
   }
 
   private createBrickTextures(): void {
@@ -138,6 +141,7 @@ export class BootScene extends Phaser.Scene {
       { name: 'powerball', color: POWERUP_CONFIGS[PowerUpType.POWERBALL].color, symbol: 'P' },
       { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
       { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
+      { name: 'bouncehouse', color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color, symbol: 'N' },
       { name: 'partyfavor', color: POWERUP_CONFIGS[PowerUpType.PARTY_FAVOR].color, symbol: '+' },
     ];
 
@@ -277,6 +281,46 @@ export class BootScene extends Phaser.Scene {
     electric.fillRect(3, 4, 2, 2);
     electric.generateTexture('particle-electric', 6, 6);
     electric.destroy();
+
+    // Glow particle (soft radial gradient circle for balloon trail bubbles)
+    const glow = this.make.graphics({ x: 0, y: 0 });
+    // Create layered circles with decreasing alpha for soft glow effect
+    glow.fillStyle(0xffffff, 0.15);
+    glow.fillCircle(8, 8, 8);
+    glow.fillStyle(0xffffff, 0.3);
+    glow.fillCircle(8, 8, 6);
+    glow.fillStyle(0xffffff, 0.5);
+    glow.fillCircle(8, 8, 4);
+    glow.fillStyle(0xffffff, 0.8);
+    glow.fillCircle(8, 8, 2);
+    glow.generateTexture('particle-glow', 16, 16);
+    glow.destroy();
+  }
+
+  /**
+   * Create safety net texture (wide green bar for Bounce House power-up)
+   */
+  private createSafetyNetTexture(): void {
+    const netWidth = PLAYABLE_WIDTH;
+    const netHeight = 10;
+    const g = this.make.graphics({ x: 0, y: 0 });
+
+    // Glowing green bar
+    g.fillStyle(0x90ee90, 0.9);
+    g.fillRoundedRect(0, 0, netWidth, netHeight, 4);
+
+    // White border for visibility
+    g.lineStyle(1, 0xffffff, 0.5);
+    g.strokeRoundedRect(0, 0, netWidth, netHeight, 4);
+
+    // Center dot pattern for visual texture
+    g.fillStyle(0xffffff, 0.3);
+    for (let i = 20; i < netWidth; i += 40) {
+      g.fillCircle(i, netHeight / 2, 2);
+    }
+
+    g.generateTexture('safety-net', netWidth, netHeight);
+    g.destroy();
   }
 
   /**

@@ -62,9 +62,15 @@
 
 ### Score System & Multiplier
 - Points earned per brick hit (not per brick destroyed) — **10 / 15 / 20** depending on type
-- **Multiplier system** (1.0× to 5.0× cap):
-  - Each brick hit increments the multiplier with diminishing returns: `+0.15 × (1 / currentMultiplier)`
-  - Decays after 1 second of no hits
+- **MultiplierSystem** (`src/systems/MultiplierSystem.ts`) — extracted for testability:
+  - `getValue()` — current multiplier value
+  - `increment(currentTime)` — called on brick hit, uses diminishing returns: `+0.15 × (1 / currentMultiplier)`
+  - `update(currentTime, deltaMs)` — handles time-based decay
+  - `reset()` — returns to base value (called on life loss or level transition)
+  - `applyToScore(points)` — multiplies and floors points
+- **Multiplier mechanics** (1.0× to 5.0× cap):
+  - Each brick hit increments the multiplier with diminishing returns
+  - Decays after 1 second of no hits (`DECAY_DELAY_MS`)
   - Decay rate scales with multiplier level (low multiplier decays slowly, high decays fast)
   - Resets to 1.0× on life loss or level transition
   - UI shows multiplier when ≥ 1.1× with color coding: yellow → orange → red
@@ -386,14 +392,20 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Power-Up Configs** | Every `PowerUpType` enum value has a matching `POWERUP_CONFIGS` entry with correct type, color, duration, dropWeight, and emoji |
 | **Currency Conversion** | `CurrencyManager.calculateCurrencyFromScore()` returns correct values across all tier thresholds (0, 100, 1K, 5K, 10K, 25K scores) |
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
+| **Multiplier System** | `MultiplierSystem` initialization, increment with diminishing returns, max cap enforcement, decay mechanics (grace period, scaling), reset behavior, and score application |
 | **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |
 | **Drop Roll Probability** | Pure drop logic functions (`calculateDropChance`, `rollDrop`, `rollDropsForDamage`): base chances per brick type, Power Ball bonus (2× capped at 100%), AOE penalty (50%), debug override precedence, edge cases |
+| **Paddle Collision** | Center/edge/clamped angle calculations return correct radian values |
+| **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
 
-### Pure Utility Functions
-- **`src/utils/dropRoll.ts`** — Drop probability logic extracted to pure, testable functions:
-  - `calculateDropChance()`: Computes effective drop chance with Power Ball bonus, AOE penalty, and debug override
-  - `rollDrop()`: Single drop roll with injectable RNG for deterministic testing
-  - `rollDropsForDamage()`: Multi-damage roll (one roll per damage point) with injectable RNG
+### Utility Functions
+| Module | Function | Description |
+|--------|----------|-------------|
+| `utils/dropRoll.ts` | `calculateDropChance(brickType, powerBallActive, isAOE, debugOverride?)` | Computes effective drop chance with Power Ball bonus (2×), AOE penalty (50%), and debug override support. Returns 0-1. |
+| `utils/dropRoll.ts` | `rollDrop(chance, rng?)` | Single drop roll with injectable RNG for deterministic testing. Returns boolean. |
+| `utils/dropRoll.ts` | `rollDropsForDamage(damage, chance, rng?)` | Multi-damage roll (one roll per damage point) with injectable RNG. Returns count of successful drops. |
+| `utils/paddleAngle.ts` | `calculatePaddleBounceAngle(relativeHitX, paddleWidth, minAngle?, maxAngle?)` | Pure function for paddle collision angle calculation. Returns angle in radians. Handles center hits (straight up), edge hits (steep angles), and clamping. |
+| `utils/ballLaunch.ts` | `calculateLaunchVelocity(speed, minAngle?, maxAngle?)` | Pure function to calculate ball launch velocity. Extracted from `Ball.ts` for unit testing. Returns `{velocityX, velocityY, angleDeg}` with random angle in specified range (default: -120° to -60°). |
 
 ### Commands
 ```bash
@@ -404,7 +416,18 @@ npm run test:watch # Run tests in watch mode (development)
 
 ---
 
-## 9. TODO / Known Gaps
+## 9. Utilities
+
+### Weighted Random Selection
+- **`src/utils/weightedSelection.ts`** — Pure, testable utility for weighted random selection
+- `weightedSelect<T>(items, randomValue)` — Selects item based on weights and a provided random value (0-1)
+- `getTotalWeight<T>(items)` — Convenience helper to sum item weights
+- **Power-up selection** uses this utility with weights from `POWERUP_CONFIGS`
+- Supports edge cases: zero weights, negative weights (treated as zero), empty arrays
+
+---
+
+## 10. TODO / Known Gaps
 
 ### Unused Systems
 - **Currency system exists but has no shop**: `CurrencyManager` has `spendCurrency()`, `canAfford()`, and `resetCurrency()` methods, but there is no shop scene or purchasable items. Coins accumulate with no way to spend them.
