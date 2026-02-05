@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { BrickType, BRICK_DROP_CHANCES } from '../types/BrickTypes';
 import { BRICK_WIDTH, BRICK_HEIGHT, SCORE_VALUES } from '../config/Constants';
+import { calculateDropChance, rollDrop, rollDropsForDamage as rollDropsUtil } from '../utils/dropRoll';
 
 // Debug value stored on window to survive HMR
 declare global {
@@ -139,7 +140,7 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
    * @param isAOE If true, apply 50% AOE penalty
    */
   shouldDropPowerUp(isAOE: boolean = false): boolean {
-    return Math.random() < this.getDropChance(isAOE);
+    return rollDrop(this.getDropChance(isAOE));
   }
 
   /**
@@ -149,14 +150,7 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
    * @param isAOE If true, apply 50% AOE penalty
    */
   rollDropsForDamage(damageAmount: number, isAOE: boolean = false): number {
-    let drops = 0;
-    const chance = this.getDropChance(isAOE);
-    for (let i = 0; i < damageAmount; i++) {
-      if (Math.random() < chance) {
-        drops++;
-      }
-    }
-    return drops;
+    return rollDropsUtil(this.getDropChance(isAOE), damageAmount);
   }
 
   /**
@@ -225,25 +219,12 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
    * @param isAOE If true, apply 50% AOE penalty
    */
   getDropChance(isAOE: boolean = false): number {
-    // Debug override takes absolute precedence
-    if (Brick.debugDropChance !== null) {
-      return Brick.debugDropChance;
-    }
-
-    // Get base chance for this brick type
-    let chance = BRICK_DROP_CHANCES[this.brickType];
-
-    // Apply Power Ball multiplier if active (double, cap at 100%)
-    if (Brick.powerBallActive) {
-      chance = Math.min(chance * 2, 1);
-    }
-
-    // Apply AOE penalty (50% reduction for Electric Ball chain damage)
-    if (isAOE) {
-      chance *= 0.5;
-    }
-
-    return chance;
+    return calculateDropChance({
+      baseChance: BRICK_DROP_CHANCES[this.brickType],
+      powerBallActive: Brick.powerBallActive,
+      isAOE,
+      debugOverride: Brick.debugDropChance,
+    });
   }
 
   /**

@@ -394,12 +394,16 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
 | **Multiplier System** | `MultiplierSystem` initialization, increment with diminishing returns, max cap enforcement, decay mechanics (grace period, scaling), reset behavior, and score application |
 | **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |
+| **Drop Roll Probability** | Pure drop logic functions (`calculateDropChance`, `rollDrop`, `rollDropsForDamage`): base chances per brick type, Power Ball bonus (2× capped at 100%), AOE penalty (50%), debug override precedence, edge cases |
 | **Paddle Collision** | Center/edge/clamped angle calculations return correct radian values |
 | **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
 
 ### Utility Functions
 | Module | Function | Description |
 |--------|----------|-------------|
+| `utils/dropRoll.ts` | `calculateDropChance(brickType, powerBallActive, isAOE, debugOverride?)` | Computes effective drop chance with Power Ball bonus (2×), AOE penalty (50%), and debug override support. Returns 0-1. |
+| `utils/dropRoll.ts` | `rollDrop(chance, rng?)` | Single drop roll with injectable RNG for deterministic testing. Returns boolean. |
+| `utils/dropRoll.ts` | `rollDropsForDamage(damage, chance, rng?)` | Multi-damage roll (one roll per damage point) with injectable RNG. Returns count of successful drops. |
 | `utils/paddleAngle.ts` | `calculatePaddleBounceAngle(relativeHitX, paddleWidth, minAngle?, maxAngle?)` | Pure function for paddle collision angle calculation. Returns angle in radians. Handles center hits (straight up), edge hits (steep angles), and clamping. |
 | `utils/ballLaunch.ts` | `calculateLaunchVelocity(speed, minAngle?, maxAngle?)` | Pure function to calculate ball launch velocity. Extracted from `Ball.ts` for unit testing. Returns `{velocityX, velocityY, angleDeg}` with random angle in specified range (default: -120° to -60°). |
 
