@@ -156,11 +156,14 @@ Each power-up has per-type feedback on collection:
 - Has `spendCurrency()` and `canAfford()` methods — **no shop exists yet** (see TODO)
 
 ### High Score Leaderboard
-- Top 5 scores stored locally
+- Top 5 scores stored locally in localStorage
+- Sorted descending by score
 - On new high score: 3-letter initials entry (keyboard input, A-Z only)
 - Initials typed into individual boxes with blinking cursor
 - After submission, entry panel animates out and is replaced by leaderboard display
 - Current game's score highlighted in gold on leaderboard
+- Pure functions extracted to `src/utils/leaderboard.ts` for testability
+- Tests: `src/utils/leaderboard.test.ts`
 
 ### Persistence (localStorage)
 | Key | Contents |
@@ -406,6 +409,10 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | `utils/dropRoll.ts` | `rollDropsForDamage(damage, chance, rng?)` | Multi-damage roll (one roll per damage point) with injectable RNG. Returns count of successful drops. |
 | `utils/paddleAngle.ts` | `calculatePaddleBounceAngle(relativeHitX, paddleWidth, minAngle?, maxAngle?)` | Pure function for paddle collision angle calculation. Returns angle in radians. Handles center hits (straight up), edge hits (steep angles), and clamping. |
 | `utils/ballLaunch.ts` | `calculateLaunchVelocity(speed, minAngle?, maxAngle?)` | Pure function to calculate ball launch velocity. Extracted from `Ball.ts` for unit testing. Returns `{velocityX, velocityY, angleDeg}` with random angle in specified range (default: -120° to -60°). |
+| `utils/leaderboard.ts` | `getLeaderboard(storage, key?)` | Retrieves leaderboard from localStorage. Returns empty array if key doesn't exist or contains invalid JSON. |
+| `utils/leaderboard.ts` | `checkIsHighScore(score, leaderboard, maxEntries?)` | Checks if a score qualifies for the leaderboard (score > 0 AND either room available OR beats lowest). |
+| `utils/leaderboard.ts` | `insertScore(entry, leaderboard, maxEntries?)` | Inserts entry into leaderboard, maintains descending sort, caps at maxEntries. Returns new array (immutable). |
+| `utils/leaderboard.ts` | `saveLeaderboard(leaderboard, storage, key?)` | Saves leaderboard to localStorage as JSON. |
 
 ### Commands
 ```bash
