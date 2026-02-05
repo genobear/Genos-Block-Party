@@ -92,6 +92,7 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+      [PowerUpType.BASS_DROP, () => this.applyBassDrop()],
     ]);
 
     // Initialize effect propagation config
@@ -349,6 +350,15 @@ export class PowerUpSystem {
     });
 
     this.events.emit('effectExpired', PowerUpType.ELECTRICBALL);
+  }
+
+  /**
+   * Apply Bass Drop effect (screen nuke - 1 damage to all bricks)
+   * Emits 'bassDrop' event for GameScene to handle brick iteration
+   */
+  private applyBassDrop(): void {
+    this.events.emit('bassDrop');
+    this.events.emit('effectApplied', PowerUpType.BASS_DROP);
   }
 
   /**

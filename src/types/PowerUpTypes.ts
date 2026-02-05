@@ -10,6 +10,7 @@ export enum PowerUpType {
   POWERBALL = 'powerball', // Double power-up drop chance (12s)
   FIREBALL = 'fireball', // Piercing ball with stacking damage (10s)
   ELECTRICBALL = 'electricball', // Electric ball with AOE damage (8s)
+  BASS_DROP = 'bassdrop',       // Screen nuke - 1 damage to ALL bricks (instant)
 }
 
 /**
@@ -82,6 +83,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 8000,       // 8 seconds
     dropWeight: 12,
     emoji: '⚡',
+  },
+  [PowerUpType.BASS_DROP]: {
+    type: PowerUpType.BASS_DROP,
+    color: 0x9400d3,      // Dark violet
+    duration: 0,          // Instant effect
+    dropWeight: 8,
+    emoji: '🎵',
   },
 };
 

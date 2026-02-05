@@ -14,6 +14,7 @@ import { NowPlayingToast } from '../systems/NowPlayingToast';
 import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
 import { PowerUpType } from '../types/PowerUpTypes';
+import { BrickType } from '../types/BrickTypes';
 import { BallEffectType } from '../effects/BallEffectTypes';
 import { LEVELS, LevelData } from '../config/LevelData';
 import {
@@ -29,6 +30,7 @@ import {
   STARTING_LIVES,
   AUDIO,
   MULTIPLIER,
+  COLORS,
 } from '../config/Constants';
 
 export class GameScene extends Phaser.Scene {
@@ -192,6 +194,9 @@ export class GameScene extends Phaser.Scene {
       this.powerUpFeedbackSystem.revealMystery(actualType);
     });
 
+    // Wire Bass Drop event - screen nuke: 1 damage to all bricks
+    this.powerUpSystem.events.on('bassDrop', this.handleBassDrop, this);
+
     // Emit initial state to UI
     this.events.emit('scoreUpdate', this.score);
     this.events.emit('livesUpdate', this.lives);
@@ -221,6 +226,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('effectApplied');
     this.powerUpSystem?.events?.off('effectExpired');
     this.powerUpSystem?.events?.off('mysteryRevealed');
+    this.powerUpSystem?.events?.off('bassDrop', this.handleBassDrop, this);
 
     // Clean up input events
     this.input?.off('pointerdown', this.handleClick, this);
@@ -674,6 +680,81 @@ export class GameScene extends Phaser.Scene {
 
     // Ensure slow motion is disabled
     this.screenEffects.disableSlowMotion();
+  }
+
+  /**
+   * Handle Bass Drop power-up: apply 1 damage to ALL active bricks on screen
+   * Rolls for power-up drops, handles destruction, checks level completion
+   */
+  private handleBassDrop(): void {
+    // Massive screen shake + purple flash
+    this.cameras.main.shake(400, 0.02);
+
+    // Play airhorn SFX for dramatic bass drop impact
+    this.audioManager.playSFX(AUDIO.SFX.AIRHORN);
+
+    // Iterate all active bricks and apply 1 damage
+    const bricksToProcess: Brick[] = [];
+    this.bricks.children.iterate((child) => {
+      const brick = child as Brick;
+      if (brick && brick.active) {
+        bricksToProcess.push(brick);
+      }
+      return true;
+    });
+
+    bricksToProcess.forEach((brick) => {
+      // Increment multiplier for each brick hit
+      this.incrementMultiplier();
+
+      // Score for each brick hit
+      this.addScore(brick.getScoreValue());
+
+      // Roll for power-up drop before applying damage (AOE penalty applies)
+      if (brick.shouldDropPowerUp(true)) {
+        const dropPos = brick.getPowerUpDropPosition();
+        this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+      }
+
+      // Apply 1 damage
+      const isDestroyed = brick.takeDamage(1);
+
+      if (isDestroyed) {
+        // Audio for destroyed brick
+        this.audioManager.playSFX(AUDIO.SFX.HORN);
+
+        // Confetti burst
+        const brickColor = this.getBrickColorForParticles(brick.getType());
+        this.particleSystem.burstConfetti(brick.x, brick.y, brickColor);
+
+        // Immediately deactivate for countActive()
+        brick.setActive(false);
+        brick.disableBody(true);
+
+        // Play destroy animation
+        brick.playDestroyAnimation();
+      } else {
+        // Hit but not destroyed
+        this.audioManager.playSFX(AUDIO.SFX.POP);
+      }
+    });
+
+    // Check level completion after all bricks processed
+    if (this.bricks.countActive() === 0) {
+      this.handleLevelComplete();
+    }
+  }
+
+  /**
+   * Get brick color for particle effects (used by bass drop handler)
+   */
+  private getBrickColorForParticles(type: BrickType): number {
+    switch (type) {
+      case BrickType.PRESENT: return COLORS.PRESENT;
+      case BrickType.PINATA: return COLORS.PINATA;
+      case BrickType.BALLOON: return COLORS.BALLOON;
+      default: return 0xffffff;
+    }
   }
 
   // ========== DEBUG METHODS ==========

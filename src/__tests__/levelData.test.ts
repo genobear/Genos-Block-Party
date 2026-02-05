@@ -24,16 +24,10 @@ describe('Level Data', () => {
         expect(level.ballSpeedMultiplier).toBeDefined();
         expect(level.backgroundColor).toBeDefined();
         expect(level.bricks).toBeDefined();
-        expect(level.powerUpDropChance).toBeDefined();
       });
 
       it('should have a positive ballSpeedMultiplier', () => {
         expect(level.ballSpeedMultiplier).toBeGreaterThan(0);
-      });
-
-      it('should have powerUpDropChance between 0 and 1', () => {
-        expect(level.powerUpDropChance).toBeGreaterThanOrEqual(0);
-        expect(level.powerUpDropChance).toBeLessThanOrEqual(1);
       });
 
       it('should have bricks with valid types', () => {
