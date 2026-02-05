@@ -277,6 +277,20 @@ export class BootScene extends Phaser.Scene {
     electric.fillRect(3, 4, 2, 2);
     electric.generateTexture('particle-electric', 6, 6);
     electric.destroy();
+
+    // Glow particle (soft radial gradient circle for balloon trail bubbles)
+    const glow = this.make.graphics({ x: 0, y: 0 });
+    // Create layered circles with decreasing alpha for soft glow effect
+    glow.fillStyle(0xffffff, 0.15);
+    glow.fillCircle(8, 8, 8);
+    glow.fillStyle(0xffffff, 0.3);
+    glow.fillCircle(8, 8, 6);
+    glow.fillStyle(0xffffff, 0.5);
+    glow.fillCircle(8, 8, 4);
+    glow.fillStyle(0xffffff, 0.8);
+    glow.fillCircle(8, 8, 2);
+    glow.generateTexture('particle-glow', 16, 16);
+    glow.destroy();
   }
 
   /**
