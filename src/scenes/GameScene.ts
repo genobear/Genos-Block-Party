@@ -175,6 +175,7 @@ export class GameScene extends Phaser.Scene {
     // Create electric arc system for Electric Ball AOE
     this.electricArcSystem = new ElectricArcSystem(this, this.bricks);
     this.collisionHandler.setElectricArcSystem(this.electricArcSystem);
+    this.collisionHandler.setBricksGroup(this.bricks);
 
     // Load first level
     this.loadLevel(0);
@@ -723,6 +724,7 @@ export class GameScene extends Phaser.Scene {
     // Consume the safety net (destroy with animation)
     this.powerUpSystem.consumeSafetyNet();
   }
+
 
   // ========== DEBUG METHODS ==========
 

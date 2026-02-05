@@ -112,6 +112,18 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, alpha: 0.45 },
     },
   },
+  [PowerUpType.PARTY_POPPER]: {
+    displayName: 'PARTY POPPER!',
+    color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color,
+    particles: {
+      colors: [0xff4500, 0xff6600, 0xffaa00, 0xffcc00, 0xffffff],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color, alpha: 0.5 },
+      shake: { duration: 100, intensity: 0.005 },
+    },
+  },
   [PowerUpType.BOUNCE_HOUSE]: {
     displayName: 'SAFETY NET!',
     color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color,

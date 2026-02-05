@@ -7,6 +7,7 @@ import { DiscoEffectHandler } from './handlers/DiscoEffectHandler';
 import { ElectricBallEffectHandler } from './handlers/ElectricBallEffectHandler';
 import { DangerSparksEffectHandler } from './handlers/DangerSparksEffectHandler';
 import { BalloonTrailEffectHandler } from './handlers/BalloonTrailEffectHandler';
+import { BombGlowEffectHandler } from './handlers/BombGlowEffectHandler';
 
 /**
  * Manages multiple simultaneous particle effects on a Ball
@@ -40,6 +41,7 @@ export class BallEffectManager {
       [BallEffectType.ELECTRIC_TRAIL, () => new ElectricBallEffectHandler(this.scene)],
       [BallEffectType.DANGER_SPARKS, () => new DangerSparksEffectHandler(this.scene)],
       [BallEffectType.BALLOON_TRAIL, () => new BalloonTrailEffectHandler(this.scene)],
+      [BallEffectType.BOMB_GLOW, () => new BombGlowEffectHandler(this.scene)],
     ]);
   }
 

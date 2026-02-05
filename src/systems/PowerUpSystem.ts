@@ -99,6 +99,7 @@ export class PowerUpSystem {
       [PowerUpType.POWERBALL, () => this.applyPowerBall()],
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
+      [PowerUpType.PARTY_POPPER, () => this.applyPartyPopper()],
       [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
       [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
     ]);
@@ -596,6 +597,20 @@ export class PowerUpSystem {
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
       ball.clearElectricBall();
+      ball.clearBomb();
     });
+  }
+
+  // ========== PARTY POPPER (3x3 BOMB) ==========
+
+  private applyPartyPopper(): void {
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.setBomb();
+    });
+    this.events.emit('effectApplied', PowerUpType.PARTY_POPPER);
+  }
+
+  onBombDetonated(): void {
+    this.events.emit('effectExpired', PowerUpType.PARTY_POPPER);
   }
 }
