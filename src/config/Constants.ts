@@ -145,3 +145,34 @@ export const STATS = {
     perfectGames: 0,
   },
 } as const;
+
+// Endless Mode settings
+export const ENDLESS_MODE = {
+  // Storage keys
+  STORAGE_KEY: 'genos-block-party-endless-unlocked',
+  LEADERBOARD_KEY: 'genos-block-party-endless-leaderboard',
+  LEVEL_PROGRESS_KEY: 'genos-block-party-level-progress',
+
+  // Checkpoint system
+  CHECKPOINT_INTERVAL: 5,
+
+  // Brick generation
+  BASE_BRICK_COUNT: 20,
+  MAX_BRICK_COUNT: 40,
+  DIFFICULTY_RAMP_RATE: 0.1,
+
+  // Grid dimensions
+  GRID_COLS: 10,
+  GRID_ROWS: 12,
+
+  // Difficulty scaling
+  SPEED_INCREMENT_PER_WAVE: 0.03,
+  MAX_SPEED_MULTIPLIER: 1.5,
+  HP_INCREMENT_WAVE_INTERVAL: 10,
+  DENSITY_INCREMENT_PER_WAVE: 0.02,
+  MAX_DENSITY: 0.7,
+  BASE_DENSITY: 0.3,
+
+  // Currency bonus per wave in endless mode
+  CURRENCY_PER_WAVE: 3,
+} as const;

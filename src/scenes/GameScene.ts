@@ -16,6 +16,7 @@ import { TransitionManager } from '../systems/TransitionManager';
 import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { MultiplierSystem } from '../systems/MultiplierSystem';
 import { LifetimeStatsManager } from '../systems/LifetimeStatsManager';
+import { EndlessModeManager } from '../systems/EndlessModeManager';
 import { PowerUpType } from '../types/PowerUpTypes';
 import { BrickType } from '../types/BrickTypes';
 import { SafetyNet } from '../objects/SafetyNet';
@@ -82,11 +83,26 @@ export class GameScene extends Phaser.Scene {
   // Lifetime stats tracking
   private statsManager!: LifetimeStatsManager;
 
+  // Endless mode
+  private isEndlessMode: boolean = false;
+  private endlessModeManager!: EndlessModeManager;
+
   constructor() {
     super('GameScene');
   }
 
+  init(data: { isEndlessMode?: boolean }): void {
+    this.isEndlessMode = data?.isEndlessMode || false;
+  }
+
   create(): void {
+    // Get endless mode manager
+    this.endlessModeManager = EndlessModeManager.getInstance();
+
+    // Start endless session if in endless mode
+    if (this.isEndlessMode) {
+      this.endlessModeManager.startSession();
+    }
     // Reset game state
     this.score = 0;
     this.lives = STARTING_LIVES;
@@ -203,8 +219,8 @@ export class GameScene extends Phaser.Scene {
     // Listen for world bounds events
     this.physics.world.on('worldbounds', this.handleWorldBounds, this);
 
-    // Launch the UI scene
-    this.scene.launch('UIScene');
+    // Launch the UI scene with endless mode flag
+    this.scene.launch('UIScene', { isEndlessMode: this.isEndlessMode });
 
     // Forward power-up events to UIScene
     this.powerUpSystem.events.on('effectApplied', (type: string, duration?: number, stackCount?: number) => {
@@ -415,41 +431,80 @@ export class GameScene extends Phaser.Scene {
     // Clear existing bricks
     this.bricks.clear(true, true);
 
-    // Get level data
-    this.currentLevelIndex = index;
-    this.currentLevel = LEVELS[index];
-
-    // Load and play level music (async, non-blocking)
-    this.audioManager.loadLevelMusic(index + 1).catch(() => {
-      // Music loading is optional - game continues without it
-    });
-
-    // Background preload next level's music
-    if (index < LEVELS.length - 1) {
-      this.audioManager.preloadLevelMusic(index + 2);
-    }
-
-    // Set the full-viewport background for this level
-    BackgroundManager.setLevelBackground(index + 1);
-
     // Calculate brick grid offset to center it
     const totalWidth = BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING;
     const offsetX = (GAME_WIDTH - totalWidth) / 2 + BRICK_WIDTH / 2;
 
-    // Create bricks from level data
-    this.currentLevel.bricks.forEach((brickConfig) => {
-      const x = offsetX + brickConfig.x * (BRICK_WIDTH + BRICK_PADDING);
-      const y = BRICK_ROWS_START_Y + brickConfig.y * (BRICK_HEIGHT + BRICK_PADDING);
+    if (this.isEndlessMode) {
+      // Endless mode: use procedural generation
+      const wave = this.endlessModeManager.getCurrentWave();
+      const brickConfigs = this.endlessModeManager.generateWave(wave);
 
-      const brick = new Brick(this, x, y, brickConfig.type, brickConfig.health);
-      this.bricks.add(brick);
-    });
+      // Create bricks from procedural data
+      brickConfigs.forEach((brickConfig) => {
+        const x = offsetX + brickConfig.x * (BRICK_WIDTH + BRICK_PADDING);
+        const y = BRICK_ROWS_START_Y + brickConfig.y * (BRICK_HEIGHT + BRICK_PADDING);
 
-    // Emit level update to UI
-    this.events.emit('levelUpdate', this.currentLevel.name);
+        const brick = new Brick(this, x, y, brickConfig.type, brickConfig.health);
+        this.bricks.add(brick);
+      });
 
-    // Set level speed multiplier on speed manager
-    this.speedManager.setLevelMultiplier(this.currentLevel.ballSpeedMultiplier);
+      // Emit wave update to UI
+      const waveName = this.endlessModeManager.getWaveDisplayName(wave);
+      this.events.emit('levelUpdate', waveName);
+      this.events.emit('waveUpdate', wave);
+
+      // Check for checkpoint wave
+      if (this.endlessModeManager.isCheckpointWave()) {
+        this.events.emit('checkpoint', this.endlessModeManager.getCheckpoint());
+      }
+
+      // Set speed multiplier based on wave
+      const speedMultiplier = this.endlessModeManager.getSpeedMultiplier(wave);
+      this.speedManager.setLevelMultiplier(speedMultiplier);
+
+      // Use level music based on wave (cycle through levels 1-9)
+      const musicLevel = ((wave - 1) % 9) + 1;
+      this.audioManager.loadLevelMusic(musicLevel).catch(() => {
+        // Music loading is optional
+      });
+
+      // Background based on wave (cycle through levels 1-10)
+      const bgLevel = ((wave - 1) % 10) + 1;
+      BackgroundManager.setLevelBackground(bgLevel);
+    } else {
+      // Story mode: use predefined levels
+      this.currentLevelIndex = index;
+      this.currentLevel = LEVELS[index];
+
+      // Load and play level music (async, non-blocking)
+      this.audioManager.loadLevelMusic(index + 1).catch(() => {
+        // Music loading is optional - game continues without it
+      });
+
+      // Background preload next level's music
+      if (index < LEVELS.length - 1) {
+        this.audioManager.preloadLevelMusic(index + 2);
+      }
+
+      // Set the full-viewport background for this level
+      BackgroundManager.setLevelBackground(index + 1);
+
+      // Create bricks from level data
+      this.currentLevel.bricks.forEach((brickConfig) => {
+        const x = offsetX + brickConfig.x * (BRICK_WIDTH + BRICK_PADDING);
+        const y = BRICK_ROWS_START_Y + brickConfig.y * (BRICK_HEIGHT + BRICK_PADDING);
+
+        const brick = new Brick(this, x, y, brickConfig.type, brickConfig.health);
+        this.bricks.add(brick);
+      });
+
+      // Emit level update to UI
+      this.events.emit('levelUpdate', this.currentLevel.name);
+
+      // Set level speed multiplier on speed manager
+      this.speedManager.setLevelMultiplier(this.currentLevel.ballSpeedMultiplier);
+    }
   }
 
   private setupCollisions(): void {
@@ -668,17 +723,27 @@ export class GameScene extends Phaser.Scene {
     this.ballPool.clearAll();
     this.events.emit('effectsCleared');
 
-    // Check if there are more levels
-    if (this.currentLevelIndex < LEVELS.length - 1) {
-      // Transition to next level with animation
+    if (this.isEndlessMode) {
+      // Endless mode: advance to next wave (infinite)
+      this.endlessModeManager.nextWave();
+
+      // Transition to next wave with animation
       this.time.delayedCall(800, () => {
-        this.transitionToNextLevel();
+        this.transitionToNextWave();
       });
     } else {
-      // Game completed!
-      this.time.delayedCall(1000, () => {
-        this.gameWin();
-      });
+      // Story mode: check if there are more levels
+      if (this.currentLevelIndex < LEVELS.length - 1) {
+        // Transition to next level with animation
+        this.time.delayedCall(800, () => {
+          this.transitionToNextLevel();
+        });
+      } else {
+        // Game completed!
+        this.time.delayedCall(1000, () => {
+          this.gameWin();
+        });
+      }
     }
   }
 
@@ -714,6 +779,40 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
+  private transitionToNextWave(): void {
+    const nextWave = this.endlessModeManager.getCurrentWave();
+    const transitionManager = TransitionManager.getInstance();
+    transitionManager.init(this);
+
+    // Get any active ball for transition animation (may be null)
+    const activeBalls = this.ballPool.getActiveBalls();
+    const transitionBall = activeBalls.length > 0 ? activeBalls[0] : null;
+
+    // Use level number based on wave for visual consistency (cycle 1-10)
+    const displayLevel = ((nextWave - 1) % 10) + 1;
+
+    transitionManager.transitionToNextLevel(
+      displayLevel,
+      this.bricks,
+      this.paddle,
+      transitionBall,
+      () => {
+        // Reset paddle visual properties and position
+        this.paddle.setScale(1);
+        this.paddle.setAlpha(1);
+        this.paddle.setRotation(0);
+        this.paddle.setPosition(GAME_WIDTH / 2, PLAY_AREA_Y + PLAYABLE_HEIGHT - 50);
+
+        // Load the next wave (endless mode uses wave number, not level index)
+        this.loadLevel(0); // Index doesn't matter for endless mode
+        this.resetBall();
+
+        // Allow new transitions
+        this.isLevelTransitioning = false;
+      }
+    );
+  }
+
   private gameOver(): void {
     this.isGameOver = true;
 
@@ -724,13 +823,36 @@ export class GameScene extends Phaser.Scene {
     this.exitDangerMode();
     this.screenEffects.destroy();
 
+    // End endless mode session if active
+    if (this.isEndlessMode) {
+      this.endlessModeManager.endSession();
+    }
+
     // Emit game over event
     this.events.emit('gameOver');
 
     // Transition to game over scene (currency awarded there)
     this.time.delayedCall(500, () => {
       this.scene.stop('UIScene');
-      this.scene.start('GameOverScene', { score: this.score, isWin: false, level: this.currentLevelIndex + 1 });
+
+      if (this.isEndlessMode) {
+        const waveReached = this.endlessModeManager.getCurrentWave();
+        const checkpoint = this.endlessModeManager.getCheckpoint();
+        this.scene.start('GameOverScene', {
+          score: this.score,
+          isWin: false,
+          isEndlessMode: true,
+          waveReached,
+          checkpoint,
+        });
+      } else {
+        this.scene.start('GameOverScene', {
+          score: this.score,
+          isWin: false,
+          level: this.currentLevelIndex + 1,
+          isEndlessMode: false,
+        });
+      }
     });
   }
 
@@ -744,13 +866,22 @@ export class GameScene extends Phaser.Scene {
     this.exitDangerMode();
     this.screenEffects.destroy();
 
+    // Unlock endless mode on campaign completion
+    this.endlessModeManager.unlockEndlessMode();
+
     // Emit game win event
     this.events.emit('gameWin');
 
     // Transition to game over scene (currency awarded there)
     this.time.delayedCall(500, () => {
       this.scene.stop('UIScene');
-      this.scene.start('GameOverScene', { score: this.score, isWin: true, level: 10 });
+      this.scene.start('GameOverScene', {
+        score: this.score,
+        isWin: true,
+        level: 10,
+        isEndlessMode: false,
+        justUnlockedEndless: true,
+      });
     });
   }
 

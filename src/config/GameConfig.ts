@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
 import { MusicScene } from '../scenes/MusicScene';
 import { MenuScene } from '../scenes/MenuScene';
+import { ModeSelectScene } from '../scenes/ModeSelectScene';
 import { GameScene } from '../scenes/GameScene';
 import { UIScene } from '../scenes/UIScene';
 import { PauseScene } from '../scenes/PauseScene';
@@ -30,7 +31,7 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, MusicScene, MenuScene, ShopScene, StatsScene, SettingsScene, MusicPlayerScene, GameScene, UIScene, PauseScene, GameOverScene],
+  scene: [BootScene, MusicScene, MenuScene, ModeSelectScene, ShopScene, StatsScene, SettingsScene, MusicPlayerScene, GameScene, UIScene, PauseScene, GameOverScene],
   input: {
     activePointers: 1,
     touch: {

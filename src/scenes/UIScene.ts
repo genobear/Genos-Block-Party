@@ -13,6 +13,10 @@ interface PowerUpIndicator {
   stackBadge?: Phaser.GameObjects.Container;
 }
 
+interface SceneData {
+  isEndlessMode?: boolean;
+}
+
 export class UIScene extends Phaser.Scene {
   // UI elements
   private scoreText!: Phaser.GameObjects.Text;
@@ -34,8 +38,20 @@ export class UIScene extends Phaser.Scene {
   private currentLives: number = 3;
   private isPaused: boolean = false;
 
+  // Endless mode state (tracked for potential future UI extensions)
+  public isEndlessMode: boolean = false;
+  public currentWave: number = 0;
+
+  // Checkpoint celebration elements
+  private checkpointOverlay: Phaser.GameObjects.Container | null = null;
+
   constructor() {
     super('UIScene');
+  }
+
+  init(data: SceneData): void {
+    this.isEndlessMode = data?.isEndlessMode || false;
+    this.currentWave = 0;
   }
 
   create(): void {
@@ -252,6 +268,10 @@ export class UIScene extends Phaser.Scene {
     // Level updates
     gameScene.events.on('levelUpdate', this.updateLevel, this);
 
+    // Endless mode: wave and checkpoint updates
+    gameScene.events.on('waveUpdate', this.onWaveUpdate, this);
+    gameScene.events.on('checkpoint', this.onCheckpoint, this);
+
     // Launch state
     gameScene.events.on('ballLaunched', this.hideLaunchText, this);
     gameScene.events.on('ballReset', this.showLaunchText, this);
@@ -271,6 +291,8 @@ export class UIScene extends Phaser.Scene {
       gameScene.events.off('multiplierUpdate', this.updateMultiplier, this);
       gameScene.events.off('livesUpdate', this.updateLives, this);
       gameScene.events.off('levelUpdate', this.updateLevel, this);
+      gameScene.events.off('waveUpdate', this.onWaveUpdate, this);
+      gameScene.events.off('checkpoint', this.onCheckpoint, this);
       gameScene.events.off('ballLaunched', this.hideLaunchText, this);
       gameScene.events.off('ballReset', this.showLaunchText, this);
       gameScene.events.off('effectApplied', this.showPowerUpIndicator, this);
@@ -523,6 +545,106 @@ export class UIScene extends Phaser.Scene {
     return config?.color ?? 0xffffff;
   }
 
+  private onWaveUpdate(wave: number): void {
+    this.currentWave = wave;
+  }
+
+  private onCheckpoint(checkpointNumber: number): void {
+    // Show checkpoint celebration
+    this.showCheckpointCelebration(checkpointNumber);
+  }
+
+  private showCheckpointCelebration(checkpointNumber: number): void {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+
+    // Create overlay container
+    this.checkpointOverlay = this.add.container(centerX, centerY);
+
+    // Semi-transparent background flash
+    const flash = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xffd700, 0.3);
+    this.checkpointOverlay.add(flash);
+
+    // Main text
+    const mainText = this.add.text(0, -30, '🎉 CHECKPOINT! 🎉', {
+      font: 'bold 42px Arial',
+      color: '#ffd700',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5);
+    this.checkpointOverlay.add(mainText);
+
+    // Checkpoint number
+    const checkpointText = this.add.text(0, 30, `Checkpoint ${checkpointNumber}`, {
+      font: 'bold 24px Arial',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.checkpointOverlay.add(checkpointText);
+
+    // Add glow effect
+    const glowEffect = mainText.postFX?.addGlow(0xffd700, 4, 0, false, 0.1, 24);
+    if (glowEffect) {
+      this.tweens.add({
+        targets: glowEffect,
+        outerStrength: { from: 4, to: 10 },
+        duration: 500,
+        yoyo: true,
+        repeat: 2,
+      });
+    }
+
+    // Entrance animation
+    this.checkpointOverlay.setScale(0);
+    this.checkpointOverlay.setAlpha(0);
+
+    this.tweens.add({
+      targets: this.checkpointOverlay,
+      scale: 1,
+      alpha: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
+    });
+
+    // Create confetti particles
+    for (let i = 0; i < 20; i++) {
+      const particle = this.add.rectangle(
+        Phaser.Math.Between(-100, 100),
+        Phaser.Math.Between(-50, 50),
+        Phaser.Math.Between(6, 12),
+        Phaser.Math.Between(6, 12),
+        Phaser.Utils.Array.GetRandom([0xffd700, 0xff69b4, 0x00ff00, 0x00bfff]),
+        0.9
+      );
+      this.checkpointOverlay.add(particle);
+
+      this.tweens.add({
+        targets: particle,
+        x: particle.x + Phaser.Math.Between(-100, 100),
+        y: particle.y + Phaser.Math.Between(-100, 100),
+        rotation: Phaser.Math.DegToRad(Phaser.Math.Between(-360, 360)),
+        alpha: 0,
+        duration: 1500,
+        delay: Phaser.Math.Between(0, 300),
+      });
+    }
+
+    // Hide after a delay
+    this.time.delayedCall(1500, () => {
+      if (this.checkpointOverlay) {
+        this.tweens.add({
+          targets: this.checkpointOverlay,
+          alpha: 0,
+          scale: 0.8,
+          duration: 300,
+          onComplete: () => {
+            this.checkpointOverlay?.destroy();
+            this.checkpointOverlay = null;
+          },
+        });
+      }
+    });
+  }
+
   private onGameEnd(): void {
     // Hide UI elements during game over
     this.tweens.add({
@@ -531,6 +653,12 @@ export class UIScene extends Phaser.Scene {
       duration: 500,
     });
     this.clearAllIndicators();
+
+    // Clean up checkpoint overlay if present
+    if (this.checkpointOverlay) {
+      this.checkpointOverlay.destroy();
+      this.checkpointOverlay = null;
+    }
   }
 
   // Public method to resume pause state (called from PauseScene)

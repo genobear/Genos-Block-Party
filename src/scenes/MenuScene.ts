@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { BackgroundManager } from '../systems/BackgroundManager';
-import { TransitionManager } from '../systems/TransitionManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import { CurrencyManager } from '../systems/CurrencyManager';
 
@@ -81,7 +80,7 @@ export class MenuScene extends Phaser.Scene {
 
     startButton.on('pointerdown', () => {
       if (this.isTransitioning) return;
-      this.startGameWithTransition();
+      this.goToModeSelect();
     });
 
     // Settings button
@@ -246,24 +245,15 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private startGameWithTransition(): void {
+  private goToModeSelect(): void {
     this.isTransitioning = true;
 
-    const transitionManager = TransitionManager.getInstance();
-    transitionManager.init(this);
+    // Simple fade transition to mode select
+    this.cameras.main.fadeOut(300, 0, 0, 0);
 
-    // Combine menu elements and decorations for animation
-    const allElements = [...this.menuElements, ...this.decorations];
-
-    transitionManager.transition(
-      'menu-to-game',
-      1, // Level 1
-      allElements,
-      () => {
-        // Midpoint: start the game scene
-        this.scene.start('GameScene');
-      }
-    );
+    this.time.delayedCall(300, () => {
+      this.scene.start('ModeSelectScene');
+    });
   }
 
   private createDecorations(): void {

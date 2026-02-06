@@ -3,13 +3,24 @@
  * Pure functions for managing high score leaderboard
  */
 
+import { ENDLESS_MODE } from '../config/Constants';
+
 export interface HighScoreEntry {
   initials: string;
   score: number;
+  wave?: number; // Optional wave number for endless mode
 }
 
 export const DEFAULT_STORAGE_KEY = 'genos-block-party-leaderboard';
+export const ENDLESS_STORAGE_KEY = ENDLESS_MODE.LEADERBOARD_KEY;
 export const MAX_ENTRIES = 5;
+
+/**
+ * Get the appropriate storage key for the game mode
+ */
+export function getStorageKey(isEndlessMode: boolean = false): string {
+  return isEndlessMode ? ENDLESS_STORAGE_KEY : DEFAULT_STORAGE_KEY;
+}
 
 /**
  * Get leaderboard from storage

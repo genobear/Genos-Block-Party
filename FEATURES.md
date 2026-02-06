@@ -58,7 +58,56 @@
 - Layout system: 10-column grid, bricks placed by (x, y) grid coordinates
 - Ball speed scales by `1.0× → 1.35×` from level 1 to 10
 - Level complete when all bricks are destroyed (countActive === 0)
-- After level 10 → win state
+- After level 10 → win state + Endless Mode unlocked
+
+### Endless Mode
+Unlocked after completing the 10-level Story Mode campaign. Features infinite procedurally generated waves with escalating difficulty.
+
+#### Unlock Condition
+- Complete all 10 Story Mode levels
+- Unlock persisted to localStorage (`genos-block-party-endless-unlocked`)
+- Celebration overlay displayed on first unlock
+
+#### Procedural Generation
+- Uses seeded random number generator (mulberry32) for consistent wave layouts
+- Generates 20–40 bricks per wave depending on difficulty
+- **Pattern types**: Scatter, Symmetric, Fortress, Maze, Clusters, Rows
+- Pattern selection weighted by wave number (easier patterns early, harder later)
+
+#### Difficulty Scaling
+| Parameter | Formula | Range |
+|-----------|---------|-------|
+| Brick Count | 20 + min(wave × 2, 20) | 20 → 40 |
+| Average HP | 1 + floor(wave / 10) | 1 → 3 |
+| Grid Density | 0.3 + min(wave × 0.02, 0.4) | 30% → 70% |
+| Ball Speed | 1.0 + min(wave × 0.03, 0.5) | 1.0× → 1.5× |
+
+#### Wave Difficulty Tiers
+- **Waves 1–5 (Easy)**: Sparse layouts, mostly Presents (low HP), simple patterns
+- **Waves 6–15 (Medium)**: Mixed density, Balloons and Piñatas appear, varied patterns
+- **Waves 16+ (Hard)**: Dense layouts, HP 2–3 average, fortress and maze patterns
+
+#### Checkpoint System
+- Checkpoint every 5 waves (wave 5, 10, 15, 20...)
+- Visual celebration on checkpoint waves ("🎉 CHECKPOINT! 🎉")
+- Checkpoint waves use simpler patterns as a "breather"
+- Checkpoint number displayed on Game Over screen
+
+#### Endless Mode Leaderboard
+- Separate leaderboard from Story Mode (`genos-block-party-endless-leaderboard`)
+- Stores wave reached alongside score
+- High score entry includes wave number
+
+#### Currency Bonus
+- Base currency from score (same formula as Story Mode)
+- **Wave bonus**: +3 coins per wave reached
+- Example: Reaching wave 20 = base currency + 60 bonus coins
+
+#### Mode Selection
+- New Mode Select screen accessible from Menu → Start Game
+- **Story Mode**: 10-level campaign (always available)
+- **Endless Mode**: Shows 🔒 lock icon + "Beat Story Mode to unlock" until unlocked
+- After unlock: Shows personal best wave record
 
 ### Score System & Multiplier
 - Points earned per brick hit (not per brick destroyed) — **10 / 15 / 20** depending on type
