@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
+import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
@@ -27,6 +27,17 @@ export class BootScene extends Phaser.Scene {
 
     // Load audio manifest first
     this.load.json('audio-manifest', 'audio/manifest.json');
+
+    // Load brick sprite images (4 types × 3 health levels)
+    const brickTypes = ['present', 'pinata', 'balloon', 'drifter'];
+    for (const type of brickTypes) {
+      for (let health = 1; health <= 3; health++) {
+        this.load.image(
+          `brick-${type}-${health}`,
+          `assets/sprites/brick-${type}-${health}.png`
+        );
+      }
+    }
 
     // Generate placeholder graphics
     this.createPlaceholderGraphics();
@@ -83,8 +94,7 @@ export class BootScene extends Phaser.Scene {
     ballGraphics.generateTexture('ball', BALL_RADIUS * 2, BALL_RADIUS * 2);
     ballGraphics.destroy();
 
-    // Create brick textures for each type and health level
-    this.createBrickTextures();
+    // Brick textures are now loaded as sprite images in preload()
 
     // Create power-up textures
     this.createPowerUpTextures();
@@ -118,43 +128,6 @@ export class BootScene extends Phaser.Scene {
       g.generateTexture(`paddle-skin-${skin.id}`, PADDLE_WIDTH, PADDLE_HEIGHT);
       g.destroy();
     }
-  }
-
-  private createBrickTextures(): void {
-    const types = [
-      { name: 'present', color: COLORS.PRESENT },
-      { name: 'pinata', color: COLORS.PINATA },
-      { name: 'balloon', color: COLORS.BALLOON },
-      { name: 'drifter', color: COLORS.DRIFTER },
-    ];
-
-    types.forEach(({ name, color }) => {
-      for (let health = 1; health <= 3; health++) {
-        const g = this.make.graphics({ x: 0, y: 0 });
-
-        // Opacity based on health (3 = full, 1 = faded)
-        const alpha = 0.4 + (health / 3) * 0.6;
-
-        // Main brick body
-        g.fillStyle(color, alpha);
-        g.fillRoundedRect(2, 2, BRICK_WIDTH - 4, BRICK_HEIGHT - 4, 4);
-
-        // Border
-        g.lineStyle(2, 0xffffff, alpha * 0.5);
-        g.strokeRoundedRect(2, 2, BRICK_WIDTH - 4, BRICK_HEIGHT - 4, 4);
-
-        // Health indicator dots
-        g.fillStyle(0xffffff, alpha);
-        const dotY = BRICK_HEIGHT - 6;
-        const dotStartX = (BRICK_WIDTH - (health * 8)) / 2;
-        for (let i = 0; i < health; i++) {
-          g.fillCircle(dotStartX + 4 + i * 8, dotY, 2);
-        }
-
-        g.generateTexture(`brick-${name}-${health}`, BRICK_WIDTH, BRICK_HEIGHT);
-        g.destroy();
-      }
-    });
   }
 
   private createPowerUpTextures(): void {

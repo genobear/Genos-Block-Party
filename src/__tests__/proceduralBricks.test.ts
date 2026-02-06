@@ -9,7 +9,7 @@ import {
   generateBrickPattern,
 } from '../utils/proceduralBricks';
 import { BrickType } from '../types/BrickTypes';
-import { ENDLESS_MODE, BRICK_COLS } from '../config/Constants';
+import { ENDLESS_MODE } from '../config/Constants';
 
 describe('Procedural Brick Generation', () => {
   // ─── 1. Seeded RNG ───────────────────────────────────────────────
