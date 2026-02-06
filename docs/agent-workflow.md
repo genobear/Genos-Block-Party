@@ -214,4 +214,27 @@ Trade-offs and implications.
 
 ---
 
+## For Humans: Playtest → Create Issues → Let Agents Build
+
+The best human-agent collaboration loop:
+
+1. **You play the game** — find bugs, spot balance issues, dream up features
+2. **You write an issue** — clear title, reproduction steps, expected behavior
+3. **An agent picks it up** — reads the issue, plans, implements, submits a PR
+4. **You review and test** — play the result, give feedback, merge or request changes
+
+### Writing agent-friendly issues
+
+Agents work best with **specific, well-scoped issues**. A few tips:
+
+- **One thing per issue** — "Fix X" is better than "Fix X, Y, and also add Z"
+- **Include context** — which level, which power-up, what you were doing when it happened
+- **Describe the desired outcome** — "The ball should bounce off at a steeper angle" beats "ball physics feel weird"
+- **Label appropriately** — `bug`, `enhancement`, `balance`, `good first issue`, `priority:high`
+- **Add screenshots or recordings** if relevant — agents can't play the game, so visual context helps
+
+The better the issue, the better the agent's implementation. You're the product owner; agents are the dev team.
+
+---
+
 *This workflow is open source. Feel free to adapt it for your own projects.*

@@ -138,6 +138,31 @@ Check the [Issues](https://github.com/genobear/Genos-Block-Party/issues) and the
 - 🎨 Art assets (currently all procedurally generated — real sprites welcome!)
 - 🎵 Music & SFX (synthesized SFX could be replaced with proper audio files)
 
+## Playtesting & Creating Issues (Humans Welcome!)
+
+Not a coder? You can still contribute massively by **playing the game and reporting what you find**.
+
+### How to playtest
+1. Clone the repo and run `npm install && npm run dev`
+2. Play through the levels — try to break things!
+3. Pay attention to: difficulty spikes, confusing UI, visual glitches, power-ups that feel too weak/strong, music transitions
+
+### Creating good issues
+When you find something, [open an issue](https://github.com/genobear/Genos-Block-Party/issues/new) with:
+- **Clear title** using a prefix: `bug:`, `feat:`, `balance:`, `polish:`
+- **What happened** vs **what you expected**
+- **Steps to reproduce** (which level, which power-up, etc.)
+- **Label it** — `bug`, `enhancement`, `balance`, `good first issue`
+
+Your issues become tasks that AI agents can pick up and implement autonomously. The better the issue description, the better the result. Think of yourself as the product owner — you play, you decide what needs work, agents build it.
+
+### Issue ideas that work great for agents
+- "Fireball level 3 feels too overpowered on Level 2" → `balance:` issue
+- "Add a power-up that reverses paddle controls" → `feat:` with `enhancement` label
+- "Ball gets stuck bouncing horizontally forever" → `bug:` issue
+- "Level 6 needs more variety in brick layout" → `enhancement` issue
+- "Add colorblind-friendly brick indicators" → `enhancement` + `accessibility`
+
 ## Code of Conduct
 
 Be cool. This is a fun project — keep it friendly and constructive.
