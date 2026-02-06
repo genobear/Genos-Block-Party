@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, BALL_RADIUS, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
+import { AUDIO } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
@@ -57,6 +57,11 @@ export class BootScene extends Phaser.Scene {
       this.load.image(`powerup-${type}`, `assets/sprites/powerup-${type}.png`);
     }
 
+    // Load ball, safety net, and bumper sprites (replaces programmatic texture generation)
+    this.load.image('ball', 'assets/sprites/ball.png');
+    this.load.image('safety-net', 'assets/sprites/safety-net.png');
+    this.load.image('bumper', 'assets/sprites/bumper.png');
+
     // Generate placeholder graphics
     this.createPlaceholderGraphics();
 
@@ -94,14 +99,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createPlaceholderGraphics(): void {
-    // Paddle textures now loaded from sprite files in preload()
-
-    // Create ball texture
-    const ballGraphics = this.make.graphics({ x: 0, y: 0 });
-    ballGraphics.fillStyle(COLORS.BALL);
-    ballGraphics.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
-    ballGraphics.generateTexture('ball', BALL_RADIUS * 2, BALL_RADIUS * 2);
-    ballGraphics.destroy();
+    // Ball, safety net, and bumper textures now loaded from sprite files in preload()
 
     // Brick textures are now loaded as sprite images in preload()
 
@@ -111,12 +109,6 @@ export class BootScene extends Phaser.Scene {
 
     // Create particle textures
     this.createParticleTextures();
-
-    // Create safety net texture (Bounce House power-up)
-    this.createSafetyNetTexture();
-
-    // Create bumper texture (pinball obstacle)
-    this.createBumperTexture();
   }
 
   private createParticleTextures(): void {
@@ -251,64 +243,6 @@ export class BootScene extends Phaser.Scene {
     glow.fillCircle(8, 8, 2);
     glow.generateTexture('particle-glow', 16, 16);
     glow.destroy();
-  }
-
-  /**
-   * Create safety net texture (wide green bar for Bounce House power-up)
-   */
-  private createSafetyNetTexture(): void {
-    const netWidth = PLAYABLE_WIDTH;
-    const netHeight = 10;
-    const g = this.make.graphics({ x: 0, y: 0 });
-
-    // Glowing green bar
-    g.fillStyle(0x90ee90, 0.9);
-    g.fillRoundedRect(0, 0, netWidth, netHeight, 4);
-
-    // White border for visibility
-    g.lineStyle(1, 0xffffff, 0.5);
-    g.strokeRoundedRect(0, 0, netWidth, netHeight, 4);
-
-    // Center dot pattern for visual texture
-    g.fillStyle(0xffffff, 0.3);
-    for (let i = 20; i < netWidth; i += 40) {
-      g.fillCircle(i, netHeight / 2, 2);
-    }
-
-    g.generateTexture('safety-net', netWidth, netHeight);
-    g.destroy();
-  }
-
-  /**
-   * Create bumper texture (classic pinball bumper look with ring/glow effect)
-   */
-  private createBumperTexture(): void {
-    const size = BUMPER.SIZE;
-    const center = size / 2;
-    const g = this.make.graphics({ x: 0, y: 0 });
-
-    // Outer glow ring (softer, larger)
-    g.fillStyle(COLORS.BUMPER, 0.3);
-    g.fillCircle(center, center, center);
-
-    // Main body (bright red)
-    g.fillStyle(COLORS.BUMPER, 1);
-    g.fillCircle(center, center, center - 4);
-
-    // Inner highlight ring (white)
-    g.lineStyle(2, 0xffffff, 0.6);
-    g.strokeCircle(center, center, center - 6);
-
-    // Center cap (darker red for depth)
-    g.fillStyle(0xcc3333, 1);
-    g.fillCircle(center, center, center - 12);
-
-    // Center highlight (shiny dot)
-    g.fillStyle(0xffffff, 0.7);
-    g.fillCircle(center - 4, center - 4, 4);
-
-    g.generateTexture('bumper', size, size);
-    g.destroy();
   }
 
   /**
