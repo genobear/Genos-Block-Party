@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Paddle } from '../objects/Paddle';
 import { Ball } from '../objects/Ball';
 import { Brick } from '../objects/Brick';
+import { DrifterBrick } from '../objects/DrifterBrick';
 import { BallPool } from '../pools/BallPool';
 import { PowerUpSystem } from '../systems/PowerUpSystem';
 import { ParticleSystem } from '../systems/ParticleSystem';
@@ -249,6 +250,9 @@ export class GameScene extends Phaser.Scene {
     // Wire Dance Floor event - shuffle all bricks
     this.powerUpSystem.events.on('danceFloor', this.handleDanceFloor, this);
 
+    // Listen for drifter brick escapes (they still count as cleared for level completion)
+    this.events.on('drifterEscaped', this.handleDrifterEscaped, this);
+
     // Wire safety net events (Bounce House power-up)
     this.powerUpSystem.events.on('safetyNetCreated', this.onSafetyNetCreated, this);
     this.powerUpSystem.events.on('safetyNetDestroyed', this.onSafetyNetDestroyed, this);
@@ -291,6 +295,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('bassDrop', this.handleBassDrop, this);
     this.powerUpSystem?.events?.off('confettiCannon', this.handleConfettiCannon, this);
     this.powerUpSystem?.events?.off('danceFloor', this.handleDanceFloor, this);
+    this.events?.off('drifterEscaped', this.handleDrifterEscaped, this);
     this.powerUpSystem?.events?.off('safetyNetCreated');
     this.powerUpSystem?.events?.off('safetyNetDestroyed');
     this.powerUpSystem?.events?.off('grantExtraLife');
@@ -445,7 +450,10 @@ export class GameScene extends Phaser.Scene {
         const x = offsetX + brickConfig.x * (BRICK_WIDTH + BRICK_PADDING);
         const y = BRICK_ROWS_START_Y + brickConfig.y * (BRICK_HEIGHT + BRICK_PADDING);
 
-        const brick = new Brick(this, x, y, brickConfig.type, brickConfig.health);
+        // Use DrifterBrick for drifter type, regular Brick otherwise
+        const brick = brickConfig.type === BrickType.DRIFTER
+          ? new DrifterBrick(this, x, y, brickConfig.health)
+          : new Brick(this, x, y, brickConfig.type, brickConfig.health);
         this.bricks.add(brick);
       });
 
@@ -495,7 +503,10 @@ export class GameScene extends Phaser.Scene {
         const x = offsetX + brickConfig.x * (BRICK_WIDTH + BRICK_PADDING);
         const y = BRICK_ROWS_START_Y + brickConfig.y * (BRICK_HEIGHT + BRICK_PADDING);
 
-        const brick = new Brick(this, x, y, brickConfig.type, brickConfig.health);
+        // Use DrifterBrick for drifter type, regular Brick otherwise
+        const brick = brickConfig.type === BrickType.DRIFTER
+          ? new DrifterBrick(this, x, y, brickConfig.health)
+          : new Brick(this, x, y, brickConfig.type, brickConfig.health);
         this.bricks.add(brick);
       });
 
@@ -1284,6 +1295,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
+   * Handle drifter brick escape - brick floated to the top without being hit
+   * No points awarded, but still counts toward level completion
+   */
+  private handleDrifterEscaped(_brick: DrifterBrick): void {
+    // Brick is already being destroyed by DrifterBrick.escape()
+    // Just need to check level completion after it's destroyed
+    // Use a short delay to ensure the brick has been removed from the group
+    this.time.delayedCall(50, () => {
+      if (this.bricks.countActive() === 0) {
+        this.handleLevelComplete();
+      }
+    });
+  }
+
+  /**
    * Get brick color for particle effects (used by bass drop handler)
    */
   private getBrickColorForParticles(type: BrickType): number {
@@ -1291,6 +1317,7 @@ export class GameScene extends Phaser.Scene {
       case BrickType.PRESENT: return COLORS.PRESENT;
       case BrickType.PINATA: return COLORS.PINATA;
       case BrickType.BALLOON: return COLORS.BALLOON;
+      case BrickType.DRIFTER: return COLORS.DRIFTER;
       default: return 0xffffff;
     }
   }

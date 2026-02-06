@@ -2,6 +2,7 @@ export enum BrickType {
   PRESENT = 'present',
   PINATA = 'pinata',
   BALLOON = 'balloon',
+  DRIFTER = 'drifter',
 }
 
 /**
@@ -11,6 +12,7 @@ export const BRICK_DROP_CHANCES: Record<BrickType, number> = {
   [BrickType.PRESENT]: 0.15,   // 15% - lowest (common bricks)
   [BrickType.PINATA]: 0.25,    // 25% - medium
   [BrickType.BALLOON]: 0.30,   // 30% - highest
+  [BrickType.DRIFTER]: 0.20,   // 20% - between Present and Piñata
 };
 
 export interface BrickConfig {

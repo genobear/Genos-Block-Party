@@ -71,6 +71,9 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
       case BrickType.BALLOON:
         this.scoreValue = SCORE_VALUES.BALLOON;
         break;
+      case BrickType.DRIFTER:
+        this.scoreValue = SCORE_VALUES.DRIFTER;
+        break;
     }
 
     // Add to scene and enable physics

@@ -33,6 +33,16 @@
 | **Present** | 1–3 | 10 | 15% | Pink |
 | **Piñata** | 1–3 | 15 | 25% | Orange |
 | **Balloon** | 1–3 | 20 | 30% | Cyan |
+| **Drifter** | 1–3 | 25 | 20% | Ghostly blue |
+
+### Drifter Bricks
+- Special brick type that slowly drifts upward (~25 px/s)
+- Gentle horizontal bobbing animation while drifting
+- Semi-transparent ethereal appearance (alpha 0.75) with pulsing effect
+- If it reaches the top of the screen (y < 60), it escapes: fades out, no points, no power-up drop
+- Creates urgency — player must prioritize these or lose potential score
+- Escaped drifters still count toward level completion (they're destroyed when they escape)
+- High score value (25 pts) compensates for the escape risk
 
 - Bricks display health indicator dots (1–3 dots on the brick face)
 - Texture changes on damage to reflect remaining HP

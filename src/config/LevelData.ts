@@ -90,6 +90,8 @@ export const LEVELS: LevelData[] = [
     ballSpeedMultiplier: 1.0,
     backgroundColor: 0x1a1a2e,
     bricks: [
+      // Test drifter brick
+      { x: 5, y: 2, type: BrickType.DRIFTER, health: 1 },
       // Bricks at y=6-8, much closer to paddle
       ...generateRow(6, BrickType.PRESENT, 1),
       ...generateRow(7, BrickType.PRESENT, 1),

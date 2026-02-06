@@ -60,6 +60,7 @@ export const COLORS = {
   PRESENT: 0xff69b4,      // Pink/Magenta
   PINATA: 0xffa500,       // Orange/Gold
   BALLOON: 0x00bfff,      // Cyan/Blue
+  DRIFTER: 0xaaddff,      // Ghostly pale blue
 
   // UI
   BALL: 0xffffff,         // White
@@ -75,6 +76,15 @@ export const SCORE_VALUES = {
   PRESENT: 10,
   PINATA: 15,
   BALLOON: 20,
+  DRIFTER: 25,
+} as const;
+
+// Drifter brick settings
+export const DRIFTER = {
+  DRIFT_SPEED: 25,        // px/s upward
+  BOB_AMPLITUDE: 3,       // px horizontal
+  BOB_FREQUENCY: 2,       // Hz
+  ESCAPE_THRESHOLD: 60,   // y position to escape
 } as const;
 
 // Note: Power-up durations are defined in POWERUP_CONFIGS (src/types/PowerUpTypes.ts)

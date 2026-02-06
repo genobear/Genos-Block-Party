@@ -122,6 +122,7 @@ export class BootScene extends Phaser.Scene {
       { name: 'present', color: COLORS.PRESENT },
       { name: 'pinata', color: COLORS.PINATA },
       { name: 'balloon', color: COLORS.BALLOON },
+      { name: 'drifter', color: COLORS.DRIFTER },
     ];
 
     types.forEach(({ name, color }) => {
