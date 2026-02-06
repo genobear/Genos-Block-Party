@@ -156,6 +156,11 @@ export const STATS = {
   },
 } as const;
 
+// Achievement configuration
+export const ACHIEVEMENTS = {
+  STORAGE_KEY: 'genos-block-party-achievements',
+} as const;
+
 // Endless Mode settings
 export const ENDLESS_MODE = {
   // Storage keys

@@ -613,7 +613,66 @@ Items with `price: -1` in the shop catalog are milestone-exclusive:
 
 ---
 
-## 11. TODO / Known Gaps
+## 11. Achievement System
+
+The Achievement System rewards players with bonus coins for accomplishing specific in-game feats. Achievements are tracked separately from Milestones (which unlock cosmetics).
+
+### Achievement Types
+- **Cumulative** — Based on lifetime stats (bricks destroyed, power-ups collected, games played)
+- **Session-based** — Achieved within a single game (level completion, score thresholds, flawless runs)
+- **Skill-based** — Specific gameplay feats (fireball stacking, multiplier levels)
+
+### Achievement List
+
+| ID | Name | Description | Coins | Type |
+|----|------|-------------|-------|------|
+| `party_starter` | Party Starter | Complete Level 1 | 10 | Session |
+| `halfway_there` | Halfway There | Complete Level 5 | 25 | Session |
+| `party_master` | Party Master | Complete all 10 levels | 100 | Session |
+| `flawless_one` | Flawless Start | Clear Level 1 without losing a life | 20 | Session |
+| `flawless_five` | Flawless Five | Clear Level 5 without losing a life | 50 | Session |
+| `flawless_ten` | Perfect Party | Clear Level 10 without losing a life | 100 | Session |
+| `fire_lord` | Fire Lord | Stack Fireball to level 5 | 75 | Skill |
+| `combo_king` | Combo King | Reach 5x multiplier | 50 | Skill |
+| `power_collector` | Power Collector | Collect 100 power-ups (lifetime) | 25 | Cumulative |
+| `brick_breaker` | Brick Breaker | Destroy 500 bricks (lifetime) | 25 | Cumulative |
+| `score_hunter` | Score Hunter | Reach 10,000 score in one game | 30 | Session |
+| `endless_five` | Endless Explorer | Reach wave 5 in Endless Mode | 30 | Session |
+| `endless_ten` | Endless Warrior | Reach wave 10 in Endless Mode | 50 | Session |
+| `party_animal` | Party Animal | Play 10 games | 15 | Cumulative |
+
+### Features
+- **Achievement Gallery**: Accessible from menu via "🏆 ACHIEVEMENTS" button
+- **Progress Tracking**: Cumulative achievements show progress bars in the gallery
+- **Unlock Toast**: In-game notification with chime sound when achievement unlocks
+- **Coin Rewards**: Coins automatically added to player balance on unlock
+- **Persistent Storage**: Unlocked achievements saved to localStorage (`genos-block-party-achievements`)
+
+### Flawless Achievements
+Flawless achievements require completing a specific level without losing any lives *on that level*:
+- Previous levels may have lost lives
+- Only the target level must be completed flawlessly
+- Lives at level start vs level end are tracked
+
+### Session Tracking
+The AchievementManager tracks session state including:
+- Highest level completed this session
+- Lives lost per level (for flawless detection)
+- Highest fireball stack achieved
+- Highest multiplier reached
+- Session score
+- Endless mode wave progression
+
+### Integration
+- Achievements are checked at game end (win or lose)
+- Fireball stacking is tracked via power-up system events
+- Multiplier is tracked on each brick hit
+- Level completion records flawless status
+- Endless waves are tracked as they're completed
+
+---
+
+## 12. TODO / Known Gaps
 
 ### Unused Systems
 - **`CURRENCY.AWARD_SCENE_DURATION` and `COUNT_UP_DURATION` constants** are defined but the award is handled inline in GameOverScene rather than a dedicated award scene.

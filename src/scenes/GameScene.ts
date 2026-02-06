@@ -18,6 +18,7 @@ import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { MultiplierSystem } from '../systems/MultiplierSystem';
 import { LifetimeStatsManager } from '../systems/LifetimeStatsManager';
 import { EndlessModeManager } from '../systems/EndlessModeManager';
+import { AchievementManager, Achievement } from '../systems/AchievementManager';
 import { PowerUpType } from '../types/PowerUpTypes';
 import { BrickType } from '../types/BrickTypes';
 import { SafetyNet } from '../objects/SafetyNet';
@@ -88,6 +89,10 @@ export class GameScene extends Phaser.Scene {
   private isEndlessMode: boolean = false;
   private endlessModeManager!: EndlessModeManager;
 
+  // Achievement tracking
+  private achievementManager!: AchievementManager;
+  private livesAtLevelStart: number = STARTING_LIVES;
+
   constructor() {
     super('GameScene');
   }
@@ -118,6 +123,11 @@ export class GameScene extends Phaser.Scene {
     // Initialize lifetime stats and record game start
     this.statsManager = LifetimeStatsManager.getInstance();
     this.statsManager.recordGameStart();
+
+    // Initialize achievement manager and start session
+    this.achievementManager = AchievementManager.getInstance();
+    this.achievementManager.startSession(this.isEndlessMode);
+    this.livesAtLevelStart = STARTING_LIVES;
 
     // Set transparent background so CSS background shows through
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
@@ -226,6 +236,11 @@ export class GameScene extends Phaser.Scene {
     // Forward power-up events to UIScene
     this.powerUpSystem.events.on('effectApplied', (type: string, duration?: number, stackCount?: number) => {
       this.events.emit('effectApplied', type, duration, stackCount);
+
+      // Track fireball stack for achievements
+      if (type === PowerUpType.FIREBALL && stackCount !== undefined) {
+        this.achievementManager.recordFireballStack(stackCount);
+      }
     });
     this.powerUpSystem.events.on('effectExpired', (type: string) => {
       this.events.emit('effectExpired', type);
@@ -729,6 +744,16 @@ export class GameScene extends Phaser.Scene {
     // Reset multiplier for next level
     this.resetMultiplier();
 
+    // Record level completion for achievements
+    if (this.isEndlessMode) {
+      const currentWave = this.endlessModeManager.getCurrentWave();
+      this.achievementManager.recordEndlessWave(currentWave);
+    } else {
+      // Calculate if lives were lost this level
+      const livesLostThisLevel = this.lives < this.livesAtLevelStart;
+      this.achievementManager.recordLevelComplete(this.currentLevelIndex + 1, livesLostThisLevel);
+    }
+
     // Clear power-ups and all balls
     this.powerUpSystem.clear();
     this.ballPool.clearAll();
@@ -784,6 +809,9 @@ export class GameScene extends Phaser.Scene {
         this.loadLevel(this.currentLevelIndex + 1);
         this.resetBall();
 
+        // Track lives at start of this level for flawless achievement detection
+        this.livesAtLevelStart = this.lives;
+
         // Allow new transitions
         this.isLevelTransitioning = false;
       }
@@ -818,6 +846,9 @@ export class GameScene extends Phaser.Scene {
         this.loadLevel(0); // Index doesn't matter for endless mode
         this.resetBall();
 
+        // Track lives at start of this wave for achievement detection
+        this.livesAtLevelStart = this.lives;
+
         // Allow new transitions
         this.isLevelTransitioning = false;
       }
@@ -838,6 +869,13 @@ export class GameScene extends Phaser.Scene {
     if (this.isEndlessMode) {
       this.endlessModeManager.endSession();
     }
+
+    // End achievement session and check for newly unlocked achievements
+    this.achievementManager.endSession(this.score, this.currentLevelIndex + 1);
+    const newAchievements = this.achievementManager.checkAchievements();
+    newAchievements.forEach((achievement) => {
+      this.showAchievementToast(achievement);
+    });
 
     // Emit game over event
     this.events.emit('gameOver');
@@ -880,6 +918,13 @@ export class GameScene extends Phaser.Scene {
     // Unlock endless mode on campaign completion
     this.endlessModeManager.unlockEndlessMode();
 
+    // End achievement session and check for newly unlocked achievements
+    this.achievementManager.endSession(this.score, 10);
+    const newAchievements = this.achievementManager.checkAchievements();
+    newAchievements.forEach((achievement) => {
+      this.showAchievementToast(achievement);
+    });
+
     // Emit game win event
     this.events.emit('gameWin');
 
@@ -907,7 +952,11 @@ export class GameScene extends Phaser.Scene {
    */
   private incrementMultiplier(): void {
     this.multiplierSystem.increment(this.time.now);
-    this.events.emit('multiplierUpdate', this.multiplierSystem.getValue());
+    const currentMultiplier = this.multiplierSystem.getValue();
+    this.events.emit('multiplierUpdate', currentMultiplier);
+
+    // Track multiplier for achievements
+    this.achievementManager.recordMultiplier(currentMultiplier);
   }
 
   /**
@@ -1320,6 +1369,76 @@ export class GameScene extends Phaser.Scene {
       case BrickType.DRIFTER: return COLORS.DRIFTER;
       default: return 0xffffff;
     }
+  }
+
+  // ========== ACHIEVEMENT TOAST ==========
+
+  /**
+   * Show a toast notification when an achievement is unlocked
+   */
+  private showAchievementToast(achievement: Achievement): void {
+    const centerX = GAME_WIDTH / 2;
+    const toastY = 150;
+
+    // Create toast background
+    const toastBg = this.add.rectangle(centerX, toastY, 350, 70, 0x1a4d1a, 0.95);
+    toastBg.setStrokeStyle(3, 0xffd700);
+    toastBg.setDepth(1000);
+
+    // Trophy icon
+    const trophyText = this.add.text(centerX - 140, toastY, '🏆', {
+      font: '32px Arial',
+    }).setOrigin(0.5).setDepth(1001);
+
+    // Achievement title
+    const titleText = this.add.text(centerX - 100, toastY - 12, 'ACHIEVEMENT UNLOCKED!', {
+      font: 'bold 14px Arial',
+      color: '#ffd700',
+    }).setOrigin(0, 0.5).setDepth(1001);
+
+    // Achievement name
+    const nameText = this.add.text(centerX - 100, toastY + 12, achievement.name, {
+      font: 'bold 16px Arial',
+      color: '#4ade80',
+    }).setOrigin(0, 0.5).setDepth(1001);
+
+    // Coins earned
+    const coinsText = this.add.text(centerX + 140, toastY, `+${achievement.coins} 🪙`, {
+      font: 'bold 16px Arial',
+      color: '#ffd700',
+    }).setOrigin(1, 0.5).setDepth(1001);
+
+    // Play chime sound
+    this.audioManager.playSFX(AUDIO.SFX.CHIME);
+
+    // Animate in
+    const elements = [toastBg, trophyText, titleText, nameText, coinsText];
+    elements.forEach((el) => {
+      el.setAlpha(0);
+      el.setScale(0.5);
+    });
+
+    this.tweens.add({
+      targets: elements,
+      alpha: 1,
+      scale: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
+    });
+
+    // Animate out after 3 seconds
+    this.time.delayedCall(3000, () => {
+      this.tweens.add({
+        targets: elements,
+        alpha: 0,
+        y: toastY - 50,
+        duration: 300,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          elements.forEach((el) => el.destroy());
+        },
+      });
+    });
   }
 
   // ========== DEBUG METHODS ==========

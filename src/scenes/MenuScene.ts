@@ -175,12 +175,40 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('StatsScene');
     });
 
+    // Achievements button (gold/trophy color)
+    const achievementsButton = this.add.rectangle(centerX, centerY + 350, 200, 50, 0xffd700)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(achievementsButton);
+
+    const achievementsText = this.add.text(centerX, centerY + 350, '🏆 ACHIEVEMENTS', {
+      font: 'bold 18px Arial',
+      color: '#1a1a2e',
+    }).setOrigin(0.5);
+    this.menuElements.push(achievementsText);
+
+    achievementsButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      achievementsButton.setScale(1.05);
+      achievementsText.setScale(1.05);
+    });
+
+    achievementsButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      achievementsButton.setScale(1);
+      achievementsText.setScale(1);
+    });
+
+    achievementsButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('AchievementScene');
+    });
+
     // Music Player button (vintage brown)
-    const musicPlayerButton = this.add.rectangle(centerX, centerY + 350, 200, 50, 0x8b4513)
+    const musicPlayerButton = this.add.rectangle(centerX, centerY + 420, 200, 50, 0x8b4513)
       .setInteractive({ useHandCursor: true });
     this.menuElements.push(musicPlayerButton);
 
-    const musicPlayerText = this.add.text(centerX, centerY + 350, 'MUSIC PLAYER', {
+    const musicPlayerText = this.add.text(centerX, centerY + 420, 'MUSIC PLAYER', {
       font: 'bold 20px Arial',
       color: '#f5e6c8',
     }).setOrigin(0.5);
