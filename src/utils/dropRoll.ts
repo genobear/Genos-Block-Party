@@ -8,6 +8,7 @@ export interface DropChanceParams {
   powerBallActive?: boolean;
   isAOE?: boolean;
   debugOverride?: number | null;
+  remixBoostBonus?: number;
 }
 
 /**
@@ -21,7 +22,8 @@ export function calculateDropChance(params: DropChanceParams): number {
     return params.debugOverride;
   }
 
-  let chance = params.baseChance;
+  // Start with base chance + Remix Boost bonus (additive)
+  let chance = params.baseChance + (params.remixBoostBonus ?? 0);
 
   // Apply Power Ball multiplier if active (double, cap at 100%)
   if (params.powerBallActive) {

@@ -624,6 +624,20 @@ Items with `price: -1` in the shop catalog are milestone-exclusive:
 - Veteran — Party Veteran reward (military green particles)
 - Flawless — Perfect Run reward (diamond sparkle particles)
 
+### Permanent Upgrades
+
+The Party Shop includes a dedicated UPGRADES tab for permanent stat boosts that persist across sessions.
+
+| Upgrade | Tier 1 | Tier 2 | Tier 3 |
+|---------|--------|--------|--------|
+| **Remix Boost** | +5% drop (¢50) | +10% drop (¢150) | +15% drop (¢400) |
+
+**Remix Boost** increases power-up drop chances additively. The bonus applies to all brick types and stacks with Power Ball's multiplicative bonus. Example: A Balloon brick (30% base) with Tier 2 Remix Boost (+10%) and Power Ball active would have: (30% + 10%) × 2 = 80% drop chance.
+
+- Upgrades are persistent via localStorage (`genos-block-party-upgrades`)
+- Visual tier indicator shows ★★☆ style progress
+- MAXED label with gold border when fully upgraded
+
 ---
 
 ## 11. Achievement System

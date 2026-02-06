@@ -5,6 +5,7 @@
 export enum ShopCategory {
   PADDLE_SKIN = 'paddleSkin',
   BALL_TRAIL = 'ballTrail',
+  UPGRADE = 'upgrade',
 }
 
 export interface ShopItem {

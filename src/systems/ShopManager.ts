@@ -33,6 +33,7 @@ export class ShopManager {
     this.equipped = {
       [ShopCategory.PADDLE_SKIN]: 'default',
       [ShopCategory.BALL_TRAIL]: 'default',
+      [ShopCategory.UPGRADE]: '', // Upgrades don't have equip state
     };
     this.load();
   }

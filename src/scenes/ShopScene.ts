@@ -10,6 +10,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { CurrencyManager } from '../systems/CurrencyManager';
 import { ShopManager } from '../systems/ShopManager';
+import { UpgradeManager } from '../systems/UpgradeManager';
 import { ITEM_TO_MILESTONE, MILESTONES } from '../systems/MilestoneSystem';
 import {
   ShopCategory,
@@ -31,8 +32,10 @@ export class ShopScene extends Phaser.Scene {
   private currencyText!: Phaser.GameObjects.Text;
   private paddleTabBg!: Phaser.GameObjects.Rectangle;
   private trailTabBg!: Phaser.GameObjects.Rectangle;
+  private upgradesTabBg!: Phaser.GameObjects.Rectangle;
   private paddleTabText!: Phaser.GameObjects.Text;
   private trailTabText!: Phaser.GameObjects.Text;
+  private upgradesTabText!: Phaser.GameObjects.Text;
 
   // Feedback overlay elements
   private feedbackOverlay: Phaser.GameObjects.Rectangle | null = null;
@@ -75,28 +78,38 @@ export class ShopScene extends Phaser.Scene {
       color: '#ffd700',
     }).setOrigin(0, 0.5);
 
-    // Category tabs
+    // Category tabs (3 tabs)
     const tabY = 130;
-    const tabWidth = 180;
+    const tabWidth = 145;
     const tabHeight = 44;
-    const tabGap = 20;
+    const tabGap = 12;
+    const totalTabWidth = tabWidth * 3 + tabGap * 2;
+    const tabStartX = centerX - totalTabWidth / 2 + tabWidth / 2;
 
-    this.paddleTabBg = this.add.rectangle(centerX - tabWidth / 2 - tabGap / 2, tabY, tabWidth, tabHeight, 0x8b5cf6)
+    this.paddleTabBg = this.add.rectangle(tabStartX, tabY, tabWidth, tabHeight, 0x8b5cf6)
       .setInteractive({ useHandCursor: true });
-    this.paddleTabText = this.add.text(centerX - tabWidth / 2 - tabGap / 2, tabY, 'PADDLE SKINS', {
-      font: 'bold 18px Arial',
+    this.paddleTabText = this.add.text(tabStartX, tabY, 'PADDLES', {
+      font: 'bold 16px Arial',
       color: '#ffffff',
     }).setOrigin(0.5);
 
-    this.trailTabBg = this.add.rectangle(centerX + tabWidth / 2 + tabGap / 2, tabY, tabWidth, tabHeight, 0x444444)
+    this.trailTabBg = this.add.rectangle(tabStartX + tabWidth + tabGap, tabY, tabWidth, tabHeight, 0x444444)
       .setInteractive({ useHandCursor: true });
-    this.trailTabText = this.add.text(centerX + tabWidth / 2 + tabGap / 2, tabY, 'BALL TRAILS', {
-      font: 'bold 18px Arial',
+    this.trailTabText = this.add.text(tabStartX + tabWidth + tabGap, tabY, 'TRAILS', {
+      font: 'bold 16px Arial',
+      color: '#999999',
+    }).setOrigin(0.5);
+
+    this.upgradesTabBg = this.add.rectangle(tabStartX + (tabWidth + tabGap) * 2, tabY, tabWidth, tabHeight, 0x444444)
+      .setInteractive({ useHandCursor: true });
+    this.upgradesTabText = this.add.text(tabStartX + (tabWidth + tabGap) * 2, tabY, 'UPGRADES', {
+      font: 'bold 16px Arial',
       color: '#999999',
     }).setOrigin(0.5);
 
     this.paddleTabBg.on('pointerdown', () => this.switchCategory(ShopCategory.PADDLE_SKIN));
     this.trailTabBg.on('pointerdown', () => this.switchCategory(ShopCategory.BALL_TRAIL));
+    this.upgradesTabBg.on('pointerdown', () => this.switchCategory(ShopCategory.UPGRADE));
 
     // Item container (scrollable area placeholder)
     this.itemContainer = this.add.container(0, 0);
@@ -126,17 +139,24 @@ export class ShopScene extends Phaser.Scene {
     if (this.activeCategory === category) return;
     this.activeCategory = category;
 
-    // Update tab visuals
+    // Reset all tabs to inactive
+    this.paddleTabBg.fillColor = 0x444444;
+    this.paddleTabText.setColor('#999999');
+    this.trailTabBg.fillColor = 0x444444;
+    this.trailTabText.setColor('#999999');
+    this.upgradesTabBg.fillColor = 0x444444;
+    this.upgradesTabText.setColor('#999999');
+
+    // Activate selected tab
     if (category === ShopCategory.PADDLE_SKIN) {
       this.paddleTabBg.fillColor = 0x8b5cf6;
       this.paddleTabText.setColor('#ffffff');
-      this.trailTabBg.fillColor = 0x444444;
-      this.trailTabText.setColor('#999999');
-    } else {
-      this.paddleTabBg.fillColor = 0x444444;
-      this.paddleTabText.setColor('#999999');
+    } else if (category === ShopCategory.BALL_TRAIL) {
       this.trailTabBg.fillColor = 0x0088ff;
       this.trailTabText.setColor('#ffffff');
+    } else if (category === ShopCategory.UPGRADE) {
+      this.upgradesTabBg.fillColor = 0xdaa520;
+      this.upgradesTabText.setColor('#ffffff');
     }
 
     this.renderItems();
@@ -148,6 +168,12 @@ export class ShopScene extends Phaser.Scene {
   private renderItems(): void {
     // Clear previous items
     this.itemContainer.removeAll(true);
+
+    // Handle upgrades tab separately
+    if (this.activeCategory === ShopCategory.UPGRADE) {
+      this.renderUpgradeItems();
+      return;
+    }
 
     const items: ShopItem[] =
       this.activeCategory === ShopCategory.PADDLE_SKIN
@@ -318,6 +344,104 @@ export class ShopScene extends Phaser.Scene {
       color: '#888888',
     }).setOrigin(0.5);
     this.itemContainer.add(descText);
+  }
+
+  /**
+   * Render the upgrades tab content
+   */
+  private renderUpgradeItems(): void {
+    const upgradeManager = UpgradeManager.getInstance();
+    const tier = upgradeManager.getRemixBoostTier();
+    const bonus = upgradeManager.getRemixBoostBonus();
+    const nextCost = upgradeManager.getNextRemixBoostCost();
+    const isMaxed = upgradeManager.isRemixBoostMaxed();
+
+    // Card at center
+    const cardX = GAME_WIDTH / 2;
+    const cardY = 300;
+    const cardW = 280;
+    const cardH = 220;
+
+    // Background
+    const cardBg = this.add.rectangle(cardX, cardY, cardW, cardH, 0x1a1a2e, 0.9);
+    cardBg.setStrokeStyle(2, isMaxed ? 0xffd700 : 0x444444);
+    this.itemContainer.add(cardBg);
+
+    // Icon/emoji
+    const icon = this.add.text(cardX, cardY - 70, '🎵', { font: '48px Arial' }).setOrigin(0.5);
+    this.itemContainer.add(icon);
+
+    // Title
+    const title = this.add.text(cardX, cardY - 25, 'REMIX BOOST', {
+      font: 'bold 22px Arial',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.itemContainer.add(title);
+
+    // Stars showing tier (★ = filled, ☆ = empty)
+    const stars = '★'.repeat(tier) + '☆'.repeat(3 - tier);
+    const starsText = this.add.text(cardX, cardY + 10, stars, {
+      font: '28px Arial',
+      color: '#ffd700',
+    }).setOrigin(0.5);
+    this.itemContainer.add(starsText);
+
+    // Current bonus
+    const bonusPercent = Math.round(bonus * 100);
+    const bonusText = this.add.text(cardX, cardY + 45,
+      bonusPercent > 0 ? `+${bonusPercent}% Drop Rate` : 'No Bonus', {
+        font: '18px Arial',
+        color: bonusPercent > 0 ? '#00ff88' : '#888888',
+      }).setOrigin(0.5);
+    this.itemContainer.add(bonusText);
+
+    // Buy button or MAXED label
+    if (isMaxed) {
+      const maxedLabel = this.add.text(cardX, cardY + 85, '✓ MAXED', {
+        font: 'bold 18px Arial',
+        color: '#ffd700',
+      }).setOrigin(0.5);
+      this.itemContainer.add(maxedLabel);
+    } else {
+      const canAfford = this.currencyManager.canAfford(nextCost!);
+      const btnColor = canAfford ? 0xdaa520 : 0x664400;
+
+      const buyBg = this.add.rectangle(cardX, cardY + 85, 160, 40, btnColor)
+        .setInteractive({ useHandCursor: true });
+      const buyText = this.add.text(cardX, cardY + 85, `¢${nextCost} — UPGRADE`, {
+        font: 'bold 15px Arial',
+        color: canAfford ? '#ffffff' : '#999999',
+      }).setOrigin(0.5);
+      this.itemContainer.add(buyBg);
+      this.itemContainer.add(buyText);
+
+      buyBg.on('pointerover', () => { if (canAfford) buyBg.setFillStyle(0xeebb33); });
+      buyBg.on('pointerout', () => buyBg.setFillStyle(btnColor));
+      buyBg.on('pointerdown', () => this.tryUpgradeRemixBoost());
+    }
+
+    // Description
+    const desc = this.add.text(cardX, cardY + 125, 'Increases power-up drop chance', {
+      font: '13px Arial',
+      color: '#888888',
+    }).setOrigin(0.5);
+    this.itemContainer.add(desc);
+  }
+
+  /**
+   * Attempt to upgrade Remix Boost
+   */
+  private tryUpgradeRemixBoost(): void {
+    const upgradeManager = UpgradeManager.getInstance();
+    const success = upgradeManager.upgradeRemixBoost();
+    if (success) {
+      this.audioManager.playSFX('sfx-chime');
+      this.updateCurrencyDisplay();
+      this.showSuccessFeedback('Remix Boost');
+      this.time.delayedCall(600, () => this.renderItems());
+    } else {
+      this.showFailFeedback();
+    }
   }
 
   /**
