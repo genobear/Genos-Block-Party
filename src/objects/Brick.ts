@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BrickType, BRICK_DROP_CHANCES } from '../types/BrickTypes';
 import { BRICK_WIDTH, BRICK_HEIGHT, SCORE_VALUES } from '../config/Constants';
 import { calculateDropChance, rollDrop, rollDropsForDamage as rollDropsUtil } from '../utils/dropRoll';
+import { UpgradeManager } from '../systems/UpgradeManager';
 
 // Debug value stored on window to survive HMR
 declare global {
@@ -70,6 +71,9 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
         break;
       case BrickType.BALLOON:
         this.scoreValue = SCORE_VALUES.BALLOON;
+        break;
+      case BrickType.DRIFTER:
+        this.scoreValue = SCORE_VALUES.DRIFTER;
         break;
     }
 
@@ -224,6 +228,7 @@ export class Brick extends Phaser.Physics.Arcade.Sprite {
       powerBallActive: Brick.powerBallActive,
       isAOE,
       debugOverride: Brick.debugDropChance,
+      remixBoostBonus: UpgradeManager.getInstance().getRemixBoostBonus(),
     });
   }
 

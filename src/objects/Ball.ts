@@ -8,6 +8,7 @@ import {
 import { Paddle } from './Paddle';
 import { BallEffectManager } from '../effects/BallEffectManager';
 import { BallEffectType } from '../effects/BallEffectTypes';
+import { ShopManager } from '../systems/ShopManager';
 import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { calculateLaunchVelocity } from '../utils/ballLaunch';
 
@@ -24,11 +25,30 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   // Party Popper (bomb) state - one-shot 3x3 explosion
   private bomb: boolean = false;
 
+  // DJ Scratch (Magnet) state
+  private magneted: boolean = false;
+  private magnetPaddle: Paddle | null = null;
+
   // FireBall power-up state (gameplay logic)
   private fireball: boolean = false;
   private fireballLevel: number = 0;
   private preCollisionVelocity: Phaser.Math.Vector2 = new Phaser.Math.Vector2();
   private pendingVelocityRestore: boolean = false;
+
+  // Conga Line power-up state
+  private isCongaLine: boolean = false;
+  private congaGhosts: Phaser.GameObjects.Sprite[] = [];
+  private positionHistory: Array<{ x: number; y: number; time: number }> = [];
+  private congaLineTimer: Phaser.Time.TimerEvent | null = null;
+  private static readonly CONGA_GHOST_COUNT = 3;
+  private static readonly CONGA_INTERVAL_MS = 300; // 300ms between each ghost
+  private static readonly CONGA_HISTORY_MS = 1000; // Keep 1 second of history
+
+  // Spotlight power-up state
+  private isSpotlight: boolean = false;
+  private spotlightTimer: Phaser.Time.TimerEvent | null = null;
+  private spotlightGraphics: Phaser.GameObjects.Graphics | null = null;
+  private getBricksCallback: (() => Array<{ x: number; y: number }>) | null = null;
 
   // Collision cooldown to prevent velocity modifications right after collision
   private collisionCooldown: number = 0;
@@ -108,6 +128,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.y = this.attachedPaddle.y - PADDLE_HEIGHT / 2 - BALL_RADIUS - 5;
     }
 
+    // Follow paddle if magneted (DJ Scratch)
+    if (this.magneted && this.magnetPaddle) {
+      this.x = this.magnetPaddle.x;
+      this.y = this.magnetPaddle.y - PADDLE_HEIGHT / 2 - BALL_RADIUS - 5;
+    }
+
     // FireBall piercing: restore velocity after physics has resolved
     if (this.pendingVelocityRestore) {
       this.pendingVelocityRestore = false;
@@ -143,6 +169,73 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
         }
       }
     }
+
+    // Spotlight homing: gently steer toward nearest brick
+    if (this.isSpotlight && this.launched && !this.magneted && this.getBricksCallback) {
+      this.updateSpotlightSteering();
+      this.updateSpotlightGraphics();
+    }
+
+    // Update conga line ghost positions
+    if (this.isCongaLine && this.launched) {
+      const now = this.scene.time.now;
+
+      // Record current position
+      this.positionHistory.push({ x: this.x, y: this.y, time: now });
+
+      // Trim history to keep only last CONGA_HISTORY_MS worth
+      const cutoff = now - Ball.CONGA_HISTORY_MS;
+      while (this.positionHistory.length > 0 && this.positionHistory[0].time < cutoff) {
+        this.positionHistory.shift();
+      }
+
+      // Update ghost positions from history (300ms, 600ms, 900ms behind)
+      for (let i = 0; i < this.congaGhosts.length; i++) {
+        const ghost = this.congaGhosts[i];
+        const targetTime = now - (i + 1) * Ball.CONGA_INTERVAL_MS;
+
+        // Find the position from history closest to targetTime
+        const pos = this.getPositionAtTime(targetTime);
+        if (pos) {
+          ghost.setPosition(pos.x, pos.y);
+          ghost.setVisible(true);
+        } else {
+          // Not enough history yet, hide this ghost
+          ghost.setVisible(false);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get interpolated position from history at a given time
+   */
+  private getPositionAtTime(targetTime: number): { x: number; y: number } | null {
+    if (this.positionHistory.length === 0) return null;
+
+    // If target time is before our history, return null
+    if (targetTime < this.positionHistory[0].time) return null;
+
+    // If target time is after our latest entry, return latest
+    const latest = this.positionHistory[this.positionHistory.length - 1];
+    if (targetTime >= latest.time) {
+      return { x: latest.x, y: latest.y };
+    }
+
+    // Find the two entries bracketing targetTime and interpolate
+    for (let i = 0; i < this.positionHistory.length - 1; i++) {
+      const curr = this.positionHistory[i];
+      const next = this.positionHistory[i + 1];
+      if (targetTime >= curr.time && targetTime <= next.time) {
+        const t = (targetTime - curr.time) / (next.time - curr.time);
+        return {
+          x: curr.x + (next.x - curr.x) * t,
+          y: curr.y + (next.y - curr.y) * t,
+        };
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -169,6 +262,27 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Recalculate velocity magnitude based on current speed settings
+   * Preserves direction, adjusts magnitude to match speedManager.getEffectiveSpeed()
+   * Call this when speed effects change mid-flight
+   */
+  recalculateVelocity(): void {
+    if (!this.launched || this.magneted) return; // Skip if not in flight or magneted
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    const currentVelocity = body.velocity;
+    const currentMagnitude = currentVelocity.length();
+
+    if (currentMagnitude === 0) return; // Ball not moving
+
+    const targetSpeed = this.speedManager.getEffectiveSpeed();
+
+    // Scale velocity to new speed while preserving direction
+    const scale = targetSpeed / currentMagnitude;
+    body.velocity.scale(scale);
+  }
+
+  /**
    * Apply floating effect (Balloon power-up - slower ball)
    * Speed reduction is handled by BallSpeedManager effect multiplier
    * Re-applying resets the duration timer
@@ -187,8 +301,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.effectManager?.applyEffect(BallEffectType.BALLOON_TRAIL);
     }
 
-    // Speed change is handled by BallSpeedManager - velocity will adjust
-    // on next paddle bounce or via update() min speed enforcement
+    // IMMEDIATELY recalculate velocity to apply speed change
+    this.recalculateVelocity();
 
     // Reset after duration (new timer replaces old one)
     this.floatingTimer = this.scene.time.delayedCall(duration, () => {
@@ -205,6 +319,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isFloating = false;
     this.floatingTimer = null;
     this.effectManager?.removeEffect(BallEffectType.BALLOON_TRAIL);
+
+    // Restore speed after effect ends
+    this.recalculateVelocity();
   }
 
   /**
@@ -226,8 +343,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.effectManager?.applyEffect(BallEffectType.ELECTRIC_TRAIL);
     }
 
-    // Speed change is handled by BallSpeedManager - velocity will adjust
-    // on next paddle bounce or via update() min speed enforcement
+    // IMMEDIATELY recalculate velocity to apply speed change
+    this.recalculateVelocity();
 
     // Reset after duration (new timer replaces old one)
     this.electricBallTimer = this.scene.time.delayedCall(duration, () => {
@@ -244,6 +361,9 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isElectricBall = false;
     this.electricBallTimer = null;
     this.effectManager?.removeEffect(BallEffectType.ELECTRIC_TRAIL);
+
+    // Restore speed after effect ends
+    this.recalculateVelocity();
   }
 
   /**
@@ -253,6 +373,236 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     return this.isElectricBall;
   }
 
+  // ========== SPOTLIGHT POWER-UP ==========
+
+  /**
+   * Apply spotlight effect (gentle homing toward nearest brick)
+   * Re-applying resets the duration timer
+   * @param duration Duration in milliseconds
+   * @param getBricks Callback to get active brick positions
+   */
+  setSpotlight(duration: number, getBricks: () => Array<{ x: number; y: number }>): void {
+    // Cancel existing timer if re-applying (reset duration)
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+      this.spotlightTimer = null;
+    }
+
+    // Store the brick getter callback
+    this.getBricksCallback = getBricks;
+
+    // Create spotlight graphics if not already active
+    if (!this.isSpotlight) {
+      this.isSpotlight = true;
+
+      // Create graphics object for light cone
+      this.spotlightGraphics = this.scene.add.graphics();
+      this.spotlightGraphics.setDepth(this.depth - 1); // Behind the ball
+
+      // Apply spotlight beam visual effect
+      this.effectManager?.applyEffect(BallEffectType.SPOTLIGHT_BEAM);
+    }
+
+    // Reset timer with new duration
+    this.spotlightTimer = this.scene.time.delayedCall(duration, () => {
+      this.clearSpotlight();
+    });
+  }
+
+  /**
+   * Clear spotlight effect
+   */
+  clearSpotlight(): void {
+    if (!this.isSpotlight) return;
+
+    this.isSpotlight = false;
+    this.spotlightTimer = null;
+    this.getBricksCallback = null;
+
+    // Destroy light cone graphics
+    if (this.spotlightGraphics) {
+      this.spotlightGraphics.destroy();
+      this.spotlightGraphics = null;
+    }
+
+    // Remove visual effect
+    this.effectManager?.removeEffect(BallEffectType.SPOTLIGHT_BEAM);
+  }
+
+  /**
+   * Check if spotlight is active
+   */
+  isSpotlightActive(): boolean {
+    return this.isSpotlight;
+  }
+
+  /**
+   * Apply gentle steering toward the nearest brick
+   * Called each frame when spotlight is active
+   */
+  private updateSpotlightSteering(): void {
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (!body || body.velocity.length() === 0) return;
+
+    // Find nearest brick
+    const nearestBrick = this.findNearestBrick();
+    if (!nearestBrick) return;
+
+    // Calculate angle to target
+    const angleToTarget = Phaser.Math.Angle.Between(this.x, this.y, nearestBrick.x, nearestBrick.y);
+    const currentAngle = Math.atan2(body.velocity.y, body.velocity.x);
+
+    // Calculate angle difference (wrapped to -PI to PI)
+    const angleDiff = Phaser.Math.Angle.Wrap(angleToTarget - currentAngle);
+
+    // Gentle steering: max ~2.8 degrees per frame (0.05 radians)
+    const steerAmount = Phaser.Math.Clamp(angleDiff, -0.05, 0.05);
+    const newAngle = currentAngle + steerAmount;
+
+    // Apply new velocity maintaining current speed
+    const speed = body.velocity.length();
+    body.setVelocity(
+      Math.cos(newAngle) * speed,
+      Math.sin(newAngle) * speed
+    );
+  }
+
+  /**
+   * Find the nearest brick from the callback's returned positions
+   */
+  private findNearestBrick(): { x: number; y: number } | null {
+    if (!this.getBricksCallback) return null;
+
+    const bricks = this.getBricksCallback();
+    if (bricks.length === 0) return null;
+
+    let nearest: { x: number; y: number } | null = null;
+    let nearestDist = Infinity;
+
+    for (const brick of bricks) {
+      const dist = Phaser.Math.Distance.Between(this.x, this.y, brick.x, brick.y);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = brick;
+      }
+    }
+
+    return nearest;
+  }
+
+  /**
+   * Update the light cone graphics based on ball velocity direction
+   */
+  private updateSpotlightGraphics(): void {
+    if (!this.spotlightGraphics) return;
+
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    if (!body || body.velocity.length() === 0) return;
+
+    this.spotlightGraphics.clear();
+
+    // Get velocity angle for cone direction
+    const angle = Math.atan2(body.velocity.y, body.velocity.x);
+
+    // Draw light cone (triangular beam)
+    const coneLength = 80;
+    const coneWidth = 0.4; // radians (~23 degrees half-angle)
+
+    // Golden/yellow gradient effect using multiple triangles
+    const colors = [0xffd700, 0xffec8b, 0xfffacd];
+    const alphas = [0.3, 0.2, 0.1];
+
+    for (let i = colors.length - 1; i >= 0; i--) {
+      const len = coneLength * (1 - i * 0.2);
+      const width = coneWidth * (1 + i * 0.3);
+
+      this.spotlightGraphics.fillStyle(colors[i], alphas[i]);
+      this.spotlightGraphics.beginPath();
+      this.spotlightGraphics.moveTo(this.x, this.y);
+      this.spotlightGraphics.lineTo(
+        this.x + Math.cos(angle - width) * len,
+        this.y + Math.sin(angle - width) * len
+      );
+      this.spotlightGraphics.lineTo(
+        this.x + Math.cos(angle + width) * len,
+        this.y + Math.sin(angle + width) * len
+      );
+      this.spotlightGraphics.closePath();
+      this.spotlightGraphics.fillPath();
+    }
+  }
+
+  /**
+   * Apply conga line effect (trailing ghost balls that deal damage)
+   * Re-applying resets the duration timer
+   */
+  setCongaLine(duration: number): void {
+    // Cancel existing timer if re-applying (reset duration)
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+      this.congaLineTimer = null;
+    }
+
+    // Create ghosts if not already active
+    if (!this.isCongaLine) {
+      this.isCongaLine = true;
+      this.positionHistory = [];
+
+      // Create ghost sprites (semi-transparent copies of ball)
+      for (let i = 0; i < Ball.CONGA_GHOST_COUNT; i++) {
+        const ghost = this.scene.add.sprite(this.x, this.y, 'ball');
+        ghost.setAlpha(0.5 - i * 0.1); // 0.5, 0.4, 0.3 for decreasing opacity
+        ghost.setTint(0xe040fb); // Magenta tint to match power-up color
+        ghost.setDepth(this.depth - 1 - i); // Behind the main ball
+        ghost.setVisible(false); // Initially hidden until we have position history
+        this.congaGhosts.push(ghost);
+      }
+    }
+
+    // Reset timer with new duration
+    this.congaLineTimer = this.scene.time.delayedCall(duration, () => {
+      this.clearCongaLine();
+    });
+  }
+
+  /**
+   * Clear conga line effect
+   */
+  clearCongaLine(): void {
+    if (!this.isCongaLine) return;
+
+    this.isCongaLine = false;
+    this.congaLineTimer = null;
+    this.positionHistory = [];
+
+    // Fade out and destroy ghosts
+    this.congaGhosts.forEach((ghost) => {
+      this.scene.tweens.add({
+        targets: ghost,
+        alpha: 0,
+        duration: 300,
+        ease: 'Power2',
+        onComplete: () => {
+          ghost.destroy();
+        },
+      });
+    });
+    this.congaGhosts = [];
+  }
+
+  /**
+   * Get conga line ghost sprites (for collision detection by GameScene)
+   */
+  getCongaGhosts(): Phaser.GameObjects.Sprite[] {
+    return this.congaGhosts;
+  }
+
+  /**
+   * Check if conga line is active
+   */
+  isCongaLineActive(): boolean {
+    return this.isCongaLine;
+  }
 
   /**
    * Arm bomb (Party Popper power-up — next brick hit explodes 3x3 area)
@@ -300,6 +650,42 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
+   * Magnetize ball to paddle (DJ Scratch power-up)
+   * Ball stops moving and follows paddle until released
+   */
+  magnetToPaddle(paddle: Paddle): void {
+    this.magneted = true;
+    this.magnetPaddle = paddle;
+    const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setVelocity(0, 0);
+    // Snap to paddle position
+    this.x = paddle.x;
+    this.y = paddle.y - PADDLE_HEIGHT / 2 - BALL_RADIUS - 5;
+  }
+
+  /**
+   * Release magneted ball (launches upward)
+   */
+  releaseMagnet(speed: number): void {
+    if (!this.magneted) return;
+    this.magneted = false;
+    this.magnetPaddle = null;
+
+    // Launch at random upward angle (same as normal launch)
+    const angle = Phaser.Math.DegToRad(Phaser.Math.Between(-120, -60));
+    const velocityX = Math.cos(angle) * speed;
+    const velocityY = Math.sin(angle) * speed;
+    (this.body as Phaser.Physics.Arcade.Body).setVelocity(velocityX, velocityY);
+  }
+
+  /**
+   * Check if ball is magneted to paddle
+   */
+  isMagneted(): boolean {
+    return this.magneted;
+  }
+
+  /**
    * Reset ball state
    */
   reset(): void {
@@ -307,6 +693,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isFloating = false;
     this.isElectricBall = false;
     this.attachedPaddle = null;
+    this.magneted = false;
+    this.magnetPaddle = null;
     this.fireball = false;
     this.fireballLevel = 0;
     this.bomb = false;
@@ -320,6 +708,28 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     if (this.electricBallTimer) {
       this.electricBallTimer.destroy();
       this.electricBallTimer = null;
+    }
+
+    // Clear conga line (destroy ghosts immediately without animation)
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+      this.congaLineTimer = null;
+    }
+    this.isCongaLine = false;
+    this.positionHistory = [];
+    this.congaGhosts.forEach((ghost) => ghost.destroy());
+    this.congaGhosts = [];
+
+    // Clear spotlight (destroy graphics immediately without animation)
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+      this.spotlightTimer = null;
+    }
+    this.isSpotlight = false;
+    this.getBricksCallback = null;
+    if (this.spotlightGraphics) {
+      this.spotlightGraphics.destroy();
+      this.spotlightGraphics = null;
     }
 
     // Clear all visual effects
@@ -400,6 +810,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
    * Deactivate ball (return to pool)
    */
   deactivate(): void {
+    // Explicitly clear conga line ghosts before reset (in case reset is called elsewhere)
+    this.clearCongaLine();
     this.reset();
     this.setActive(false);
     this.setVisible(false);
@@ -421,5 +833,11 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.initializePhysics();
 
     this.reset();
+
+    // Apply cosmetic trail if one is equipped
+    const trail = ShopManager.getInstance().getEquippedBallTrail();
+    if (trail) {
+      this.applyEffect(BallEffectType.COSMETIC_TRAIL);
+    }
   }
 }

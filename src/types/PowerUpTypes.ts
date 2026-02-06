@@ -13,8 +13,14 @@ export enum PowerUpType {
   FIREBALL = 'fireball', // Piercing ball with stacking damage (10s)
   ELECTRICBALL = 'electricball', // Electric ball with AOE damage (8s)
   PARTY_POPPER = 'partypopper', // 3x3 bomb explosion on next brick hit (one-shot)
+  BASS_DROP = 'bassdrop',       // Screen nuke - 1 damage to ALL bricks (instant)
+  DJ_SCRATCH = 'djscratch', // Magnet paddle - ball sticks on contact (15s)
   BOUNCE_HOUSE = 'bouncehouse', // Safety net saves ball once
   PARTY_FAVOR = 'partyfavor', // Extra life (instant, very rare)
+  CONFETTI_CANNON = 'confetticannon', // Fires confetti at 5-8 random bricks
+  CONGA_LINE = 'congaline', // Trailing ghost balls deal damage (8s)
+  SPOTLIGHT = 'spotlight', // Gentle homing toward nearest brick (8s)
+  DANCE_FLOOR = 'dancefloor', // Shuffle all bricks to random positions (instant)
 }
 
 /**
@@ -95,6 +101,20 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     dropWeight: 10,
     emoji: '💣',
   },
+  [PowerUpType.BASS_DROP]: {
+    type: PowerUpType.BASS_DROP,
+    color: 0x9400d3,      // Dark violet
+    duration: 0,          // Instant effect
+    dropWeight: 8,
+    emoji: '🎵',
+  },
+  [PowerUpType.DJ_SCRATCH]: {
+    type: PowerUpType.DJ_SCRATCH,
+    color: 0x00ffff,      // Cyan
+    duration: 15000,      // 15 seconds
+    dropWeight: 12,
+    emoji: '🧲',
+  },
   [PowerUpType.BOUNCE_HOUSE]: {
     type: PowerUpType.BOUNCE_HOUSE,
     color: 0x90ee90,      // Light green
@@ -108,6 +128,34 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 0,          // Instant effect
     dropWeight: 3,        // Very rare
     emoji: '🎁',
+  },
+  [PowerUpType.CONFETTI_CANNON]: {
+    type: PowerUpType.CONFETTI_CANNON,
+    color: 0xff1493,      // Deep pink
+    duration: 0,          // Instant effect
+    dropWeight: 10,
+    emoji: '🎊',
+  },
+  [PowerUpType.CONGA_LINE]: {
+    type: PowerUpType.CONGA_LINE,
+    color: 0xe040fb,      // Vibrant magenta/purple
+    duration: 8000,       // 8 seconds
+    dropWeight: 8,
+    emoji: '💃',
+  },
+  [PowerUpType.SPOTLIGHT]: {
+    type: PowerUpType.SPOTLIGHT,
+    color: 0xffd700,      // Golden/yellow
+    duration: 8000,       // 8 seconds
+    dropWeight: 8,
+    emoji: '🔦',
+  },
+  [PowerUpType.DANCE_FLOOR]: {
+    type: PowerUpType.DANCE_FLOOR,
+    color: 0xff1493,      // Hot pink / deep disco pink
+    duration: 0,          // Instant effect
+    dropWeight: 10,
+    emoji: '🪩',
   },
 };
 

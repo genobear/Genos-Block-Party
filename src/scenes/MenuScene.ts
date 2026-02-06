@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { BackgroundManager } from '../systems/BackgroundManager';
-import { TransitionManager } from '../systems/TransitionManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
+import { CurrencyManager } from '../systems/CurrencyManager';
 
 export class MenuScene extends Phaser.Scene {
   // Track menu elements for transition animation
@@ -80,7 +80,7 @@ export class MenuScene extends Phaser.Scene {
 
     startButton.on('pointerdown', () => {
       if (this.isTransitioning) return;
-      this.startGameWithTransition();
+      this.goToModeSelect();
     });
 
     // Settings button
@@ -111,12 +111,104 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch('SettingsScene', { returnTo: 'MenuScene' });
     });
 
+    // Party Shop button (gold/yellow to stand out)
+    const shopButton = this.add.rectangle(centerX, centerY + 200, 200, 50, 0xdaa520)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(shopButton);
+
+    const shopText = this.add.text(centerX, centerY + 200, 'PARTY SHOP', {
+      font: 'bold 20px Arial',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.menuElements.push(shopText);
+
+    // Currency balance next to the shop button
+    const currency = CurrencyManager.getInstance().getTotalCurrency();
+    const currencyDisplay = this.add.text(centerX, centerY + 230, `¢ ${currency}`, {
+      font: '14px Arial',
+      color: '#ffd700',
+    }).setOrigin(0.5);
+    this.menuElements.push(currencyDisplay);
+
+    shopButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      shopButton.setScale(1.05);
+      shopText.setScale(1.05);
+    });
+
+    shopButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      shopButton.setScale(1);
+      shopText.setScale(1);
+    });
+
+    shopButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('ShopScene');
+    });
+
+    // Stats button (purple to match theme)
+    const statsButton = this.add.rectangle(centerX, centerY + 280, 200, 50, 0x8b5cf6)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(statsButton);
+
+    const statsText = this.add.text(centerX, centerY + 280, 'STATS', {
+      font: 'bold 20px Arial',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.menuElements.push(statsText);
+
+    statsButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      statsButton.setScale(1.05);
+      statsText.setScale(1.05);
+    });
+
+    statsButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      statsButton.setScale(1);
+      statsText.setScale(1);
+    });
+
+    statsButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('StatsScene');
+    });
+
+    // Achievements button (gold/trophy color)
+    const achievementsButton = this.add.rectangle(centerX, centerY + 350, 200, 50, 0xffd700)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(achievementsButton);
+
+    const achievementsText = this.add.text(centerX, centerY + 350, '🏆 ACHIEVEMENTS', {
+      font: 'bold 18px Arial',
+      color: '#1a1a2e',
+    }).setOrigin(0.5);
+    this.menuElements.push(achievementsText);
+
+    achievementsButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      achievementsButton.setScale(1.05);
+      achievementsText.setScale(1.05);
+    });
+
+    achievementsButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      achievementsButton.setScale(1);
+      achievementsText.setScale(1);
+    });
+
+    achievementsButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('AchievementScene');
+    });
+
     // Music Player button (vintage brown)
-    const musicPlayerButton = this.add.rectangle(centerX, centerY + 200, 200, 50, 0x8b4513)
+    const musicPlayerButton = this.add.rectangle(centerX, centerY + 420, 200, 50, 0x8b4513)
       .setInteractive({ useHandCursor: true });
     this.menuElements.push(musicPlayerButton);
 
-    const musicPlayerText = this.add.text(centerX, centerY + 200, 'MUSIC PLAYER', {
+    const musicPlayerText = this.add.text(centerX, centerY + 420, 'MUSIC PLAYER', {
       font: 'bold 20px Arial',
       color: '#f5e6c8',
     }).setOrigin(0.5);
@@ -181,24 +273,15 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private startGameWithTransition(): void {
+  private goToModeSelect(): void {
     this.isTransitioning = true;
 
-    const transitionManager = TransitionManager.getInstance();
-    transitionManager.init(this);
+    // Simple fade transition to mode select
+    this.cameras.main.fadeOut(300, 0, 0, 0);
 
-    // Combine menu elements and decorations for animation
-    const allElements = [...this.menuElements, ...this.decorations];
-
-    transitionManager.transition(
-      'menu-to-game',
-      1, // Level 1
-      allElements,
-      () => {
-        // Midpoint: start the game scene
-        this.scene.start('GameScene');
-      }
-    );
+    this.time.delayedCall(300, () => {
+      this.scene.start('ModeSelectScene');
+    });
   }
 
   private createDecorations(): void {

@@ -2,16 +2,20 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { CurrencyManager } from '../systems/CurrencyManager';
+import { LifetimeStatsManager } from '../systems/LifetimeStatsManager';
+import { MilestoneSystem, Milestone } from '../systems/MilestoneSystem';
 import { TransitionManager } from '../systems/TransitionManager';
 import { AUDIO } from '../config/Constants';
-
-interface HighScoreEntry {
-  initials: string;
-  score: number;
-}
-
-const STORAGE_KEY = 'genos-block-party-leaderboard';
-const MAX_LEADERBOARD_ENTRIES = 5;
+import {
+  getLeaderboard,
+  checkIsHighScore,
+  insertScore,
+  saveLeaderboard,
+  getStorageKey,
+  HighScoreEntry,
+  MAX_ENTRIES,
+} from '../utils/leaderboard';
+import { EndlessModeManager } from '../systems/EndlessModeManager';
 
 // Layout constants
 const PANEL_WIDTH = 320;
@@ -37,6 +41,14 @@ export class GameOverScene extends Phaser.Scene {
   private cursorBlink!: Phaser.Time.TimerEvent;
   private currencyEarned: number = 0;
   private totalCurrency: number = 0;
+  private levelReached: number = 1;
+  private newMilestones: Milestone[] = [];
+
+  // Endless mode state
+  private isEndlessMode: boolean = false;
+  private waveReached: number = 0;
+  private checkpoint: number = 0;
+  private justUnlockedEndless: boolean = false;
 
   // Track elements for transitions
   private panelElements: Phaser.GameObjects.GameObject[] = [];
@@ -51,9 +63,21 @@ export class GameOverScene extends Phaser.Scene {
     super('GameOverScene');
   }
 
-  init(data: { score: number; isWin: boolean; currencyEarned?: number; skipCurrencyAward?: boolean; highScoreEntered?: boolean }): void {
+  init(data: {
+    score: number;
+    isWin: boolean;
+    level?: number;
+    currencyEarned?: number;
+    skipCurrencyAward?: boolean;
+    highScoreEntered?: boolean;
+    isEndlessMode?: boolean;
+    waveReached?: number;
+    checkpoint?: number;
+    justUnlockedEndless?: boolean;
+  }): void {
     this.finalScore = data.score || 0;
     this.isWin = data.isWin || false;
+    this.levelReached = data.level || 1;
     this.currentInitials = '';
     this.panelElements = [];
     this.decorations = [];
@@ -62,13 +86,39 @@ export class GameOverScene extends Phaser.Scene {
     this.highScoreEntryElements = [];
     this.leaderboardPanelY = 0;
     this.highScoreAlreadyEntered = data.highScoreEntered || false;
+    this.newMilestones = [];
+
+    // Endless mode state
+    this.isEndlessMode = data.isEndlessMode || false;
+    this.waveReached = data.waveReached || 0;
+    this.checkpoint = data.checkpoint || 0;
+    this.justUnlockedEndless = data.justUnlockedEndless || false;
+
+    // Record game end for lifetime stats
+    const statsManager = LifetimeStatsManager.getInstance();
+    const livesLost = statsManager.getCurrentGameLivesLost();
+    statsManager.recordGameEnd(this.finalScore, this.levelReached, livesLost);
+
+    // Check for newly achieved milestones
+    this.newMilestones = MilestoneSystem.getInstance().checkMilestones();
 
     // Award currency only on first entry, not on restart after high score submission
     const currencyManager = CurrencyManager.getInstance();
     if (data.skipCurrencyAward) {
       this.currencyEarned = data.currencyEarned || 0;
     } else {
-      this.currencyEarned = currencyManager.awardCurrencyFromScore(this.finalScore);
+      // Base currency from score
+      let earned = currencyManager.awardCurrencyFromScore(this.finalScore);
+
+      // Endless mode bonus: extra currency based on waves reached
+      if (this.isEndlessMode && this.waveReached > 0) {
+        const endlessManager = EndlessModeManager.getInstance();
+        const waveBonus = endlessManager.calculateCurrencyBonus(this.waveReached);
+        currencyManager.addCurrency(waveBonus);
+        earned += waveBonus;
+      }
+
+      this.currencyEarned = earned;
     }
     this.totalCurrency = currencyManager.getTotalCurrency();
   }
@@ -83,12 +133,212 @@ export class GameOverScene extends Phaser.Scene {
     }
 
     // Check if this is a new high score (unless already entered on previous visit)
-    const leaderboard = this.getLeaderboard();
-    this.isNewHighScore = !this.highScoreAlreadyEntered && this.checkIsHighScore(this.finalScore, leaderboard);
+    const storageKey = getStorageKey(this.isEndlessMode);
+    const leaderboard = getLeaderboard(localStorage, storageKey);
+    this.isNewHighScore = !this.highScoreAlreadyEntered && checkIsHighScore(this.finalScore, leaderboard);
 
     // Keep the level background (don't change it) - just set transparent camera
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
 
+    // Show celebrations in priority order
+    if (this.justUnlockedEndless) {
+      // Show endless mode unlock celebration first
+      this.showEndlessUnlockCelebration(leaderboard);
+    } else if (this.newMilestones.length > 0) {
+      // Show milestone celebration
+      this.showMilestoneCelebration(leaderboard);
+    } else {
+      this.showGameOverContent(leaderboard);
+    }
+  }
+
+  /**
+   * Show endless mode unlock celebration (when player beats story mode)
+   */
+  private showEndlessUnlockCelebration(leaderboard: HighScoreEntry[]): void {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+
+    // Create overlay
+    const overlay = this.add.rectangle(centerX, centerY, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9);
+
+    // Unlock icon
+    const icon = this.add.text(centerX, centerY - 100, '🎮', {
+      fontSize: '80px',
+    }).setOrigin(0.5).setScale(0);
+
+    // Title
+    const title = this.add.text(centerX, centerY - 20, 'ENDLESS MODE UNLOCKED!', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '28px',
+      color: '#ff6b00',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Description
+    const desc = this.add.text(centerX, centerY + 30, 'Infinite procedural waves await!', {
+      fontFamily: 'Arial',
+      fontSize: '20px',
+      color: '#ffffff',
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Animate in
+    this.tweens.add({
+      targets: icon,
+      scale: 1,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: [title, desc],
+      alpha: 1,
+      duration: 400,
+      delay: 300,
+    });
+
+    // Orange particle burst
+    for (let i = 0; i < 30; i++) {
+      const particle = this.add.circle(
+        centerX + Phaser.Math.Between(-20, 20),
+        centerY - 100,
+        Phaser.Math.Between(3, 6),
+        Phaser.Utils.Array.GetRandom([0xff6b00, 0xffa500, 0xffff00]),
+        0.9
+      );
+      this.tweens.add({
+        targets: particle,
+        x: particle.x + Phaser.Math.Between(-150, 150),
+        y: particle.y + Phaser.Math.Between(-100, 150),
+        alpha: 0,
+        scale: 0,
+        duration: Phaser.Math.Between(600, 1200),
+        delay: Phaser.Math.Between(0, 300),
+        onComplete: () => particle.destroy(),
+      });
+    }
+
+    // Transition to normal game over content after a delay
+    this.time.delayedCall(2500, () => {
+      this.tweens.add({
+        targets: [overlay, icon, title, desc],
+        alpha: 0,
+        duration: 400,
+        onComplete: () => {
+          overlay.destroy();
+          icon.destroy();
+          title.destroy();
+          desc.destroy();
+          this.showGameOverContent(leaderboard);
+        },
+      });
+    });
+  }
+
+  /**
+   * Show milestone celebration overlay, then transition to normal game over content
+   */
+  private showMilestoneCelebration(leaderboard: HighScoreEntry[]): void {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+
+    // Create overlay
+    const overlay = this.add.rectangle(centerX, centerY, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9);
+
+    // Trophy icon
+    const trophy = this.add.text(centerX, centerY - 100, '🏆', {
+      fontSize: '80px',
+    }).setOrigin(0.5).setScale(0);
+
+    // Title
+    const title = this.add.text(centerX, centerY - 20, 'MILESTONE ACHIEVED!', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '32px',
+      color: '#ffd700',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Milestone name(s)
+    const milestoneNames = this.newMilestones.map(m => m.name).join(', ');
+    const milestoneText = this.add.text(centerX, centerY + 30, milestoneNames, {
+      fontFamily: 'Arial',
+      fontSize: '24px',
+      color: '#ffffff',
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Reward info
+    const rewardText = this.newMilestones.map(m => {
+      const typeName = m.reward.type === 'paddleSkin' ? 'Paddle' : 'Trail';
+      return `🎁 ${m.reward.id.charAt(0).toUpperCase() + m.reward.id.slice(1)} ${typeName} Unlocked!`;
+    }).join('\n');
+    const reward = this.add.text(centerX, centerY + 80, rewardText, {
+      fontFamily: 'Arial',
+      fontSize: '18px',
+      color: '#4ade80',
+      align: 'center',
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Animate in
+    this.tweens.add({
+      targets: trophy,
+      scale: 1,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: [title, milestoneText, reward],
+      alpha: 1,
+      duration: 400,
+      delay: 300,
+    });
+
+    // Golden particle burst
+    for (let i = 0; i < 30; i++) {
+      const particle = this.add.circle(
+        centerX + Phaser.Math.Between(-20, 20),
+        centerY - 100,
+        Phaser.Math.Between(3, 6),
+        Phaser.Utils.Array.GetRandom([0xffd700, 0xffed4a, 0xffa500]),
+        0.9
+      );
+      this.tweens.add({
+        targets: particle,
+        x: particle.x + Phaser.Math.Between(-150, 150),
+        y: particle.y + Phaser.Math.Between(-100, 150),
+        alpha: 0,
+        scale: 0,
+        duration: Phaser.Math.Between(600, 1200),
+        delay: Phaser.Math.Between(0, 300),
+        onComplete: () => particle.destroy(),
+      });
+    }
+
+    // Transition to normal game over content after a delay
+    this.time.delayedCall(2500, () => {
+      // Fade out celebration elements
+      this.tweens.add({
+        targets: [overlay, trophy, title, milestoneText, reward],
+        alpha: 0,
+        duration: 400,
+        onComplete: () => {
+          overlay.destroy();
+          trophy.destroy();
+          title.destroy();
+          milestoneText.destroy();
+          reward.destroy();
+          this.showGameOverContent(leaderboard);
+        },
+      });
+    });
+  }
+
+  /**
+   * Show the normal game over content (score, leaderboard, buttons)
+   */
+  private showGameOverContent(leaderboard: HighScoreEntry[]): void {
     // Create semi-transparent overlay
     const overlay = this.add.rectangle(
       GAME_WIDTH / 2,
@@ -128,9 +378,16 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private createTitle(x: number, y: number): number {
-    const titleText = this.isWin ? 'YOU WIN!' : 'GAME OVER';
-    const titleColor = this.isWin ? '#4ade80' : '#ff6b6b';
-    const glowColor = this.isWin ? 0x4ade80 : 0xff6b6b;
+    let titleText = this.isWin ? 'YOU WIN!' : 'GAME OVER';
+    let titleColor = this.isWin ? '#4ade80' : '#ff6b6b';
+    let glowColor = this.isWin ? 0x4ade80 : 0xff6b6b;
+
+    // Endless mode uses different title
+    if (this.isEndlessMode) {
+      titleText = 'ENDLESS RUN OVER';
+      titleColor = '#ff6b00';
+      glowColor = 0xff6b00;
+    }
 
     // Single text object with shader-based glow
     const title = this.add.text(x, y, titleText, {
@@ -168,50 +425,96 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   private createScorePanel(x: number, topY: number, delay: number): number {
-    const panelHeight = 90;
+    // Endless mode has taller panel to show wave info
+    const panelHeight = this.isEndlessMode ? 130 : 90;
     const centerY = topY + panelHeight / 2;
     this.createPanel(x, centerY, PANEL_WIDTH, panelHeight, delay);
 
-    // Label
-    const label = this.add.text(x, centerY - 15, 'FINAL SCORE', {
-      fontFamily: 'Arial',
-      fontSize: '14px',
-      color: '#888888',
-    }).setOrigin(0.5).setAlpha(0);
-    this.panelElements.push(label);
+    if (this.isEndlessMode) {
+      // Wave reached label
+      const waveLabel = this.add.text(x, centerY - 35, 'WAVE REACHED', {
+        fontFamily: 'Arial',
+        fontSize: '14px',
+        color: '#888888',
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(waveLabel);
 
-    // Score value with count-up
-    const scoreText = this.add.text(x, centerY + 18, '0', {
-      fontFamily: 'Arial Black, Arial',
-      fontSize: '42px',
-      color: '#ffd93d',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5).setAlpha(0);
-    this.panelElements.push(scoreText);
+      // Wave number
+      const waveText = this.add.text(x, centerY - 10, `${this.waveReached}`, {
+        fontFamily: 'Arial Black, Arial',
+        fontSize: '36px',
+        color: '#ff6b00',
+        stroke: '#000000',
+        strokeThickness: 2,
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(waveText);
 
-    // Animate panel contents
-    this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
-      this.tweens.add({
-        targets: [label, scoreText],
-        alpha: 1,
-        duration: 200,
+      // Checkpoint info
+      const checkpointText = this.add.text(x, centerY + 20, `Checkpoint: ${this.checkpoint}`, {
+        fontFamily: 'Arial',
+        fontSize: '16px',
+        color: '#ffd93d',
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(checkpointText);
+
+      // Score below
+      const scoreLabel = this.add.text(x, centerY + 45, `Score: ${this.finalScore.toLocaleString()}`, {
+        fontFamily: 'Arial',
+        fontSize: '14px',
+        color: '#aaaaaa',
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(scoreLabel);
+
+      // Animate panel contents
+      this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+        this.tweens.add({
+          targets: [waveLabel, waveText, checkpointText, scoreLabel],
+          alpha: 1,
+          duration: 200,
+        });
       });
+    } else {
+      // Standard story mode display
+      const label = this.add.text(x, centerY - 15, 'FINAL SCORE', {
+        fontFamily: 'Arial',
+        fontSize: '14px',
+        color: '#888888',
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(label);
 
-      // Count up score
-      this.tweens.addCounter({
-        from: 0,
-        to: this.finalScore,
-        duration: 1200,
-        ease: 'Power2',
-        onUpdate: (tween) => {
-          const value = tween.getValue();
-          if (value !== null) {
-            scoreText.setText(Math.floor(value).toLocaleString());
-          }
-        },
+      // Score value with count-up
+      const scoreText = this.add.text(x, centerY + 18, '0', {
+        fontFamily: 'Arial Black, Arial',
+        fontSize: '42px',
+        color: '#ffd93d',
+        stroke: '#000000',
+        strokeThickness: 2,
+      }).setOrigin(0.5).setAlpha(0);
+      this.panelElements.push(scoreText);
+
+      // Animate panel contents
+      this.time.delayedCall(delay + PANEL_ANIM_DURATION * 0.5, () => {
+        this.tweens.add({
+          targets: [label, scoreText],
+          alpha: 1,
+          duration: 200,
+        });
+
+        // Count up score
+        this.tweens.addCounter({
+          from: 0,
+          to: this.finalScore,
+          duration: 1200,
+          ease: 'Power2',
+          onUpdate: (tween) => {
+            const value = tween.getValue();
+            if (value !== null) {
+              scoreText.setText(Math.floor(value).toLocaleString());
+            }
+          },
+        });
       });
-    });
+    }
 
     return topY + panelHeight + PANEL_GAP;
   }
@@ -710,17 +1013,16 @@ export class GameOverScene extends Phaser.Scene {
       this.cursorBlink.remove();
     }
 
-    // Save to leaderboard
-    const leaderboard = this.getLeaderboard();
-    leaderboard.push({
+    // Save to leaderboard using extracted functions
+    const storageKey = getStorageKey(this.isEndlessMode);
+    const leaderboard = getLeaderboard(localStorage, storageKey);
+    const newEntry: HighScoreEntry = {
       initials: this.currentInitials,
       score: this.finalScore,
-    });
-
-    leaderboard.sort((a, b) => b.score - a.score);
-    leaderboard.splice(MAX_LEADERBOARD_ENTRIES);
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(leaderboard));
+      wave: this.isEndlessMode ? this.waveReached : undefined,
+    };
+    const updatedLeaderboard = insertScore(newEntry, leaderboard, MAX_ENTRIES);
+    saveLeaderboard(updatedLeaderboard, localStorage, storageKey);
 
     // Flash confirmation
     this.initialsTexts.forEach(text => text.setColor('#4ade80'));
@@ -756,7 +1058,8 @@ export class GameOverScene extends Phaser.Scene {
         this.initialsTexts = [];
 
         // Get updated leaderboard and create the panel
-        const leaderboard = this.getLeaderboard();
+        const storageKey = getStorageKey(this.isEndlessMode);
+        const leaderboard = getLeaderboard(localStorage, storageKey);
         this.createLeaderboardPanel(
           GAME_WIDTH / 2,
           this.leaderboardPanelY,
@@ -805,24 +1108,6 @@ export class GameOverScene extends Phaser.Scene {
     }
   }
 
-  private getLeaderboard(): HighScoreEntry[] {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        return JSON.parse(data) as HighScoreEntry[];
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return [];
-  }
-
-  private checkIsHighScore(score: number, leaderboard: HighScoreEntry[]): boolean {
-    if (score === 0) return false;
-    if (leaderboard.length < MAX_LEADERBOARD_ENTRIES) return true;
-    return score > leaderboard[leaderboard.length - 1].score;
-  }
-
   private startGameWithTransition(): void {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
@@ -839,7 +1124,7 @@ export class GameOverScene extends Phaser.Scene {
       () => {
         this.scene.stop('UIScene');
         this.scene.stop();
-        this.scene.start('GameScene');
+        this.scene.start('GameScene', { isEndlessMode: this.isEndlessMode });
       }
     );
   }

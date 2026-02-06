@@ -8,6 +8,9 @@ import { ElectricBallEffectHandler } from './handlers/ElectricBallEffectHandler'
 import { DangerSparksEffectHandler } from './handlers/DangerSparksEffectHandler';
 import { BalloonTrailEffectHandler } from './handlers/BalloonTrailEffectHandler';
 import { BombGlowEffectHandler } from './handlers/BombGlowEffectHandler';
+import { CosmeticTrailHandler } from './handlers/CosmeticTrailHandler';
+import { SpotlightBeamEffectHandler } from './handlers/SpotlightBeamEffectHandler';
+import { ShopManager } from '../systems/ShopManager';
 
 /**
  * Manages multiple simultaneous particle effects on a Ball
@@ -27,7 +30,7 @@ export class BallEffectManager {
   private scene: Phaser.Scene;
   private ball: Ball;
   private activeEffects: Map<BallEffectType, IBallEffect> = new Map();
-  private effectRegistry: Map<BallEffectType, () => IBallEffect>;
+  private effectRegistry: Map<BallEffectType, () => IBallEffect | null>;
 
   constructor(scene: Phaser.Scene, ball: Ball) {
     this.scene = scene;
@@ -35,13 +38,19 @@ export class BallEffectManager {
 
     // Register all available effect handlers
     // To add a new effect: create handler class, add entry here
-    this.effectRegistry = new Map<BallEffectType, () => IBallEffect>([
+    this.effectRegistry = new Map<BallEffectType, () => IBallEffect | null>([
       [BallEffectType.FIREBALL, () => new FireballEffectHandler(this.scene)],
       [BallEffectType.DISCO_SPARKLE, () => new DiscoEffectHandler(this.scene)],
       [BallEffectType.ELECTRIC_TRAIL, () => new ElectricBallEffectHandler(this.scene)],
       [BallEffectType.DANGER_SPARKS, () => new DangerSparksEffectHandler(this.scene)],
       [BallEffectType.BALLOON_TRAIL, () => new BalloonTrailEffectHandler(this.scene)],
       [BallEffectType.BOMB_GLOW, () => new BombGlowEffectHandler(this.scene)],
+      [BallEffectType.COSMETIC_TRAIL, () => {
+        const trail = ShopManager.getInstance().getEquippedBallTrail();
+        if (!trail) return null;
+        return new CosmeticTrailHandler(this.scene, trail);
+      }],
+      [BallEffectType.SPOTLIGHT_BEAM, () => new SpotlightBeamEffectHandler(this.scene)],
     ]);
   }
 
@@ -65,6 +74,9 @@ export class BallEffectManager {
     }
 
     const effect = factory();
+
+    // If factory returns null (e.g., no cosmetic trail equipped), skip
+    if (!effect) return;
 
     // Subscribe to tint changes from this effect
     effect.setTintChangeCallback(() => this.updateBlendedTint());

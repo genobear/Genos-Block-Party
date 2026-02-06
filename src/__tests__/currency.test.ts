@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { CurrencyManager } from '../systems/CurrencyManager';
 
 describe('CurrencyManager.calculateCurrencyFromScore', () => {
@@ -37,5 +37,92 @@ describe('CurrencyManager.calculateCurrencyFromScore', () => {
 
   it('should return 0 for negative scores', () => {
     expect(CurrencyManager.calculateCurrencyFromScore(-100)).toBe(0);
+  });
+});
+
+describe('CurrencyManager localStorage integration', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    CurrencyManager.resetInstance();
+  });
+
+  it('should return 0 when localStorage is empty', () => {
+    const manager = CurrencyManager.getInstance();
+    expect(manager.getTotalCurrency()).toBe(0);
+  });
+
+  it('should load existing currency from localStorage', () => {
+    localStorage.setItem('genos-block-party-currency', '500');
+    const manager = CurrencyManager.getInstance();
+    expect(manager.getTotalCurrency()).toBe(500);
+  });
+
+  it('should handle corrupted localStorage (non-numeric)', () => {
+    localStorage.setItem('genos-block-party-currency', 'not-a-number');
+    const manager = CurrencyManager.getInstance();
+    expect(manager.getTotalCurrency()).toBe(0);
+  });
+
+  it('should handle negative values in localStorage', () => {
+    localStorage.setItem('genos-block-party-currency', '-100');
+    const manager = CurrencyManager.getInstance();
+    expect(manager.getTotalCurrency()).toBe(0);
+  });
+
+  it('should save to localStorage after addCurrency', () => {
+    const manager = CurrencyManager.getInstance();
+    manager.addCurrency(100);
+    expect(localStorage.getItem('genos-block-party-currency')).toBe('100');
+  });
+
+  it('should save to localStorage after awardCurrencyFromScore', () => {
+    const manager = CurrencyManager.getInstance();
+    manager.awardCurrencyFromScore(100); // Should award 5 currency
+    expect(localStorage.getItem('genos-block-party-currency')).toBe('5');
+  });
+
+  it('should save to localStorage after spendCurrency', () => {
+    const manager = CurrencyManager.getInstance();
+    manager.addCurrency(100);
+    manager.spendCurrency(30);
+    expect(localStorage.getItem('genos-block-party-currency')).toBe('70');
+  });
+
+  it('should not save or modify if spendCurrency fails (insufficient funds)', () => {
+    const manager = CurrencyManager.getInstance();
+    manager.addCurrency(50);
+    const result = manager.spendCurrency(100);
+    expect(result).toBe(false);
+    expect(manager.getTotalCurrency()).toBe(50);
+    expect(localStorage.getItem('genos-block-party-currency')).toBe('50');
+  });
+
+  it('should persist across singleton resets (simulating sessions)', () => {
+    // First "session"
+    const manager1 = CurrencyManager.getInstance();
+    manager1.addCurrency(200);
+
+    // Simulate new session
+    CurrencyManager.resetInstance();
+
+    // Second "session"
+    const manager2 = CurrencyManager.getInstance();
+    expect(manager2.getTotalCurrency()).toBe(200);
+  });
+
+  it('canAfford should correctly check against current balance', () => {
+    const manager = CurrencyManager.getInstance();
+    manager.addCurrency(100);
+    expect(manager.canAfford(50)).toBe(true);
+    expect(manager.canAfford(100)).toBe(true);
+    expect(manager.canAfford(101)).toBe(false);
+  });
+
+  it('resetCurrency should clear localStorage', () => {
+    const manager = CurrencyManager.getInstance();
+    manager.addCurrency(500);
+    manager.resetCurrency();
+    expect(manager.getTotalCurrency()).toBe(0);
+    expect(localStorage.getItem('genos-block-party-currency')).toBe('0');
   });
 });

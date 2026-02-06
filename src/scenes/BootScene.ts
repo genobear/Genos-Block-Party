@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
-import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO } from '../config/Constants';
+import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
+import { PADDLE_SKINS } from '../types/ShopTypes';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -88,11 +89,35 @@ export class BootScene extends Phaser.Scene {
     // Create power-up textures
     this.createPowerUpTextures();
 
+    // Create paddle skin textures for the Party Shop
+    this.createPaddleSkinTextures();
+
     // Create particle textures
     this.createParticleTextures();
 
     // Create safety net texture (Bounce House power-up)
     this.createSafetyNetTexture();
+
+    // Create bumper texture (pinball obstacle)
+    this.createBumperTexture();
+  }
+
+  /**
+   * Generate paddle textures for each shop skin variant
+   * Same structure as the default paddle texture but with skin colors
+   */
+  private createPaddleSkinTextures(): void {
+    for (const skin of PADDLE_SKINS) {
+      const g = this.make.graphics({ x: 0, y: 0 });
+      g.fillStyle(skin.color);
+      g.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 8);
+      // Accent circles (DJ deck look)
+      g.fillStyle(skin.accentColor);
+      g.fillCircle(20, PADDLE_HEIGHT / 2, 6);
+      g.fillCircle(PADDLE_WIDTH - 20, PADDLE_HEIGHT / 2, 6);
+      g.generateTexture(`paddle-skin-${skin.id}`, PADDLE_WIDTH, PADDLE_HEIGHT);
+      g.destroy();
+    }
   }
 
   private createBrickTextures(): void {
@@ -100,6 +125,7 @@ export class BootScene extends Phaser.Scene {
       { name: 'present', color: COLORS.PRESENT },
       { name: 'pinata', color: COLORS.PINATA },
       { name: 'balloon', color: COLORS.BALLOON },
+      { name: 'drifter', color: COLORS.DRIFTER },
     ];
 
     types.forEach(({ name, color }) => {
@@ -142,6 +168,8 @@ export class BootScene extends Phaser.Scene {
       { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
       { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
       { name: 'partypopper', color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color, symbol: '💣' },
+      { name: 'bassdrop', color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color, symbol: '♪' },
+      { name: 'djscratch', color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color, symbol: 'S' },
       { name: 'bouncehouse', color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color, symbol: 'N' },
       { name: 'partyfavor', color: POWERUP_CONFIGS[PowerUpType.PARTY_FAVOR].color, symbol: '+' },
     ];
@@ -321,6 +349,38 @@ export class BootScene extends Phaser.Scene {
     }
 
     g.generateTexture('safety-net', netWidth, netHeight);
+    g.destroy();
+  }
+
+  /**
+   * Create bumper texture (classic pinball bumper look with ring/glow effect)
+   */
+  private createBumperTexture(): void {
+    const size = BUMPER.SIZE;
+    const center = size / 2;
+    const g = this.make.graphics({ x: 0, y: 0 });
+
+    // Outer glow ring (softer, larger)
+    g.fillStyle(COLORS.BUMPER, 0.3);
+    g.fillCircle(center, center, center);
+
+    // Main body (bright red)
+    g.fillStyle(COLORS.BUMPER, 1);
+    g.fillCircle(center, center, center - 4);
+
+    // Inner highlight ring (white)
+    g.lineStyle(2, 0xffffff, 0.6);
+    g.strokeCircle(center, center, center - 6);
+
+    // Center cap (darker red for depth)
+    g.fillStyle(0xcc3333, 1);
+    g.fillCircle(center, center, center - 12);
+
+    // Center highlight (shiny dot)
+    g.fillStyle(0xffffff, 0.7);
+    g.fillCircle(center - 4, center - 4, 4);
+
+    g.generateTexture('bumper', size, size);
     g.destroy();
   }
 

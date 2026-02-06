@@ -59,8 +59,23 @@ export class PowerUpSystem {
   private balloonEndTime: number = 0;
   private balloonTimer: Phaser.Time.TimerEvent | null = null;
 
+  // DJ Scratch (Magnet) state
+  private magnetActive: boolean = false;
+  private magnetTimer: Phaser.Time.TimerEvent | null = null;
+
   // Bounce House safety net state
   private safetyNet: SafetyNet | null = null;
+
+  // Conga Line global timer state
+  private congaLineEndTime: number = 0;
+  private congaLineTimer: Phaser.Time.TimerEvent | null = null;
+
+  // Spotlight global timer state
+  private spotlightEndTime: number = 0;
+  private spotlightTimer: Phaser.Time.TimerEvent | null = null;
+
+  // Callback to get active brick positions (set by GameScene)
+  private getBricksCallback: (() => Array<{ x: number; y: number }>) | null = null;
 
   // Event emitter for UI updates
   public events: Phaser.Events.EventEmitter;
@@ -100,8 +115,14 @@ export class PowerUpSystem {
       [PowerUpType.FIREBALL, () => this.applyFireball()],
       [PowerUpType.ELECTRICBALL, () => this.applyElectricBall()],
       [PowerUpType.PARTY_POPPER, () => this.applyPartyPopper()],
+      [PowerUpType.BASS_DROP, () => this.applyBassDrop()],
+      [PowerUpType.DJ_SCRATCH, () => this.applyDjScratch()],
       [PowerUpType.BOUNCE_HOUSE, () => this.applyBounceHouse()],
       [PowerUpType.PARTY_FAVOR, () => this.applyPartyFavor()],
+      [PowerUpType.CONFETTI_CANNON, () => this.applyConfettiCannon()],
+      [PowerUpType.CONGA_LINE, () => this.applyCongaLine()],
+      [PowerUpType.SPOTLIGHT, () => this.applySpotlight()],
+      [PowerUpType.DANCE_FLOOR, () => this.applyDanceFloor()],
     ]);
 
     // Initialize effect propagation config
@@ -124,6 +145,18 @@ export class PowerUpSystem {
         applyToAllBalls: true,
         applyToBall: (ball: Ball) => this.applyBalloonToBall(ball),
         isActive: () => this.balloonEndTime > this.scene.time.now,
+      }],
+      [PowerUpType.CONGA_LINE, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => this.applyCongaLineToBall(ball),
+        isActive: () => this.congaLineEndTime > this.scene.time.now,
+      }],
+      [PowerUpType.SPOTLIGHT, {
+        propagateToNewBalls: true,
+        applyToAllBalls: true,
+        applyToBall: (ball: Ball) => this.applySpotlightToBall(ball),
+        isActive: () => this.spotlightEndTime > this.scene.time.now,
       }],
     ]);
   }
@@ -368,6 +401,15 @@ export class PowerUpSystem {
   }
 
   /**
+   * Apply Bass Drop effect (screen nuke - 1 damage to all bricks)
+   * Emits 'bassDrop' event for GameScene to handle brick iteration
+   */
+  private applyBassDrop(): void {
+    this.events.emit('bassDrop');
+    this.events.emit('effectApplied', PowerUpType.BASS_DROP);
+  }
+
+  /**
    * Apply Power Ball effect (double power-up drop chance)
    */
   private applyPowerBall(): void {
@@ -439,6 +481,52 @@ export class PowerUpSystem {
    */
   getFireballLevel(): number {
     return this.fireballLevel;
+  }
+
+  /**
+   * Apply DJ Scratch effect (magnet paddle)
+   * Duration-based: balls stick to paddle on contact for the duration
+   */
+  private applyDjScratch(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].duration;
+
+    this.magnetActive = true;
+
+    // Cancel existing timer if refreshing effect
+    if (this.magnetTimer) {
+      this.magnetTimer.destroy();
+    }
+
+    // Schedule expiration
+    this.magnetTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireDjScratch();
+    });
+
+    this.trackEffect(PowerUpType.DJ_SCRATCH, duration);
+  }
+
+  /**
+   * Expire DJ Scratch - deactivate magnet and auto-release any stuck balls
+   */
+  private expireDjScratch(): void {
+    this.magnetActive = false;
+    this.magnetTimer = null;
+
+    // Auto-release any magneted balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball.isMagneted()) {
+        ball.releaseMagnet(this.speedManager.getBaseSpeed());
+      }
+    });
+
+    this.events.emit('effectExpired', PowerUpType.DJ_SCRATCH);
+  }
+
+  /**
+   * Check if magnet (DJ Scratch) is active
+   */
+  isMagnetActive(): boolean {
+    return this.magnetActive;
   }
 
   /**
@@ -590,14 +678,44 @@ export class PowerUpSystem {
     }
     this.balloonEndTime = 0;
 
+    // Clear DJ Scratch (Magnet) state
+    if (this.magnetTimer) {
+      this.magnetTimer.destroy();
+      this.magnetTimer = null;
+    }
+    this.magnetActive = false;
+
+    // Auto-release magneted balls before clearing
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      if (ball.isMagneted()) {
+        ball.releaseMagnet(this.speedManager.getBaseSpeed());
+      }
+    });
+
     // Clear Bounce House safety net
     this.clearSafetyNet(false);
+
+    // Clear Conga Line state
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+      this.congaLineTimer = null;
+    }
+    this.congaLineEndTime = 0;
+
+    // Clear Spotlight state
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+      this.spotlightTimer = null;
+    }
+    this.spotlightEndTime = 0;
 
     // Clear effects from all balls
     this.ballPool.getActiveBalls().forEach((ball) => {
       ball.clearFireball();
       ball.clearElectricBall();
       ball.clearBomb();
+      ball.clearCongaLine();
+      ball.clearSpotlight();
     });
   }
 
@@ -612,5 +730,143 @@ export class PowerUpSystem {
 
   onBombDetonated(): void {
     this.events.emit('effectExpired', PowerUpType.PARTY_POPPER);
+  }
+
+  // ========== CONFETTI CANNON ==========
+
+  /**
+   * Apply Confetti Cannon effect — fires confetti at 5-8 random bricks for 1 damage each
+   * Emits 'confettiCannon' event for GameScene to handle brick iteration and visuals
+   */
+  private applyConfettiCannon(): void {
+    this.events.emit('confettiCannon');
+    this.events.emit('effectApplied', PowerUpType.CONFETTI_CANNON);
+  }
+
+  // ========== CONGA LINE ==========
+
+  /**
+   * Apply Conga Line effect — trailing ghost balls that deal damage to bricks
+   * Uses global timer so all balls expire at the same time
+   */
+  private applyCongaLine(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.CONGA_LINE].duration;
+    this.congaLineEndTime = this.scene.time.now + duration;
+
+    // Cancel existing timer if refreshing effect
+    if (this.congaLineTimer) {
+      this.congaLineTimer.destroy();
+    }
+
+    // Apply to all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      this.applyCongaLineToBall(ball);
+    });
+
+    // Global expiration timer
+    this.congaLineTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireCongaLine();
+    });
+
+    this.trackEffect(PowerUpType.CONGA_LINE, duration);
+  }
+
+  /**
+   * Apply Conga Line effect to a single ball with remaining duration
+   * Used by propagation config when new balls spawn mid-effect
+   */
+  private applyCongaLineToBall(ball: Ball): void {
+    const remaining = Math.max(0, this.congaLineEndTime - this.scene.time.now);
+    if (remaining > 0) {
+      ball.setCongaLine(remaining);
+    }
+  }
+
+  /**
+   * Expire Conga Line effect from all balls
+   */
+  private expireCongaLine(): void {
+    this.congaLineEndTime = 0;
+    this.congaLineTimer = null;
+
+    // Clear from all balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearCongaLine();
+    });
+
+    this.events.emit('effectExpired', PowerUpType.CONGA_LINE);
+  }
+
+  // ========== SPOTLIGHT ==========
+
+  /**
+   * Set the callback to get active brick positions
+   * Called by GameScene during setup
+   */
+  setBricksCallback(callback: () => Array<{ x: number; y: number }>): void {
+    this.getBricksCallback = callback;
+  }
+
+  /**
+   * Apply Spotlight effect — gentle homing toward nearest brick
+   * Uses global timer so all balls expire at the same time
+   */
+  private applySpotlight(): void {
+    const duration = POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].duration;
+    this.spotlightEndTime = this.scene.time.now + duration;
+
+    // Cancel existing timer if refreshing effect
+    if (this.spotlightTimer) {
+      this.spotlightTimer.destroy();
+    }
+
+    // Apply to all active balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      this.applySpotlightToBall(ball);
+    });
+
+    // Global expiration timer
+    this.spotlightTimer = this.scene.time.delayedCall(duration, () => {
+      this.expireSpotlight();
+    });
+
+    this.trackEffect(PowerUpType.SPOTLIGHT, duration);
+  }
+
+  /**
+   * Apply Spotlight effect to a single ball with remaining duration
+   * Used by propagation config when new balls spawn mid-effect
+   */
+  private applySpotlightToBall(ball: Ball): void {
+    const remaining = Math.max(0, this.spotlightEndTime - this.scene.time.now);
+    if (remaining > 0 && this.getBricksCallback) {
+      ball.setSpotlight(remaining, this.getBricksCallback);
+    }
+  }
+
+  /**
+   * Expire Spotlight effect from all balls
+   */
+  private expireSpotlight(): void {
+    this.spotlightEndTime = 0;
+    this.spotlightTimer = null;
+
+    // Clear from all balls
+    this.ballPool.getActiveBalls().forEach((ball) => {
+      ball.clearSpotlight();
+    });
+
+    this.events.emit('effectExpired', PowerUpType.SPOTLIGHT);
+  }
+
+  // ========== DANCE FLOOR ==========
+
+  /**
+   * Apply Dance Floor effect — shuffles all bricks to random positions on the grid
+   * Emits 'danceFloor' event for GameScene to handle brick shuffling
+   */
+  private applyDanceFloor(): void {
+    this.events.emit('danceFloor');
+    this.events.emit('effectApplied', PowerUpType.DANCE_FLOOR);
   }
 }

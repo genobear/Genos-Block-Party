@@ -33,6 +33,29 @@
 | **Present** | 1–3 | 10 | 15% | Pink |
 | **Piñata** | 1–3 | 15 | 25% | Orange |
 | **Balloon** | 1–3 | 20 | 30% | Cyan |
+| **Drifter** | 1–3 | 25 | 20% | Ghostly blue |
+
+### Drifter Bricks
+- Special brick type that slowly drifts upward (~25 px/s)
+- Gentle horizontal bobbing animation while drifting
+- Semi-transparent ethereal appearance (alpha 0.75) with pulsing effect
+- If it reaches the top of the screen (y < 60), it escapes: fades out, no points, no power-up drop
+- Creates urgency — player must prioritize these or lose potential score
+- Escaped drifters still count toward level completion (they're destroyed when they escape)
+- High score value (25 pts) compensates for the escape risk
+
+### Pinball Bumpers
+- Static circular obstacles (40px diameter) that appear in certain levels
+- Classic pinball bumper aesthetic: red body with white ring highlight and center cap
+- **Cannot be destroyed** — purely deflection obstacles
+- On ball collision:
+  - Ball velocity multiplied by 1.5× (boost)
+  - Velocity capped at 3× base speed to prevent crazy speeds
+  - Bumper flashes white briefly (100ms) with scale punch animation
+  - Bounce sound plays
+- Bumpers don't count toward level completion (not bricks)
+- First appears in Level 3 ("Gift Wrapped") with 2 bumpers in play area
+- Adds pinball-style chaos and strategic bouncing opportunities
 
 - Bricks display health indicator dots (1–3 dots on the brick face)
 - Texture changes on damage to reflect remaining HP
@@ -58,7 +81,56 @@
 - Layout system: 10-column grid, bricks placed by (x, y) grid coordinates
 - Ball speed scales by `1.0× → 1.35×` from level 1 to 10
 - Level complete when all bricks are destroyed (countActive === 0)
-- After level 10 → win state
+- After level 10 → win state + Endless Mode unlocked
+
+### Endless Mode
+Unlocked after completing the 10-level Story Mode campaign. Features infinite procedurally generated waves with escalating difficulty.
+
+#### Unlock Condition
+- Complete all 10 Story Mode levels
+- Unlock persisted to localStorage (`genos-block-party-endless-unlocked`)
+- Celebration overlay displayed on first unlock
+
+#### Procedural Generation
+- Uses seeded random number generator (mulberry32) for consistent wave layouts
+- Generates 20–40 bricks per wave depending on difficulty
+- **Pattern types**: Scatter, Symmetric, Fortress, Maze, Clusters, Rows
+- Pattern selection weighted by wave number (easier patterns early, harder later)
+
+#### Difficulty Scaling
+| Parameter | Formula | Range |
+|-----------|---------|-------|
+| Brick Count | 20 + min(wave × 2, 20) | 20 → 40 |
+| Average HP | 1 + floor(wave / 10) | 1 → 3 |
+| Grid Density | 0.3 + min(wave × 0.02, 0.4) | 30% → 70% |
+| Ball Speed | 1.0 + min(wave × 0.03, 0.5) | 1.0× → 1.5× |
+
+#### Wave Difficulty Tiers
+- **Waves 1–5 (Easy)**: Sparse layouts, mostly Presents (low HP), simple patterns
+- **Waves 6–15 (Medium)**: Mixed density, Balloons and Piñatas appear, varied patterns
+- **Waves 16+ (Hard)**: Dense layouts, HP 2–3 average, fortress and maze patterns
+
+#### Checkpoint System
+- Checkpoint every 5 waves (wave 5, 10, 15, 20...)
+- Visual celebration on checkpoint waves ("🎉 CHECKPOINT! 🎉")
+- Checkpoint waves use simpler patterns as a "breather"
+- Checkpoint number displayed on Game Over screen
+
+#### Endless Mode Leaderboard
+- Separate leaderboard from Story Mode (`genos-block-party-endless-leaderboard`)
+- Stores wave reached alongside score
+- High score entry includes wave number
+
+#### Currency Bonus
+- Base currency from score (same formula as Story Mode)
+- **Wave bonus**: +3 coins per wave reached
+- Example: Reaching wave 20 = base currency + 60 bonus coins
+
+#### Mode Selection
+- New Mode Select screen accessible from Menu → Start Game
+- **Story Mode**: 10-level campaign (always available)
+- **Endless Mode**: Shows 🔒 lock icon + "Beat Story Mode to unlock" until unlocked
+- After unlock: Shows personal best wave record
 
 ### Score System & Multiplier
 - Points earned per brick hit (not per brick destroyed) — **10 / 15 / 20** depending on type
@@ -98,7 +170,7 @@
 
 | Power-Up | Emoji | Duration | Weight | Effect |
 |----------|-------|----------|--------|--------|
-| **Balloon** | 🎈 | 10s | 20 | Slow ball — velocity scaled to 60%, min speed halved |
+| **Balloon** | 🎈 | 10s | 20 | Slow ball — velocity scaled to 60% **immediately**, min speed halved |
 | **Cake** | 🎂 | 15s | 15 | Wide paddle — 1.5× width for duration |
 | **Drinks** | 🍹 | 8s | 15 | Wobbly paddle — sinusoidal offset (debuff!) |
 | **Disco** | 🪩 | Instant | 10 | Multi-ball — spawns 2 extra balls at current ball's position |
@@ -106,6 +178,11 @@
 | **Power Ball** | 💪 | 12s | 12 | Doubles power-up drop chance from all bricks |
 | **Fireball** | 🔥 | 10s | 10 | Piercing ball with stacking damage (see below) |
 | **Electric Ball** | ⚡ | 8s | 12 | 1.5× speed + AOE damage to adjacent bricks |
+| **DJ Scratch** | 🧲 | 15s | 12 | Magnet paddle — ball sticks on contact, click to release |
+| **Confetti Cannon** | 🎊 | Instant | 10 | Fires confetti at 5-8 random bricks for 1 damage each |
+| **Conga Line** | 💃 | 8s | 8 | Trailing ghost balls deal damage to bricks |
+| **Spotlight** | 🔦 | 8s | 8 | Gentle homing toward nearest brick |
+| **Dance Floor** | 🪩 | Instant | 10 | Shuffles all bricks to random grid positions |
 
 ### Fireball Stacking
 - Collecting multiple Fireballs during active duration **stacks the level** (1 → 2 → 3 → ...)
@@ -115,11 +192,58 @@
 - Visual intensity caps at level 3 (3 tiers of flame particle effects + smoke trail)
 
 ### Electric Ball Details
-- Ball speed boosted 1.5×
+- Ball speed boosted 1.5× — **applies immediately on collection** (velocity recalculated mid-flight)
 - On every brick hit (not just destruction), damages all **cardinal-adjacent** bricks (N/S/E/W)
 - AOE hits deal 1 damage each, give 50% score, and have 50% reduced drop chance
 - Lightning arc visual drawn to each adjacent brick with jagged bolt + particle impact
 - Propagates to new balls spawned during the effect (via Disco)
+
+### DJ Scratch (Magnet Paddle) Details
+- Collecting activates magnetic paddle for 15 seconds
+- On paddle collision while active, ball stops and sticks to paddle surface
+- Ball follows paddle horizontally while stuck
+- Click/tap to release all stuck balls (launches at random upward angle)
+- Works with multi-ball — each ball sticks individually on contact
+- When effect expires, any remaining stuck balls auto-release
+- Timer refreshes if collected again while active
+- Uses existing Scratch SFX on ball catch
+
+### Conga Line Details
+- Ball spawns 3 trailing ghost copies at 300ms intervals (positions from 300ms, 600ms, 900ms ago)
+- Ghost balls are semi-transparent (alpha 0.5→0.3) with magenta tint
+- Ghosts track the ball's position history and follow its path with delay
+- When a ghost overlaps a brick, it deals 1 damage (ghosts pass through, don't bounce)
+- Damage triggers score, multiplier increment, and power-up drop rolls
+- Effect lasts 8 seconds, then ghosts fade out gracefully (300ms fade)
+- Works with multi-ball — each ball gets its own set of ghosts
+- Propagates to new balls spawned during the effect (via Disco)
+- Ball lost: clears that ball's ghosts immediately
+- Timer refreshes if collected again while active
+
+### Spotlight Details
+- Ball gently curves toward the nearest brick while the effect is active
+- **Steering algorithm**: On each frame, calculates angle to nearest brick and adjusts velocity by max ~2.8° per frame
+- Subtle homing — player still has control over general direction, but ball "drifts" toward bricks
+- **Visual effects**:
+  - Golden glow and tint on ball (0xffd700)
+  - Light cone/beam emanating from ball in its direction of travel
+  - Trailing golden particles with sparkle effects
+- Effect lasts 8 seconds
+- Works with multi-ball — each ball independently homes toward its nearest brick
+- Propagates to new balls spawned during the effect (via Disco)
+- Timer refreshes if collected again while active
+
+### Dance Floor Details
+- **Instant effect**: On collection, all active bricks shuffle to random positions on the grid
+- **Animation**: Bricks animate smoothly to new positions (~450ms, Back easeOut)
+- **Visual effects**:
+  - Hot pink + white screen flash (disco theme)
+  - Bricks wobble/rotate during movement
+  - Camera shake on activation
+- **Grid**: 10-column × 12-row valid positions (same as level layouts)
+- **No overlapping**: Each brick gets a unique random position
+- **Physics sync**: StaticBody positions update after animation completes
+- Plays party horn SFX on activation
 
 ### Mystery Power-Up
 - Shows "???" feedback on collection
@@ -130,6 +254,8 @@
 - **Fireball**: propagates to newly spawned balls AND applies to all existing balls
 - **Electric Ball**: propagates to new balls AND applies to all existing balls
 - **Balloon**: applies to all existing balls but does NOT propagate to newly spawned ones
+- **Conga Line**: propagates to new balls AND applies to all existing balls
+- **Spotlight**: propagates to new balls AND applies to all existing balls
 - Disco spawns get the Disco Sparkle visual effect on all active balls
 
 ### Visual Feedback System
@@ -154,13 +280,17 @@ Each power-up has per-type feedback on collection:
 - Minimum 1 coin for any positive score
 - Awarded on Game Over screen (animated count-up), or on quit-to-menu from pause
 - Has `spendCurrency()` and `canAfford()` methods — **no shop exists yet** (see TODO)
+- **Testability**: `CurrencyManager.resetInstance()` allows resetting the singleton between tests for proper localStorage integration testing
 
 ### High Score Leaderboard
-- Top 5 scores stored locally
+- Top 5 scores stored locally in localStorage
+- Sorted descending by score
 - On new high score: 3-letter initials entry (keyboard input, A-Z only)
 - Initials typed into individual boxes with blinking cursor
 - After submission, entry panel animates out and is replaced by leaderboard display
 - Current game's score highlighted in gold on leaderboard
+- Pure functions extracted to `src/utils/leaderboard.ts` for testability
+- Tests: `src/utils/leaderboard.test.ts`
 
 ### Persistence (localStorage)
 | Key | Contents |
@@ -356,7 +486,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 |---------|-------------|
 | `GameDebug.skipToLevel(n)` | Jump to level n (0-indexed). Clears effects, resets ball |
 | `GameDebug.completeLevel()` | Instantly destroys all bricks, triggers level completion |
-| `GameDebug.spawnPowerUp(type, x?, y?)` | Force-spawn a power-up. e.g. `GameDebug.spawnPowerUp('fireball', 400, 300)` |
+| `GameDebug.spawnPowerUp(type, x?, y?)` | Force-spawn a power-up. e.g. `GameDebug.spawnPowerUp('fireball', 400, 300)` or `'djscratch'` |
 | `GameDebug.getState()` | Returns `{level, levelName, lives, score, activeBalls, canLaunch}` |
 
 **`Brick` class** (available at `window.Brick`):
@@ -391,12 +521,15 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Level Data** | All 10 levels have required fields, sequential IDs, positive speed multipliers, valid brick types/health/positions, no duplicate positions |
 | **Power-Up Configs** | Every `PowerUpType` enum value has a matching `POWERUP_CONFIGS` entry with correct type, color, duration, dropWeight, and emoji |
 | **Currency Conversion** | `CurrencyManager.calculateCurrencyFromScore()` returns correct values across all tier thresholds (0, 100, 1K, 5K, 10K, 25K scores) |
+| **Currency Persistence** | `CurrencyManager` localStorage integration: loads on init, handles corrupted/negative values, saves after transactions, cross-session persistence, `resetCurrency()` behavior |
 | **Brick Drop Chances** | Every `BrickType` has a `BRICK_DROP_CHANCES` entry between 0–1, with correct ordering (Present < Piñata < Balloon) |
 | **Multiplier System** | `MultiplierSystem` initialization, increment with diminishing returns, max cap enforcement, decay mechanics (grace period, scaling), reset behavior, and score application |
 | **Constants Validation** | All game constants in `config/Constants.ts` have sane values: positive dimensions, valid ranges (0–1 for volumes/probabilities), ascending tier thresholds, valid hex colors, positive scores/durations |
 | **Drop Roll Probability** | Pure drop logic functions (`calculateDropChance`, `rollDrop`, `rollDropsForDamage`): base chances per brick type, Power Ball bonus (2× capped at 100%), AOE penalty (50%), debug override precedence, edge cases |
 | **Paddle Collision** | Center/edge/clamped angle calculations return correct radian values |
 | **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
+| **Fireball Stacking** | `FireballState` functions: `reset()` initializes level 0, `incrementLevel()` increases by 1 (immutable), `isActive()` returns false at 0/true at 1+, `getDamage()` equals level, `getVisualTier()` maps levels to 4 tiers (0/1/2/3), `canPierce()` returns level ≥ brickHP, integration test covers full gameplay flow |
+| **Procedural Brick Generation** | Endless Mode brick generation (`proceduralBricks.ts`): seeded PRNG determinism & range, difficulty parameter scaling/caps (brickCount, avgHP, density, speed), brick type selection thresholds across 3 difficulty tiers, HP calculation with center/top bonuses & clamping, pattern selection by wave phase (checkpoint/early/mid/late), main generator determinism, position uniqueness, and valid output bounds (42 tests) |
 
 ### Utility Functions
 | Module | Function | Description |
@@ -406,6 +539,16 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | `utils/dropRoll.ts` | `rollDropsForDamage(damage, chance, rng?)` | Multi-damage roll (one roll per damage point) with injectable RNG. Returns count of successful drops. |
 | `utils/paddleAngle.ts` | `calculatePaddleBounceAngle(relativeHitX, paddleWidth, minAngle?, maxAngle?)` | Pure function for paddle collision angle calculation. Returns angle in radians. Handles center hits (straight up), edge hits (steep angles), and clamping. |
 | `utils/ballLaunch.ts` | `calculateLaunchVelocity(speed, minAngle?, maxAngle?)` | Pure function to calculate ball launch velocity. Extracted from `Ball.ts` for unit testing. Returns `{velocityX, velocityY, angleDeg}` with random angle in specified range (default: -120° to -60°). |
+| `utils/leaderboard.ts` | `getLeaderboard(storage, key?)` | Retrieves leaderboard from localStorage. Returns empty array if key doesn't exist or contains invalid JSON. |
+| `utils/leaderboard.ts` | `checkIsHighScore(score, leaderboard, maxEntries?)` | Checks if a score qualifies for the leaderboard (score > 0 AND either room available OR beats lowest). |
+| `utils/leaderboard.ts` | `insertScore(entry, leaderboard, maxEntries?)` | Inserts entry into leaderboard, maintains descending sort, caps at maxEntries. Returns new array (immutable). |
+| `utils/leaderboard.ts` | `saveLeaderboard(leaderboard, storage, key?)` | Saves leaderboard to localStorage as JSON. |
+| `utils/fireball.ts` | `reset()` | Returns initial fireball state with level 0. |
+| `utils/fireball.ts` | `incrementLevel(state)` | Increments fireball level by 1. Returns new state (immutable). |
+| `utils/fireball.ts` | `isActive(state)` | Returns true if fireball level > 0. |
+| `utils/fireball.ts` | `getDamage(state)` | Returns damage per hit (equals current level). |
+| `utils/fireball.ts` | `getVisualTier(state)` | Returns visual tier (0-3) based on level: 0→0, 1-2→1, 3-4→2, 5+→3. |
+| `utils/fireball.ts` | `canPierce(state, brickHP)` | Returns true if fireball level ≥ brickHP (ball passes through brick). |
 
 ### Commands
 ```bash
@@ -427,10 +570,139 @@ npm run test:watch # Run tests in watch mode (development)
 
 ---
 
-## 10. TODO / Known Gaps
+## 10. Lifetime Stats & Milestones
+
+### Lifetime Stats System
+All-time player statistics are tracked and persisted to localStorage:
+
+| Stat | Description |
+|------|-------------|
+| **Bricks Destroyed** | Total number of bricks destroyed across all games |
+| **Power-Ups Collected** | Total power-ups collected (by type breakdown available) |
+| **Games Played** | Total number of game sessions started |
+| **Time Played** | Cumulative play time in hours/minutes |
+| **Highest Multiplier** | Best multiplier achieved |
+| **Total Score** | Sum of all scores earned |
+| **Highest Level** | Furthest level reached (1-10) |
+| **Perfect Games** | Games completed without losing a life |
+
+- Storage key: `geno_lifetime_stats`
+- Accessible via **Stats** button on main menu
+- Stats scene shows all statistics with progress bars for milestones
+
+### Milestones
+Achievement-based milestones that unlock exclusive cosmetic rewards:
+
+| Milestone | Requirement | Reward |
+|-----------|-------------|--------|
+| **Brick Basher** | Destroy 500 bricks | Bash paddle skin (orange/red) |
+| **Block Buster** | Destroy 2,500 bricks | Crusher ball trail (rocky debris) |
+| **Demolition Expert** | Destroy 10,000 bricks | Destroyer paddle skin (black/purple) |
+| **Power Hungry** | Collect 100 power-ups | Power ball trail (electric blue) |
+| **Combo Master** | Reach 5.0× multiplier | Master paddle skin (platinum) |
+| **Party Veteran** | Play 25 games | Veteran ball trail (military green) |
+| **Endurance** | Accumulate 1 hour of play time | Time paddle skin (clock themed) |
+| **Perfect Run** | Complete a game without losing a life | Flawless ball trail (diamond sparkle) |
+
+- Milestones are checked at game end
+- Achievement celebration overlay shows when milestones are unlocked
+- Milestone rewards appear in Party Shop with "🔒 [Milestone Name]" until unlocked
+- Once unlocked, milestone items show "✓ Unlocked" and can be equipped for free
+- Progress is saved in localStorage under `genos-block-party-milestones`
+
+### Milestone-Exclusive Cosmetics
+Items with `price: -1` in the shop catalog are milestone-exclusive:
+
+**Paddle Skins:**
+- Bash (0xff4500) — Brick Basher reward
+- Destroyer (0x1a0033) — Demolition Expert reward
+- Master (0xe5e4e2) — Combo Master reward
+- Time (0x4169e1) — Endurance reward
+
+**Ball Trails:**
+- Crusher — Block Buster reward (rocky debris particles)
+- Power — Power Hungry reward (electric blue particles)
+- Veteran — Party Veteran reward (military green particles)
+- Flawless — Perfect Run reward (diamond sparkle particles)
+
+### Permanent Upgrades
+
+The Party Shop includes a dedicated UPGRADES tab for permanent stat boosts that persist across sessions.
+
+| Upgrade | Tier 1 | Tier 2 | Tier 3 |
+|---------|--------|--------|--------|
+| **Remix Boost** | +5% drop (¢50) | +10% drop (¢150) | +15% drop (¢400) |
+
+**Remix Boost** increases power-up drop chances additively. The bonus applies to all brick types and stacks with Power Ball's multiplicative bonus. Example: A Balloon brick (30% base) with Tier 2 Remix Boost (+10%) and Power Ball active would have: (30% + 10%) × 2 = 80% drop chance.
+
+- Upgrades are persistent via localStorage (`genos-block-party-upgrades`)
+- Visual tier indicator shows ★★☆ style progress
+- MAXED label with gold border when fully upgraded
+
+---
+
+## 11. Achievement System
+
+The Achievement System rewards players with bonus coins for accomplishing specific in-game feats. Achievements are tracked separately from Milestones (which unlock cosmetics).
+
+### Achievement Types
+- **Cumulative** — Based on lifetime stats (bricks destroyed, power-ups collected, games played)
+- **Session-based** — Achieved within a single game (level completion, score thresholds, flawless runs)
+- **Skill-based** — Specific gameplay feats (fireball stacking, multiplier levels)
+
+### Achievement List
+
+| ID | Name | Description | Coins | Type |
+|----|------|-------------|-------|------|
+| `party_starter` | Party Starter | Complete Level 1 | 10 | Session |
+| `halfway_there` | Halfway There | Complete Level 5 | 25 | Session |
+| `party_master` | Party Master | Complete all 10 levels | 100 | Session |
+| `flawless_one` | Flawless Start | Clear Level 1 without losing a life | 20 | Session |
+| `flawless_five` | Flawless Five | Clear Level 5 without losing a life | 50 | Session |
+| `flawless_ten` | Perfect Party | Clear Level 10 without losing a life | 100 | Session |
+| `fire_lord` | Fire Lord | Stack Fireball to level 5 | 75 | Skill |
+| `combo_king` | Combo King | Reach 5x multiplier | 50 | Skill |
+| `power_collector` | Power Collector | Collect 100 power-ups (lifetime) | 25 | Cumulative |
+| `brick_breaker` | Brick Breaker | Destroy 500 bricks (lifetime) | 25 | Cumulative |
+| `score_hunter` | Score Hunter | Reach 10,000 score in one game | 30 | Session |
+| `endless_five` | Endless Explorer | Reach wave 5 in Endless Mode | 30 | Session |
+| `endless_ten` | Endless Warrior | Reach wave 10 in Endless Mode | 50 | Session |
+| `party_animal` | Party Animal | Play 10 games | 15 | Cumulative |
+
+### Features
+- **Achievement Gallery**: Accessible from menu via "🏆 ACHIEVEMENTS" button
+- **Progress Tracking**: Cumulative achievements show progress bars in the gallery
+- **Unlock Toast**: In-game notification with chime sound when achievement unlocks
+- **Coin Rewards**: Coins automatically added to player balance on unlock
+- **Persistent Storage**: Unlocked achievements saved to localStorage (`genos-block-party-achievements`)
+
+### Flawless Achievements
+Flawless achievements require completing a specific level without losing any lives *on that level*:
+- Previous levels may have lost lives
+- Only the target level must be completed flawlessly
+- Lives at level start vs level end are tracked
+
+### Session Tracking
+The AchievementManager tracks session state including:
+- Highest level completed this session
+- Lives lost per level (for flawless detection)
+- Highest fireball stack achieved
+- Highest multiplier reached
+- Session score
+- Endless mode wave progression
+
+### Integration
+- Achievements are checked at game end (win or lose)
+- Fireball stacking is tracked via power-up system events
+- Multiplier is tracked on each brick hit
+- Level completion records flawless status
+- Endless waves are tracked as they're completed
+
+---
+
+## 12. TODO / Known Gaps
 
 ### Unused Systems
-- **Currency system exists but has no shop**: `CurrencyManager` has `spendCurrency()`, `canAfford()`, and `resetCurrency()` methods, but there is no shop scene or purchasable items. Coins accumulate with no way to spend them.
 - **`CURRENCY.AWARD_SCENE_DURATION` and `COUNT_UP_DURATION` constants** are defined but the award is handled inline in GameOverScene rather than a dedicated award scene.
 
 ### Missing Content
@@ -444,10 +716,9 @@ npm run test:watch # Run tests in watch mode (development)
 - **Mute toggle**: `AudioManager` has `setMuted()`/`toggleMute()` but there's no mute button in the UI (only volume sliders)
 
 ### Obvious Next Steps
-- **Shop system**: Use accumulated currency to buy cosmetics, power-up loadouts, or upgrades
 - **More levels**: Level data system supports unlimited levels via the `LEVELS` array
 - **Custom art assets**: All graphics are currently generated programmatically in BootScene — real sprite sheets would elevate the visual quality
 - **Beat-sync effects**: BPM data exists in manifest for future rhythm-based visual effects
 - **Leaderboard online**: Currently localStorage only — could integrate with a backend for global scores
-- **More power-up types**: Effect system is registry-based and designed for easy extension
+- **More power-up types**: Effect system is registry-based and designed for easy extension (DJ Scratch added as latest example)
 - **Accessibility**: No colorblind mode, no screen reader support beyond the "Now Playing" toast ARIA attributes

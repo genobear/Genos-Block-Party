@@ -124,6 +124,29 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       shake: { duration: 100, intensity: 0.005 },
     },
   },
+  [PowerUpType.BASS_DROP]: {
+    displayName: '🎵 BASS DROP! 🎵',
+    color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color,
+    particles: {
+      colors: [0x9400d3, 0xba55d3, 0xff00ff, 0x7b00ff, 0xffffff],
+      count: 25,
+    },
+    screenEffect: {
+      flash: { duration: 300, color: 0x9400d3, alpha: 0.6 },
+      shake: { duration: 400, intensity: 0.02 },
+    },
+  },
+  [PowerUpType.DJ_SCRATCH]: {
+    displayName: 'MAGNET PADDLE!',
+    color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color,
+    particles: {
+      colors: [0x00ffff, 0x00e5ff, 0xffffff, 0x40ffff],
+      count: 12,
+    },
+    screenEffect: {
+      flash: { duration: 100, color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color, alpha: 0.35 },
+    },
+  },
   [PowerUpType.BOUNCE_HOUSE]: {
     displayName: 'SAFETY NET!',
     color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color,
@@ -144,6 +167,51 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
     },
     screenEffect: {
       flash: { duration: 200, color: 0xffd700, alpha: 0.5 },
+    },
+  },
+  [PowerUpType.CONFETTI_CANNON]: {
+    displayName: 'CONFETTI CANNON!',
+    color: POWERUP_CONFIGS[PowerUpType.CONFETTI_CANNON].color,
+    particles: {
+      colors: [0xff1493, 0x00ff00, 0xffff00, 0x00ffff, 0xff6600, 0xff00ff],
+      count: 20,
+    },
+    screenEffect: {
+      flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.CONFETTI_CANNON].color, alpha: 0.4 },
+    },
+  },
+  [PowerUpType.CONGA_LINE]: {
+    displayName: 'CONGA LINE!',
+    color: POWERUP_CONFIGS[PowerUpType.CONGA_LINE].color,
+    particles: {
+      colors: [0xe040fb, 0xff00ff, 0xda70d6, 0xffffff, 0xba55d3],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.CONGA_LINE].color, alpha: 0.4 },
+    },
+  },
+  [PowerUpType.SPOTLIGHT]: {
+    displayName: 'SPOTLIGHT!',
+    color: POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].color,
+    particles: {
+      colors: [0xffd700, 0xffec8b, 0xffffff, 0xfffacd, 0xffe135],
+      count: 15,
+    },
+    screenEffect: {
+      flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].color, alpha: 0.4 },
+    },
+  },
+  [PowerUpType.DANCE_FLOOR]: {
+    displayName: 'DANCE FLOOR!',
+    color: POWERUP_CONFIGS[PowerUpType.DANCE_FLOOR].color,
+    particles: {
+      colors: [0xff1493, 0xff69b4, 0xffffff, 0xff00ff, 0x00ffff],
+      count: 20,
+    },
+    screenEffect: {
+      flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.DANCE_FLOOR].color, alpha: 0.5 },
+      shake: { duration: 200, intensity: 0.008 },
     },
   },
 };

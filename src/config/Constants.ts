@@ -60,11 +60,16 @@ export const COLORS = {
   PRESENT: 0xff69b4,      // Pink/Magenta
   PINATA: 0xffa500,       // Orange/Gold
   BALLOON: 0x00bfff,      // Cyan/Blue
+  DRIFTER: 0xaaddff,      // Ghostly pale blue
 
   // UI
   BALL: 0xffffff,         // White
   PADDLE: 0x8b5cf6,       // Purple
   PADDLE_ACCENT: 0xa78bfa, // Light purple
+
+  // Bumper (pinball obstacle)
+  BUMPER: 0xff4444,       // Classic pinball red
+  BUMPER_FLASH: 0xffffff, // White flash on impact
 
   // Background
   BACKGROUND: 0x1a1a2e,
@@ -75,6 +80,22 @@ export const SCORE_VALUES = {
   PRESENT: 10,
   PINATA: 15,
   BALLOON: 20,
+  DRIFTER: 25,
+} as const;
+
+// Drifter brick settings
+export const DRIFTER = {
+  DRIFT_SPEED: 25,        // px/s upward
+  BOB_AMPLITUDE: 3,       // px horizontal
+  BOB_FREQUENCY: 2,       // Hz
+  ESCAPE_THRESHOLD: 60,   // y position to escape
+} as const;
+
+// Bumper settings (pinball-style obstacles)
+export const BUMPER = {
+  BOOST_MULTIPLIER: 1.5,  // Velocity multiplier on contact
+  SIZE: 40,               // Diameter in pixels
+  FLASH_DURATION: 100,    // Impact flash duration (ms)
 } as const;
 
 // Note: Power-up durations are defined in POWERUP_CONFIGS (src/types/PowerUpTypes.ts)
@@ -128,4 +149,56 @@ export const MULTIPLIER = {
   DECAY_DELAY_MS: 1000,         // Grace period before decay starts (shorter since decay scales)
   DECAY_RATE: 0.5,              // Multiplier drop per second during decay (scales with level)
   MIN_DISPLAY_THRESHOLD: 1.1,   // Only show UI when above this
+} as const;
+
+// Lifetime stats settings
+export const STATS = {
+  STORAGE_KEY: 'geno_lifetime_stats',
+  INITIAL: {
+    totalBricksDestroyed: 0,
+    totalPowerUpsCollected: 0,
+    powerUpsByType: {} as Record<string, number>,
+    gamesPlayed: 0,
+    totalPlayTimeMs: 0,
+    highestMultiplier: 1,
+    totalScoreEarned: 0,
+    highestLevel: 0,
+    perfectGames: 0,
+  },
+} as const;
+
+// Achievement configuration
+export const ACHIEVEMENTS = {
+  STORAGE_KEY: 'genos-block-party-achievements',
+} as const;
+
+// Endless Mode settings
+export const ENDLESS_MODE = {
+  // Storage keys
+  STORAGE_KEY: 'genos-block-party-endless-unlocked',
+  LEADERBOARD_KEY: 'genos-block-party-endless-leaderboard',
+  LEVEL_PROGRESS_KEY: 'genos-block-party-level-progress',
+
+  // Checkpoint system
+  CHECKPOINT_INTERVAL: 5,
+
+  // Brick generation
+  BASE_BRICK_COUNT: 20,
+  MAX_BRICK_COUNT: 40,
+  DIFFICULTY_RAMP_RATE: 0.1,
+
+  // Grid dimensions
+  GRID_COLS: 10,
+  GRID_ROWS: 12,
+
+  // Difficulty scaling
+  SPEED_INCREMENT_PER_WAVE: 0.03,
+  MAX_SPEED_MULTIPLIER: 1.5,
+  HP_INCREMENT_WAVE_INTERVAL: 10,
+  DENSITY_INCREMENT_PER_WAVE: 0.02,
+  MAX_DENSITY: 0.7,
+  BASE_DENSITY: 0.3,
+
+  // Currency bonus per wave in endless mode
+  CURRENCY_PER_WAVE: 3,
 } as const;
