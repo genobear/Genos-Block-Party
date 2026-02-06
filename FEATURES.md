@@ -529,6 +529,7 @@ All SFX are **synthesized at runtime** via Web Audio API (no audio files):
 | **Paddle Collision** | Center/edge/clamped angle calculations return correct radian values |
 | **Ball Launch** | `calculateLaunchVelocity()` returns angles within specified range, always upward (negative velocityY), magnitude matches input speed, handles edge cases (zero/negative/high speeds) |
 | **Fireball Stacking** | `FireballState` functions: `reset()` initializes level 0, `incrementLevel()` increases by 1 (immutable), `isActive()` returns false at 0/true at 1+, `getDamage()` equals level, `getVisualTier()` maps levels to 4 tiers (0/1/2/3), `canPierce()` returns level ≥ brickHP, integration test covers full gameplay flow |
+| **Procedural Brick Generation** | Endless Mode brick generation (`proceduralBricks.ts`): seeded PRNG determinism & range, difficulty parameter scaling/caps (brickCount, avgHP, density, speed), brick type selection thresholds across 3 difficulty tiers, HP calculation with center/top bonuses & clamping, pattern selection by wave phase (checkpoint/early/mid/late), main generator determinism, position uniqueness, and valid output bounds (42 tests) |
 
 ### Utility Functions
 | Module | Function | Description |
