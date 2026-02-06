@@ -31,7 +31,7 @@ export class LifetimeStatsManager {
   private currentGameLivesLost: number = 0;
 
   private constructor() {
-    this.stats = { ...STATS.INITIAL };
+    this.stats = { ...STATS.INITIAL, powerUpsByType: { ...STATS.INITIAL.powerUpsByType } };
     this.load();
   }
 
@@ -181,7 +181,7 @@ export class LifetimeStatsManager {
    * Reset all stats (for testing/debug)
    */
   resetStats(): void {
-    this.stats = { ...STATS.INITIAL };
+    this.stats = { ...STATS.INITIAL, powerUpsByType: { ...STATS.INITIAL.powerUpsByType } };
     this.save();
   }
 }
