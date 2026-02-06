@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import { COLORS, BALL_RADIUS, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
-import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
@@ -47,6 +46,16 @@ export class BootScene extends Phaser.Scene {
     }
     // Also load 'paddle' key pointing to default skin (used as initial texture in Paddle constructor)
     this.load.image('paddle', 'assets/sprites/paddle-skin-default.png');
+
+    // Load power-up icon sprites (replaces programmatic texture generation)
+    const powerupTypes = [
+      'balloon', 'cake', 'drinks', 'disco', 'mystery', 'powerball',
+      'fireball', 'electricball', 'partypopper', 'bassdrop', 'djscratch',
+      'bouncehouse', 'partyfavor', 'confetticannon', 'congaline', 'spotlight', 'dancefloor'
+    ];
+    for (const type of powerupTypes) {
+      this.load.image(`powerup-${type}`, `assets/sprites/powerup-${type}.png`);
+    }
 
     // Generate placeholder graphics
     this.createPlaceholderGraphics();
@@ -96,8 +105,7 @@ export class BootScene extends Phaser.Scene {
 
     // Brick textures are now loaded as sprite images in preload()
 
-    // Create power-up textures
-    this.createPowerUpTextures();
+    // Power-up textures now loaded from sprite files in preload()
 
     // Paddle skin textures now loaded from sprite files in preload()
 
@@ -109,41 +117,6 @@ export class BootScene extends Phaser.Scene {
 
     // Create bumper texture (pinball obstacle)
     this.createBumperTexture();
-  }
-
-  private createPowerUpTextures(): void {
-    const powerUps = [
-      { name: 'balloon', color: POWERUP_CONFIGS[PowerUpType.BALLOON].color, symbol: 'B' },
-      { name: 'cake', color: POWERUP_CONFIGS[PowerUpType.CAKE].color, symbol: 'C' },
-      { name: 'drinks', color: POWERUP_CONFIGS[PowerUpType.DRINKS].color, symbol: 'D' },
-      { name: 'disco', color: POWERUP_CONFIGS[PowerUpType.DISCO].color, symbol: 'M' },
-      { name: 'mystery', color: POWERUP_CONFIGS[PowerUpType.MYSTERY].color, symbol: '?' },
-      { name: 'powerball', color: POWERUP_CONFIGS[PowerUpType.POWERBALL].color, symbol: 'P' },
-      { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
-      { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
-      { name: 'partypopper', color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color, symbol: '💣' },
-      { name: 'bassdrop', color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color, symbol: '♪' },
-      { name: 'djscratch', color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color, symbol: 'S' },
-      { name: 'bouncehouse', color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color, symbol: 'N' },
-      { name: 'partyfavor', color: POWERUP_CONFIGS[PowerUpType.PARTY_FAVOR].color, symbol: '+' },
-    ];
-
-    const size = 24;
-
-    powerUps.forEach(({ name, color }) => {
-      const g = this.make.graphics({ x: 0, y: 0 });
-
-      // Circle background
-      g.fillStyle(color);
-      g.fillCircle(size / 2, size / 2, size / 2 - 1);
-
-      // Border
-      g.lineStyle(2, 0xffffff, 0.8);
-      g.strokeCircle(size / 2, size / 2, size / 2 - 1);
-
-      g.generateTexture(`powerup-${name}`, size, size);
-      g.destroy();
-    });
   }
 
   private createParticleTextures(): void {
