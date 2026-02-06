@@ -67,6 +67,10 @@ export const COLORS = {
   PADDLE: 0x8b5cf6,       // Purple
   PADDLE_ACCENT: 0xa78bfa, // Light purple
 
+  // Bumper (pinball obstacle)
+  BUMPER: 0xff4444,       // Classic pinball red
+  BUMPER_FLASH: 0xffffff, // White flash on impact
+
   // Background
   BACKGROUND: 0x1a1a2e,
 } as const;
@@ -85,6 +89,13 @@ export const DRIFTER = {
   BOB_AMPLITUDE: 3,       // px horizontal
   BOB_FREQUENCY: 2,       // Hz
   ESCAPE_THRESHOLD: 60,   // y position to escape
+} as const;
+
+// Bumper settings (pinball-style obstacles)
+export const BUMPER = {
+  BOOST_MULTIPLIER: 1.5,  // Velocity multiplier on contact
+  SIZE: 40,               // Diameter in pixels
+  FLASH_DURATION: 100,    // Impact flash duration (ms)
 } as const;
 
 // Note: Power-up durations are defined in POWERUP_CONFIGS (src/types/PowerUpTypes.ts)

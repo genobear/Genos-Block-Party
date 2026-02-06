@@ -7,6 +7,7 @@ export interface LevelData {
   ballSpeedMultiplier: number;
   backgroundColor: number;
   bricks: BrickConfig[];
+  bumpers?: { x: number; y: number }[];
 }
 
 /**
@@ -120,7 +121,7 @@ export const LEVELS: LevelData[] = [
 
   // ===========================================
   // Level 3: Gift Wrapped
-  // Pyramid with HP variation
+  // Pyramid with HP variation + bumpers
   // ===========================================
   {
     id: 3,
@@ -135,6 +136,11 @@ export const LEVELS: LevelData[] = [
       ...generateRow(5, BrickType.PRESENT, 2, 2, 7),
       ...generateRow(6, BrickType.BALLOON, 2, 3, 6),
       ...generateRow(7, BrickType.PINATA, 2, 4, 5),
+    ],
+    // Pinball bumpers for extra chaos
+    bumpers: [
+      { x: 200, y: 600 },
+      { x: 600, y: 600 },
     ],
   },
 

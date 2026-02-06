@@ -44,6 +44,19 @@
 - Escaped drifters still count toward level completion (they're destroyed when they escape)
 - High score value (25 pts) compensates for the escape risk
 
+### Pinball Bumpers
+- Static circular obstacles (40px diameter) that appear in certain levels
+- Classic pinball bumper aesthetic: red body with white ring highlight and center cap
+- **Cannot be destroyed** — purely deflection obstacles
+- On ball collision:
+  - Ball velocity multiplied by 1.5× (boost)
+  - Velocity capped at 3× base speed to prevent crazy speeds
+  - Bumper flashes white briefly (100ms) with scale punch animation
+  - Bounce sound plays
+- Bumpers don't count toward level completion (not bricks)
+- First appears in Level 3 ("Gift Wrapped") with 2 bumpers in play area
+- Adds pinball-style chaos and strategic bouncing opportunities
+
 - Bricks display health indicator dots (1–3 dots on the brick face)
 - Texture changes on damage to reflect remaining HP
 - Hit animation: quick scale punch (1.1x / 0.9y) + white flash

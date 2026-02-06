@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO } from '../config/Constants';
+import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
@@ -97,6 +97,9 @@ export class BootScene extends Phaser.Scene {
 
     // Create safety net texture (Bounce House power-up)
     this.createSafetyNetTexture();
+
+    // Create bumper texture (pinball obstacle)
+    this.createBumperTexture();
   }
 
   /**
@@ -346,6 +349,38 @@ export class BootScene extends Phaser.Scene {
     }
 
     g.generateTexture('safety-net', netWidth, netHeight);
+    g.destroy();
+  }
+
+  /**
+   * Create bumper texture (classic pinball bumper look with ring/glow effect)
+   */
+  private createBumperTexture(): void {
+    const size = BUMPER.SIZE;
+    const center = size / 2;
+    const g = this.make.graphics({ x: 0, y: 0 });
+
+    // Outer glow ring (softer, larger)
+    g.fillStyle(COLORS.BUMPER, 0.3);
+    g.fillCircle(center, center, center);
+
+    // Main body (bright red)
+    g.fillStyle(COLORS.BUMPER, 1);
+    g.fillCircle(center, center, center - 4);
+
+    // Inner highlight ring (white)
+    g.lineStyle(2, 0xffffff, 0.6);
+    g.strokeCircle(center, center, center - 6);
+
+    // Center cap (darker red for depth)
+    g.fillStyle(0xcc3333, 1);
+    g.fillCircle(center, center, center - 12);
+
+    // Center highlight (shiny dot)
+    g.fillStyle(0xffffff, 0.7);
+    g.fillCircle(center - 4, center - 4, 4);
+
+    g.generateTexture('bumper', size, size);
     g.destroy();
   }
 

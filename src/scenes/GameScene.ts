@@ -3,6 +3,7 @@ import { Paddle } from '../objects/Paddle';
 import { Ball } from '../objects/Ball';
 import { Brick } from '../objects/Brick';
 import { DrifterBrick } from '../objects/DrifterBrick';
+import { Bumper } from '../objects/Bumper';
 import { BallPool } from '../pools/BallPool';
 import { PowerUpSystem } from '../systems/PowerUpSystem';
 import { ParticleSystem } from '../systems/ParticleSystem';
@@ -37,12 +38,14 @@ import {
   STARTING_LIVES,
   AUDIO,
   COLORS,
+  BALL_SPEED_BASE,
 } from '../config/Constants';
 
 export class GameScene extends Phaser.Scene {
   // Game objects
   private paddle!: Paddle;
   private bricks!: Phaser.Physics.Arcade.StaticGroup;
+  private bumpers!: Phaser.Physics.Arcade.StaticGroup;
 
   // Ball pool (all balls are equal, no primary ball)
   private ballPool!: BallPool;
@@ -215,6 +218,9 @@ export class GameScene extends Phaser.Scene {
 
     // Create brick group
     this.bricks = this.physics.add.staticGroup();
+
+    // Create bumper group (pinball obstacles)
+    this.bumpers = this.physics.add.staticGroup();
 
     // Create electric arc system for Electric Ball AOE
     this.electricArcSystem = new ElectricArcSystem(this, this.bricks);
@@ -448,8 +454,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Clear existing bricks
+    // Clear existing bricks and bumpers
     this.bricks.clear(true, true);
+    this.bumpers.clear(true, true);
 
     // Calculate brick grid offset to center it
     const totalWidth = BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING;
@@ -525,6 +532,14 @@ export class GameScene extends Phaser.Scene {
         this.bricks.add(brick);
       });
 
+      // Create bumpers from level data (if any)
+      if (this.currentLevel.bumpers) {
+        this.currentLevel.bumpers.forEach((bumperConfig) => {
+          const bumper = new Bumper(this, bumperConfig.x, bumperConfig.y);
+          this.bumpers.add(bumper);
+        });
+      }
+
       // Emit level update to UI
       this.events.emit('levelUpdate', this.currentLevel.name);
 
@@ -562,6 +577,15 @@ export class GameScene extends Phaser.Scene {
       undefined,
       this
     );
+
+    // Ball vs Bumpers (pinball obstacles)
+    this.physics.add.collider(
+      this.ballPool.getGroup(),
+      this.bumpers,
+      this.handleBallBumperCollision.bind(this) as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback,
+      undefined,
+      this
+    );
   }
 
   private handleWorldBounds(
@@ -575,6 +599,27 @@ export class GameScene extends Phaser.Scene {
     if (left || right || up) {
       // Optional: add wall bounce effect
     }
+  }
+
+  /**
+   * Handle ball collision with a pinball bumper
+   * Applies velocity boost and triggers flash animation
+   */
+  private handleBallBumperCollision(
+    ballObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+    bumperObj: Phaser.Types.Physics.Arcade.GameObjectWithBody,
+  ): void {
+    const ball = ballObj as Ball;
+    const bumper = bumperObj as Bumper;
+
+    // Calculate max speed cap (3× base speed)
+    const maxSpeed = BALL_SPEED_BASE * 3;
+
+    // Apply velocity boost
+    bumper.applyBoost(ball, maxSpeed);
+
+    // Play bounce sound
+    this.audioManager.playSFX(AUDIO.SFX.BOUNCE);
   }
 
   // ========== CONGA LINE GHOST COLLISIONS ==========
