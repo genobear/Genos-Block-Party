@@ -62,6 +62,28 @@ export class BootScene extends Phaser.Scene {
     this.load.image('safety-net', 'assets/sprites/safety-net.png');
     this.load.image('bumper', 'assets/sprites/bumper.png');
 
+    // Load particle effect sprites (replaces programmatic texture generation)
+    const particleTypes = [
+      'confetti', 'streamer', 'sparkle', 'spark', 'flame',
+      'mirror-facet', 'light-ray', 'glint', 'speedline', 'electric', 'glow'
+    ];
+    for (const type of particleTypes) {
+      this.load.image(`particle-${type}`, `assets/sprites/particle-${type}.png`);
+    }
+
+    // Load UI sprites
+    this.load.image('ui-heart', 'assets/sprites/ui-heart.png');
+    this.load.image('ui-coin', 'assets/sprites/ui-coin.png');
+
+    // Load achievement badge sprites
+    const badgeTypes = [
+      'brick-basher', 'block-buster', 'demolition-expert', 'combo-master',
+      'power-hungry', 'party-veteran', 'endurance', 'perfect-run'
+    ];
+    for (const badge of badgeTypes) {
+      this.load.image(`badge-${badge}`, `assets/sprites/badge-${badge}.png`);
+    }
+
     // Generate placeholder graphics
     this.createPlaceholderGraphics();
 
@@ -107,142 +129,7 @@ export class BootScene extends Phaser.Scene {
 
     // Paddle skin textures now loaded from sprite files in preload()
 
-    // Create particle textures
-    this.createParticleTextures();
-  }
-
-  private createParticleTextures(): void {
-    // Confetti particle (small rectangle)
-    const confetti = this.make.graphics({ x: 0, y: 0 });
-    confetti.fillStyle(0xffffff);
-    confetti.fillRect(0, 0, 8, 4);
-    confetti.generateTexture('particle-confetti', 8, 4);
-    confetti.destroy();
-
-    // Streamer particle (longer rectangle)
-    const streamer = this.make.graphics({ x: 0, y: 0 });
-    streamer.fillStyle(0xffffff);
-    streamer.fillRect(0, 0, 4, 16);
-    streamer.generateTexture('particle-streamer', 4, 16);
-    streamer.destroy();
-
-    // Sparkle particle (star-like diamond)
-    const sparkle = this.make.graphics({ x: 0, y: 0 });
-    sparkle.fillStyle(0xffffff);
-    sparkle.beginPath();
-    sparkle.moveTo(6, 0);
-    sparkle.lineTo(8, 4);
-    sparkle.lineTo(12, 6);
-    sparkle.lineTo(8, 8);
-    sparkle.lineTo(6, 12);
-    sparkle.lineTo(4, 8);
-    sparkle.lineTo(0, 6);
-    sparkle.lineTo(4, 4);
-    sparkle.closePath();
-    sparkle.fillPath();
-    sparkle.generateTexture('particle-sparkle', 12, 12);
-    sparkle.destroy();
-
-    // Spark particle (small circle for danger trail)
-    const spark = this.make.graphics({ x: 0, y: 0 });
-    spark.fillStyle(0xffffff);
-    spark.fillCircle(4, 4, 4);
-    spark.generateTexture('particle-spark', 8, 8);
-    spark.destroy();
-
-    // Flame particle (larger soft circle for fireball trail)
-    const flame = this.make.graphics({ x: 0, y: 0 });
-    flame.fillStyle(0xffffff);
-    flame.fillCircle(6, 6, 6);
-    flame.generateTexture('particle-flame', 12, 12);
-    flame.destroy();
-
-    // Mirror facet particle (small diamond for mirror ball reflections)
-    const mirrorFacet = this.make.graphics({ x: 0, y: 0 });
-    mirrorFacet.fillStyle(0xffffff);
-    mirrorFacet.beginPath();
-    mirrorFacet.moveTo(4, 0);
-    mirrorFacet.lineTo(8, 4);
-    mirrorFacet.lineTo(4, 8);
-    mirrorFacet.lineTo(0, 4);
-    mirrorFacet.closePath();
-    mirrorFacet.fillPath();
-    mirrorFacet.generateTexture('particle-mirror-facet', 8, 8);
-    mirrorFacet.destroy();
-
-    // Light ray particle (elongated beam for mirror ball light reflections)
-    const lightRay = this.make.graphics({ x: 0, y: 0 });
-    lightRay.fillStyle(0xffffff);
-    lightRay.beginPath();
-    lightRay.moveTo(2, 0);
-    lightRay.lineTo(4, 0);
-    lightRay.lineTo(4, 20);
-    lightRay.lineTo(2, 20);
-    lightRay.closePath();
-    lightRay.fillPath();
-    // Add tapered glow at top
-    lightRay.fillStyle(0xffffff, 0.6);
-    lightRay.fillCircle(3, 2, 3);
-    lightRay.generateTexture('particle-light-ray', 6, 20);
-    lightRay.destroy();
-
-    // Glint particle (4-point star for light refractions)
-    const glint = this.make.graphics({ x: 0, y: 0 });
-    glint.fillStyle(0xffffff);
-    glint.beginPath();
-    // Vertical spike
-    glint.moveTo(5, 0);
-    glint.lineTo(6, 4);
-    glint.lineTo(5, 10);
-    glint.lineTo(4, 4);
-    glint.closePath();
-    glint.fillPath();
-    // Horizontal spike
-    glint.beginPath();
-    glint.moveTo(0, 5);
-    glint.lineTo(4, 4);
-    glint.lineTo(10, 5);
-    glint.lineTo(4, 6);
-    glint.closePath();
-    glint.fillPath();
-    glint.generateTexture('particle-glint', 10, 10);
-    glint.destroy();
-
-    // Speed line particle (elongated tapered streak for fast ball trail)
-    const speedline = this.make.graphics({ x: 0, y: 0 });
-    speedline.fillStyle(0xffffff);
-    speedline.fillRect(0, 5, 2, 2);  // Core (brightest)
-    speedline.fillStyle(0xffffff, 0.7);
-    speedline.fillRect(0, 3, 2, 2);  // Upper fade
-    speedline.fillRect(0, 7, 2, 2);  // Lower fade
-    speedline.fillStyle(0xffffff, 0.3);
-    speedline.fillRect(0, 0, 2, 3);  // Top tip
-    speedline.fillRect(0, 9, 2, 3);  // Bottom tip
-    speedline.generateTexture('particle-speedline', 2, 12);
-    speedline.destroy();
-
-    // Electric particle (small lightning bolt fragment for energy crackle)
-    const electric = this.make.graphics({ x: 0, y: 0 });
-    electric.fillStyle(0xffffff);
-    electric.fillRect(2, 0, 2, 2);
-    electric.fillRect(1, 2, 2, 2);
-    electric.fillRect(3, 4, 2, 2);
-    electric.generateTexture('particle-electric', 6, 6);
-    electric.destroy();
-
-    // Glow particle (soft radial gradient circle for balloon trail bubbles)
-    const glow = this.make.graphics({ x: 0, y: 0 });
-    // Create layered circles with decreasing alpha for soft glow effect
-    glow.fillStyle(0xffffff, 0.15);
-    glow.fillCircle(8, 8, 8);
-    glow.fillStyle(0xffffff, 0.3);
-    glow.fillCircle(8, 8, 6);
-    glow.fillStyle(0xffffff, 0.5);
-    glow.fillCircle(8, 8, 4);
-    glow.fillStyle(0xffffff, 0.8);
-    glow.fillCircle(8, 8, 2);
-    glow.generateTexture('particle-glow', 16, 16);
-    glow.destroy();
+    // Particle textures now loaded from sprite files in preload()
   }
 
   /**
