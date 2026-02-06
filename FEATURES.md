@@ -110,6 +110,7 @@
 | **Confetti Cannon** | 🎊 | Instant | 10 | Fires confetti at 5-8 random bricks for 1 damage each |
 | **Conga Line** | 💃 | 8s | 8 | Trailing ghost balls deal damage to bricks |
 | **Spotlight** | 🔦 | 8s | 8 | Gentle homing toward nearest brick |
+| **Dance Floor** | 🪩 | Instant | 10 | Shuffles all bricks to random grid positions |
 
 ### Fireball Stacking
 - Collecting multiple Fireballs during active duration **stacks the level** (1 → 2 → 3 → ...)
@@ -159,6 +160,18 @@
 - Works with multi-ball — each ball independently homes toward its nearest brick
 - Propagates to new balls spawned during the effect (via Disco)
 - Timer refreshes if collected again while active
+
+### Dance Floor Details
+- **Instant effect**: On collection, all active bricks shuffle to random positions on the grid
+- **Animation**: Bricks animate smoothly to new positions (~450ms, Back easeOut)
+- **Visual effects**:
+  - Hot pink + white screen flash (disco theme)
+  - Bricks wobble/rotate during movement
+  - Camera shake on activation
+- **Grid**: 10-column × 12-row valid positions (same as level layouts)
+- **No overlapping**: Each brick gets a unique random position
+- **Physics sync**: StaticBody positions update after animation completes
+- Plays party horn SFX on activation
 
 ### Mystery Power-Up
 - Shows "???" feedback on collection

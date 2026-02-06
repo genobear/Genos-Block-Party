@@ -122,6 +122,7 @@ export class PowerUpSystem {
       [PowerUpType.CONFETTI_CANNON, () => this.applyConfettiCannon()],
       [PowerUpType.CONGA_LINE, () => this.applyCongaLine()],
       [PowerUpType.SPOTLIGHT, () => this.applySpotlight()],
+      [PowerUpType.DANCE_FLOOR, () => this.applyDanceFloor()],
     ]);
 
     // Initialize effect propagation config
@@ -856,5 +857,16 @@ export class PowerUpSystem {
     });
 
     this.events.emit('effectExpired', PowerUpType.SPOTLIGHT);
+  }
+
+  // ========== DANCE FLOOR ==========
+
+  /**
+   * Apply Dance Floor effect — shuffles all bricks to random positions on the grid
+   * Emits 'danceFloor' event for GameScene to handle brick shuffling
+   */
+  private applyDanceFloor(): void {
+    this.events.emit('danceFloor');
+    this.events.emit('effectApplied', PowerUpType.DANCE_FLOOR);
   }
 }

@@ -230,6 +230,9 @@ export class GameScene extends Phaser.Scene {
     // Wire Confetti Cannon event - damage 5-8 random bricks
     this.powerUpSystem.events.on('confettiCannon', this.handleConfettiCannon, this);
 
+    // Wire Dance Floor event - shuffle all bricks
+    this.powerUpSystem.events.on('danceFloor', this.handleDanceFloor, this);
+
     // Wire safety net events (Bounce House power-up)
     this.powerUpSystem.events.on('safetyNetCreated', this.onSafetyNetCreated, this);
     this.powerUpSystem.events.on('safetyNetDestroyed', this.onSafetyNetDestroyed, this);
@@ -271,6 +274,7 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem?.events?.off('mysteryRevealed');
     this.powerUpSystem?.events?.off('bassDrop', this.handleBassDrop, this);
     this.powerUpSystem?.events?.off('confettiCannon', this.handleConfettiCannon, this);
+    this.powerUpSystem?.events?.off('danceFloor', this.handleDanceFloor, this);
     this.powerUpSystem?.events?.off('safetyNetCreated');
     this.powerUpSystem?.events?.off('safetyNetDestroyed');
     this.powerUpSystem?.events?.off('grantExtraLife');
@@ -967,6 +971,88 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => confetti.destroy(),
       });
     }
+  }
+
+  // ========== DANCE FLOOR ==========
+
+  /**
+   * Handle Dance Floor power-up: shuffle all bricks to random positions on the grid
+   * Bricks animate smoothly to their new positions with disco-themed effects
+   */
+  private handleDanceFloor(): void {
+    // Collect all active bricks
+    const activeBricks: Brick[] = [];
+    this.bricks.children.iterate((child) => {
+      const brick = child as Brick;
+      if (brick && brick.active) {
+        activeBricks.push(brick);
+      }
+      return true;
+    });
+
+    if (activeBricks.length === 0) return;
+
+    // Disco screen flash (hot pink then white)
+    this.cameras.main.flash(150, 255, 20, 147); // Hot pink flash
+    this.time.delayedCall(100, () => {
+      this.cameras.main.flash(100, 255, 255, 255); // White flash
+    });
+
+    // Play party SFX
+    this.audioManager.playSFX(AUDIO.SFX.AIRHORN);
+
+    // Calculate grid parameters (same math as loadLevel)
+    const totalWidth = BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING;
+    const offsetX = (GAME_WIDTH - totalWidth) / 2 + BRICK_WIDTH / 2;
+
+    // Generate all valid grid positions (10 cols x 12 rows gives plenty of space)
+    const maxRows = 12;
+    const allPositions: Array<{ x: number; y: number }> = [];
+    for (let row = 0; row < maxRows; row++) {
+      for (let col = 0; col < BRICK_COLS; col++) {
+        const x = offsetX + col * (BRICK_WIDTH + BRICK_PADDING);
+        const y = BRICK_ROWS_START_Y + row * (BRICK_HEIGHT + BRICK_PADDING);
+        allPositions.push({ x, y });
+      }
+    }
+
+    // Fisher-Yates shuffle the positions
+    for (let i = allPositions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allPositions[i], allPositions[j]] = [allPositions[j], allPositions[i]];
+    }
+
+    // Assign unique random positions to each brick and animate
+    activeBricks.forEach((brick, index) => {
+      const newPos = allPositions[index];
+
+      // Animate brick to new position
+      this.tweens.add({
+        targets: brick,
+        x: newPos.x,
+        y: newPos.y,
+        duration: 450,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          // Update physics body after animation (StaticBody needs manual sync)
+          const body = brick.body as Phaser.Physics.Arcade.StaticBody;
+          if (body) {
+            body.updateFromGameObject();
+          }
+        },
+      });
+
+      // Add a little rotation wobble for fun
+      this.tweens.add({
+        targets: brick,
+        angle: { from: Phaser.Math.Between(-15, 15), to: 0 },
+        duration: 450,
+        ease: 'Sine.easeOut',
+      });
+    });
+
+    // Brief camera shake for impact
+    this.cameras.main.shake(200, 0.008);
   }
 
   /**

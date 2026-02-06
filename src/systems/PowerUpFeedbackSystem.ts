@@ -202,6 +202,18 @@ const POWERUP_FEEDBACK_CONFIG: Record<PowerUpType, PowerUpFeedbackConfig> = {
       flash: { duration: 120, color: POWERUP_CONFIGS[PowerUpType.SPOTLIGHT].color, alpha: 0.4 },
     },
   },
+  [PowerUpType.DANCE_FLOOR]: {
+    displayName: 'DANCE FLOOR!',
+    color: POWERUP_CONFIGS[PowerUpType.DANCE_FLOOR].color,
+    particles: {
+      colors: [0xff1493, 0xff69b4, 0xffffff, 0xff00ff, 0x00ffff],
+      count: 20,
+    },
+    screenEffect: {
+      flash: { duration: 150, color: POWERUP_CONFIGS[PowerUpType.DANCE_FLOOR].color, alpha: 0.5 },
+      shake: { duration: 200, intensity: 0.008 },
+    },
+  },
 };
 
 /**

@@ -20,6 +20,7 @@ export enum PowerUpType {
   CONFETTI_CANNON = 'confetticannon', // Fires confetti at 5-8 random bricks
   CONGA_LINE = 'congaline', // Trailing ghost balls deal damage (8s)
   SPOTLIGHT = 'spotlight', // Gentle homing toward nearest brick (8s)
+  DANCE_FLOOR = 'dancefloor', // Shuffle all bricks to random positions (instant)
 }
 
 /**
@@ -148,6 +149,13 @@ export const POWERUP_CONFIGS: Record<PowerUpType, PowerUpConfig> = {
     duration: 8000,       // 8 seconds
     dropWeight: 8,
     emoji: '🔦',
+  },
+  [PowerUpType.DANCE_FLOOR]: {
+    type: PowerUpType.DANCE_FLOOR,
+    color: 0xff1493,      // Hot pink / deep disco pink
+    duration: 0,          // Instant effect
+    dropWeight: 10,
+    emoji: '🪩',
   },
 };
 
