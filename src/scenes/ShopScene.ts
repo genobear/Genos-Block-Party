@@ -66,12 +66,9 @@ export class ShopScene extends Phaser.Scene {
       color: '#daa520',
     }).setOrigin(0.5);
 
-    // Currency display
-    const coinIcon = this.add.circle(GAME_WIDTH - 130, 60, 12, 0xffd700);
-    this.add.text(coinIcon.x - 6, coinIcon.y, '¢', {
-      font: 'bold 14px Arial',
-      color: '#000000',
-    }).setOrigin(0.5);
+    // Currency display using HD coin sprite
+    const coinIcon = this.add.image(GAME_WIDTH - 130, 60, 'ui-coin');
+    coinIcon.setDisplaySize(24, 24);
 
     this.currencyText = this.add.text(GAME_WIDTH - 100, 60, `${this.currencyManager.getTotalCurrency()}`, {
       font: 'bold 24px Arial',

@@ -29,6 +29,9 @@ export class SafetyNet extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this, true); // Static body
 
+    // Scale HD sprite to game dimensions (800×10)
+    this.setDisplaySize(PLAYABLE_WIDTH, 10);
+
     // Semi-transparent glowing green bar
     this.setAlpha(0.7);
     this.setDepth(5);

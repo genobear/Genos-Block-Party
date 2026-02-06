@@ -17,6 +17,9 @@ export class Bumper extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this, true); // true = static body
 
+    // Scale HD sprite to game dimensions
+    this.setDisplaySize(BUMPER.SIZE, BUMPER.SIZE);
+
     // Configure circular physics body
     const body = this.body as Phaser.Physics.Arcade.StaticBody;
     const radius = BUMPER.SIZE / 2;
