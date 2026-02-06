@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
+import { COLORS, BALL_RADIUS, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
 import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
-import { PADDLE_SKINS } from '../types/ShopTypes';
+// PADDLE_SKINS import no longer needed for texture generation (sprites loaded from files)
+// import { PADDLE_SKINS } from '../types/ShopTypes';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -38,6 +39,14 @@ export class BootScene extends Phaser.Scene {
         );
       }
     }
+
+    // Load paddle skin sprites (replaces programmatic texture generation)
+    const paddleSkins = ['default', 'neon', 'gold', 'rainbow', 'invisible', 'bash', 'destroyer', 'master', 'time'];
+    for (const skin of paddleSkins) {
+      this.load.image(`paddle-skin-${skin}`, `assets/sprites/paddle-skin-${skin}.png`);
+    }
+    // Also load 'paddle' key pointing to default skin (used as initial texture in Paddle constructor)
+    this.load.image('paddle', 'assets/sprites/paddle-skin-default.png');
 
     // Generate placeholder graphics
     this.createPlaceholderGraphics();
@@ -76,16 +85,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createPlaceholderGraphics(): void {
-    // Create paddle texture (DJ deck style)
-    const paddleGraphics = this.make.graphics({ x: 0, y: 0 });
-    paddleGraphics.fillStyle(COLORS.PADDLE);
-    paddleGraphics.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 8);
-    // Add accent lines for DJ deck look
-    paddleGraphics.fillStyle(COLORS.PADDLE_ACCENT);
-    paddleGraphics.fillCircle(20, PADDLE_HEIGHT / 2, 6);
-    paddleGraphics.fillCircle(PADDLE_WIDTH - 20, PADDLE_HEIGHT / 2, 6);
-    paddleGraphics.generateTexture('paddle', PADDLE_WIDTH, PADDLE_HEIGHT);
-    paddleGraphics.destroy();
+    // Paddle textures now loaded from sprite files in preload()
 
     // Create ball texture
     const ballGraphics = this.make.graphics({ x: 0, y: 0 });
@@ -99,8 +99,7 @@ export class BootScene extends Phaser.Scene {
     // Create power-up textures
     this.createPowerUpTextures();
 
-    // Create paddle skin textures for the Party Shop
-    this.createPaddleSkinTextures();
+    // Paddle skin textures now loaded from sprite files in preload()
 
     // Create particle textures
     this.createParticleTextures();
@@ -110,24 +109,6 @@ export class BootScene extends Phaser.Scene {
 
     // Create bumper texture (pinball obstacle)
     this.createBumperTexture();
-  }
-
-  /**
-   * Generate paddle textures for each shop skin variant
-   * Same structure as the default paddle texture but with skin colors
-   */
-  private createPaddleSkinTextures(): void {
-    for (const skin of PADDLE_SKINS) {
-      const g = this.make.graphics({ x: 0, y: 0 });
-      g.fillStyle(skin.color);
-      g.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 8);
-      // Accent circles (DJ deck look)
-      g.fillStyle(skin.accentColor);
-      g.fillCircle(20, PADDLE_HEIGHT / 2, 6);
-      g.fillCircle(PADDLE_WIDTH - 20, PADDLE_HEIGHT / 2, 6);
-      g.generateTexture(`paddle-skin-${skin.id}`, PADDLE_WIDTH, PADDLE_HEIGHT);
-      g.destroy();
-    }
   }
 
   private createPowerUpTextures(): void {
