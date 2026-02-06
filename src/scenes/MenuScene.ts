@@ -148,12 +148,40 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('ShopScene');
     });
 
+    // Stats button (purple to match theme)
+    const statsButton = this.add.rectangle(centerX, centerY + 280, 200, 50, 0x8b5cf6)
+      .setInteractive({ useHandCursor: true });
+    this.menuElements.push(statsButton);
+
+    const statsText = this.add.text(centerX, centerY + 280, 'STATS', {
+      font: 'bold 20px Arial',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    this.menuElements.push(statsText);
+
+    statsButton.on('pointerover', () => {
+      if (this.isTransitioning) return;
+      statsButton.setScale(1.05);
+      statsText.setScale(1.05);
+    });
+
+    statsButton.on('pointerout', () => {
+      if (this.isTransitioning) return;
+      statsButton.setScale(1);
+      statsText.setScale(1);
+    });
+
+    statsButton.on('pointerdown', () => {
+      if (this.isTransitioning) return;
+      this.scene.start('StatsScene');
+    });
+
     // Music Player button (vintage brown)
-    const musicPlayerButton = this.add.rectangle(centerX, centerY + 280, 200, 50, 0x8b4513)
+    const musicPlayerButton = this.add.rectangle(centerX, centerY + 350, 200, 50, 0x8b4513)
       .setInteractive({ useHandCursor: true });
     this.menuElements.push(musicPlayerButton);
 
-    const musicPlayerText = this.add.text(centerX, centerY + 280, 'MUSIC PLAYER', {
+    const musicPlayerText = this.add.text(centerX, centerY + 350, 'MUSIC PLAYER', {
       font: 'bold 20px Arial',
       color: '#f5e6c8',
     }).setOrigin(0.5);

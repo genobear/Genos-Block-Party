@@ -129,3 +129,19 @@ export const MULTIPLIER = {
   DECAY_RATE: 0.5,              // Multiplier drop per second during decay (scales with level)
   MIN_DISPLAY_THRESHOLD: 1.1,   // Only show UI when above this
 } as const;
+
+// Lifetime stats settings
+export const STATS = {
+  STORAGE_KEY: 'geno_lifetime_stats',
+  INITIAL: {
+    totalBricksDestroyed: 0,
+    totalPowerUpsCollected: 0,
+    powerUpsByType: {} as Record<string, number>,
+    gamesPlayed: 0,
+    totalPlayTimeMs: 0,
+    highestMultiplier: 1,
+    totalScoreEarned: 0,
+    highestLevel: 0,
+    perfectGames: 0,
+  },
+} as const;

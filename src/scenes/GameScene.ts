@@ -15,6 +15,7 @@ import { BackgroundManager } from '../systems/BackgroundManager';
 import { TransitionManager } from '../systems/TransitionManager';
 import { BallSpeedManager } from '../systems/BallSpeedManager';
 import { MultiplierSystem } from '../systems/MultiplierSystem';
+import { LifetimeStatsManager } from '../systems/LifetimeStatsManager';
 import { PowerUpType } from '../types/PowerUpTypes';
 import { BrickType } from '../types/BrickTypes';
 import { SafetyNet } from '../objects/SafetyNet';
@@ -78,6 +79,9 @@ export class GameScene extends Phaser.Scene {
   // Multiplier system
   private multiplierSystem!: MultiplierSystem;
 
+  // Lifetime stats tracking
+  private statsManager!: LifetimeStatsManager;
+
   constructor() {
     super('GameScene');
   }
@@ -93,6 +97,10 @@ export class GameScene extends Phaser.Scene {
 
     // Initialize multiplier system
     this.multiplierSystem = new MultiplierSystem();
+
+    // Initialize lifetime stats and record game start
+    this.statsManager = LifetimeStatsManager.getInstance();
+    this.statsManager.recordGameStart();
 
     // Set transparent background so CSS background shows through
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
@@ -172,6 +180,7 @@ export class GameScene extends Phaser.Scene {
       {
         onScoreChange: (points: number) => this.addScore(points),
         onBrickHit: () => this.incrementMultiplier(),
+        onBrickDestroyed: () => this.statsManager.recordBrickDestroyed(),
         onLevelComplete: () => this.handleLevelComplete(),
         getBrickCount: () => this.bricks.countActive(),
       }
@@ -203,6 +212,11 @@ export class GameScene extends Phaser.Scene {
     });
     this.powerUpSystem.events.on('effectExpired', (type: string) => {
       this.events.emit('effectExpired', type);
+    });
+
+    // Track power-up collection for lifetime stats
+    this.powerUpSystem.events.on('collected', (type: string) => {
+      this.statsManager.recordPowerUpCollected(type);
     });
 
     // Wire mystery reveal to feedback system
@@ -308,6 +322,10 @@ export class GameScene extends Phaser.Scene {
     if (this.multiplierSystem.getValue() !== previousMultiplier) {
       this.events.emit('multiplierUpdate', this.multiplierSystem.getValue());
     }
+
+    // Track lifetime stats: play time and highest multiplier
+    this.statsManager.updatePlayTime(delta);
+    this.statsManager.updateHighestMultiplier(this.multiplierSystem.getValue());
 
     // Update debug drop chance display on bricks
     if (Brick.debugShowDropChance || this.lastDebugShowDropChance !== Brick.debugShowDropChance) {
@@ -531,6 +549,9 @@ export class GameScene extends Phaser.Scene {
     const destroyed = brick.takeDamage(1);
 
     if (destroyed) {
+      // Track brick destroyed for lifetime stats
+      this.statsManager.recordBrickDestroyed();
+
       // Score for destroyed brick
       this.addScore(brick.getScoreValue());
 
@@ -570,6 +591,9 @@ export class GameScene extends Phaser.Scene {
     if (this.isLevelTransitioning) return;
     this.lives--;
     this.events.emit('livesUpdate', this.lives);
+
+    // Track life lost for perfect game detection
+    this.statsManager.recordLifeLost();
 
     // Play scratch sound for life lost
     this.audioManager.playSFX(AUDIO.SFX.SCRATCH);
@@ -702,7 +726,7 @@ export class GameScene extends Phaser.Scene {
     // Transition to game over scene (currency awarded there)
     this.time.delayedCall(500, () => {
       this.scene.stop('UIScene');
-      this.scene.start('GameOverScene', { score: this.score, isWin: false });
+      this.scene.start('GameOverScene', { score: this.score, isWin: false, level: this.currentLevelIndex + 1 });
     });
   }
 
@@ -722,7 +746,7 @@ export class GameScene extends Phaser.Scene {
     // Transition to game over scene (currency awarded there)
     this.time.delayedCall(500, () => {
       this.scene.stop('UIScene');
-      this.scene.start('GameOverScene', { score: this.score, isWin: true });
+      this.scene.start('GameOverScene', { score: this.score, isWin: true, level: 10 });
     });
   }
 
@@ -833,6 +857,9 @@ export class GameScene extends Phaser.Scene {
       const isDestroyed = brick.takeDamage(1);
 
       if (isDestroyed) {
+        // Track brick destroyed for lifetime stats
+        this.statsManager.recordBrickDestroyed();
+
         // Audio for destroyed brick
         this.audioManager.playSFX(AUDIO.SFX.HORN);
 
@@ -946,6 +973,9 @@ export class GameScene extends Phaser.Scene {
    * Handle brick destruction for Confetti Cannon hits
    */
   private handleBrickDestroyed(brick: Brick): void {
+    // Track brick destroyed for lifetime stats
+    this.statsManager.recordBrickDestroyed();
+
     // Score for destroyed brick
     this.addScore(brick.getScoreValue());
 

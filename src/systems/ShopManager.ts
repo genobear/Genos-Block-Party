@@ -87,6 +87,11 @@ export class ShopManager {
       return true;
     }
 
+    // Milestone items cannot be purchased (price: -1)
+    if (item.price < 0) {
+      return false;
+    }
+
     // Try to spend currency
     const currencyManager = CurrencyManager.getInstance();
     if (!currencyManager.spendCurrency(item.price)) {
@@ -96,6 +101,17 @@ export class ShopManager {
     this.purchases.add(item.id);
     this.save();
     return true;
+  }
+
+  /**
+   * Unlock a milestone reward (called by MilestoneSystem)
+   * This marks the item as "purchased" without spending currency
+   */
+  unlockMilestoneReward(itemId: string): void {
+    if (!this.purchases.has(itemId)) {
+      this.purchases.add(itemId);
+      this.save();
+    }
   }
 
   /**

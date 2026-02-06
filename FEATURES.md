@@ -484,10 +484,66 @@ npm run test:watch # Run tests in watch mode (development)
 
 ---
 
-## 10. TODO / Known Gaps
+## 10. Lifetime Stats & Milestones
+
+### Lifetime Stats System
+All-time player statistics are tracked and persisted to localStorage:
+
+| Stat | Description |
+|------|-------------|
+| **Bricks Destroyed** | Total number of bricks destroyed across all games |
+| **Power-Ups Collected** | Total power-ups collected (by type breakdown available) |
+| **Games Played** | Total number of game sessions started |
+| **Time Played** | Cumulative play time in hours/minutes |
+| **Highest Multiplier** | Best multiplier achieved |
+| **Total Score** | Sum of all scores earned |
+| **Highest Level** | Furthest level reached (1-10) |
+| **Perfect Games** | Games completed without losing a life |
+
+- Storage key: `geno_lifetime_stats`
+- Accessible via **Stats** button on main menu
+- Stats scene shows all statistics with progress bars for milestones
+
+### Milestones
+Achievement-based milestones that unlock exclusive cosmetic rewards:
+
+| Milestone | Requirement | Reward |
+|-----------|-------------|--------|
+| **Brick Basher** | Destroy 500 bricks | Bash paddle skin (orange/red) |
+| **Block Buster** | Destroy 2,500 bricks | Crusher ball trail (rocky debris) |
+| **Demolition Expert** | Destroy 10,000 bricks | Destroyer paddle skin (black/purple) |
+| **Power Hungry** | Collect 100 power-ups | Power ball trail (electric blue) |
+| **Combo Master** | Reach 5.0× multiplier | Master paddle skin (platinum) |
+| **Party Veteran** | Play 25 games | Veteran ball trail (military green) |
+| **Endurance** | Accumulate 1 hour of play time | Time paddle skin (clock themed) |
+| **Perfect Run** | Complete a game without losing a life | Flawless ball trail (diamond sparkle) |
+
+- Milestones are checked at game end
+- Achievement celebration overlay shows when milestones are unlocked
+- Milestone rewards appear in Party Shop with "🔒 [Milestone Name]" until unlocked
+- Once unlocked, milestone items show "✓ Unlocked" and can be equipped for free
+- Progress is saved in localStorage under `genos-block-party-milestones`
+
+### Milestone-Exclusive Cosmetics
+Items with `price: -1` in the shop catalog are milestone-exclusive:
+
+**Paddle Skins:**
+- Bash (0xff4500) — Brick Basher reward
+- Destroyer (0x1a0033) — Demolition Expert reward
+- Master (0xe5e4e2) — Combo Master reward
+- Time (0x4169e1) — Endurance reward
+
+**Ball Trails:**
+- Crusher — Block Buster reward (rocky debris particles)
+- Power — Power Hungry reward (electric blue particles)
+- Veteran — Party Veteran reward (military green particles)
+- Flawless — Perfect Run reward (diamond sparkle particles)
+
+---
+
+## 11. TODO / Known Gaps
 
 ### Unused Systems
-- **Currency system exists but has no shop**: `CurrencyManager` has `spendCurrency()`, `canAfford()`, and `resetCurrency()` methods, but there is no shop scene or purchasable items. Coins accumulate with no way to spend them.
 - **`CURRENCY.AWARD_SCENE_DURATION` and `COUNT_UP_DURATION` constants** are defined but the award is handled inline in GameOverScene rather than a dedicated award scene.
 
 ### Missing Content
@@ -501,7 +557,6 @@ npm run test:watch # Run tests in watch mode (development)
 - **Mute toggle**: `AudioManager` has `setMuted()`/`toggleMute()` but there's no mute button in the UI (only volume sliders)
 
 ### Obvious Next Steps
-- **Shop system**: Use accumulated currency to buy cosmetics, power-up loadouts, or upgrades
 - **More levels**: Level data system supports unlimited levels via the `LEVELS` array
 - **Custom art assets**: All graphics are currently generated programmatically in BootScene — real sprite sheets would elevate the visual quality
 - **Beat-sync effects**: BPM data exists in manifest for future rhythm-based visual effects

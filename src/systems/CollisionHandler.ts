@@ -47,6 +47,7 @@ export class CollisionHandler {
   // Callbacks for game state changes
   private onScoreChange: (points: number) => void;
   private onBrickHit: () => void;
+  private onBrickDestroyed: () => void;
   private onLevelComplete: () => void;
   private getBrickCount: () => number;
 
@@ -59,6 +60,7 @@ export class CollisionHandler {
     callbacks: {
       onScoreChange: (points: number) => void;
       onBrickHit: () => void;
+      onBrickDestroyed: () => void;
       onLevelComplete: () => void;
       getBrickCount: () => number;
     }
@@ -70,6 +72,7 @@ export class CollisionHandler {
     this.audioManager = audioManager;
     this.onScoreChange = callbacks.onScoreChange;
     this.onBrickHit = callbacks.onBrickHit;
+    this.onBrickDestroyed = callbacks.onBrickDestroyed;
     this.onLevelComplete = callbacks.onLevelComplete;
     this.getBrickCount = callbacks.getBrickCount;
   }
@@ -238,6 +241,9 @@ export class CollisionHandler {
     brick.setActive(false);
     brick.disableBody(true);
 
+    // Track brick destroyed for lifetime stats
+    this.onBrickDestroyed();
+
     // Check if level is complete (before animation finishes)
     const levelComplete = this.getBrickCount() === 0;
 
@@ -316,6 +322,9 @@ export class CollisionHandler {
     // Immediately deactivate
     brick.setActive(false);
     brick.disableBody(true);
+
+    // Track brick destroyed for lifetime stats
+    this.onBrickDestroyed();
 
     // Check if level is complete
     const levelComplete = this.getBrickCount() === 0;

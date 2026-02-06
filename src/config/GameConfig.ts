@@ -9,6 +9,7 @@ import { SettingsScene } from '../scenes/SettingsScene';
 import { MusicPlayerScene } from '../scenes/MusicPlayerScene';
 import { GameOverScene } from '../scenes/GameOverScene';
 import { ShopScene } from '../scenes/ShopScene';
+import { StatsScene } from '../scenes/StatsScene';
 import { GAME_WIDTH, GAME_HEIGHT } from './Constants';
 
 export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
@@ -29,7 +30,7 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, MusicScene, MenuScene, ShopScene, SettingsScene, MusicPlayerScene, GameScene, UIScene, PauseScene, GameOverScene],
+  scene: [BootScene, MusicScene, MenuScene, ShopScene, StatsScene, SettingsScene, MusicPlayerScene, GameScene, UIScene, PauseScene, GameOverScene],
   input: {
     activePointers: 1,
     touch: {

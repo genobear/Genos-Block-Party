@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { CurrencyManager } from '../systems/CurrencyManager';
+import { LifetimeStatsManager } from '../systems/LifetimeStatsManager';
+import { MilestoneSystem, Milestone } from '../systems/MilestoneSystem';
 import { TransitionManager } from '../systems/TransitionManager';
 import { AUDIO } from '../config/Constants';
 import {
@@ -37,6 +39,8 @@ export class GameOverScene extends Phaser.Scene {
   private cursorBlink!: Phaser.Time.TimerEvent;
   private currencyEarned: number = 0;
   private totalCurrency: number = 0;
+  private levelReached: number = 1;
+  private newMilestones: Milestone[] = [];
 
   // Track elements for transitions
   private panelElements: Phaser.GameObjects.GameObject[] = [];
@@ -51,9 +55,10 @@ export class GameOverScene extends Phaser.Scene {
     super('GameOverScene');
   }
 
-  init(data: { score: number; isWin: boolean; currencyEarned?: number; skipCurrencyAward?: boolean; highScoreEntered?: boolean }): void {
+  init(data: { score: number; isWin: boolean; level?: number; currencyEarned?: number; skipCurrencyAward?: boolean; highScoreEntered?: boolean }): void {
     this.finalScore = data.score || 0;
     this.isWin = data.isWin || false;
+    this.levelReached = data.level || 1;
     this.currentInitials = '';
     this.panelElements = [];
     this.decorations = [];
@@ -62,6 +67,15 @@ export class GameOverScene extends Phaser.Scene {
     this.highScoreEntryElements = [];
     this.leaderboardPanelY = 0;
     this.highScoreAlreadyEntered = data.highScoreEntered || false;
+    this.newMilestones = [];
+
+    // Record game end for lifetime stats
+    const statsManager = LifetimeStatsManager.getInstance();
+    const livesLost = statsManager.getCurrentGameLivesLost();
+    statsManager.recordGameEnd(this.finalScore, this.levelReached, livesLost);
+
+    // Check for newly achieved milestones
+    this.newMilestones = MilestoneSystem.getInstance().checkMilestones();
 
     // Award currency only on first entry, not on restart after high score submission
     const currencyManager = CurrencyManager.getInstance();
@@ -89,6 +103,117 @@ export class GameOverScene extends Phaser.Scene {
     // Keep the level background (don't change it) - just set transparent camera
     this.cameras.main.setBackgroundColor('rgba(0, 0, 0, 0)');
 
+    // Show milestone celebration first if there are new milestones
+    if (this.newMilestones.length > 0) {
+      this.showMilestoneCelebration(leaderboard);
+    } else {
+      this.showGameOverContent(leaderboard);
+    }
+  }
+
+  /**
+   * Show milestone celebration overlay, then transition to normal game over content
+   */
+  private showMilestoneCelebration(leaderboard: HighScoreEntry[]): void {
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+
+    // Create overlay
+    const overlay = this.add.rectangle(centerX, centerY, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.9);
+
+    // Trophy icon
+    const trophy = this.add.text(centerX, centerY - 100, '🏆', {
+      fontSize: '80px',
+    }).setOrigin(0.5).setScale(0);
+
+    // Title
+    const title = this.add.text(centerX, centerY - 20, 'MILESTONE ACHIEVED!', {
+      fontFamily: 'Arial Black, Arial',
+      fontSize: '32px',
+      color: '#ffd700',
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Milestone name(s)
+    const milestoneNames = this.newMilestones.map(m => m.name).join(', ');
+    const milestoneText = this.add.text(centerX, centerY + 30, milestoneNames, {
+      fontFamily: 'Arial',
+      fontSize: '24px',
+      color: '#ffffff',
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Reward info
+    const rewardText = this.newMilestones.map(m => {
+      const typeName = m.reward.type === 'paddleSkin' ? 'Paddle' : 'Trail';
+      return `🎁 ${m.reward.id.charAt(0).toUpperCase() + m.reward.id.slice(1)} ${typeName} Unlocked!`;
+    }).join('\n');
+    const reward = this.add.text(centerX, centerY + 80, rewardText, {
+      fontFamily: 'Arial',
+      fontSize: '18px',
+      color: '#4ade80',
+      align: 'center',
+    }).setOrigin(0.5).setAlpha(0);
+
+    // Animate in
+    this.tweens.add({
+      targets: trophy,
+      scale: 1,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    this.tweens.add({
+      targets: [title, milestoneText, reward],
+      alpha: 1,
+      duration: 400,
+      delay: 300,
+    });
+
+    // Golden particle burst
+    for (let i = 0; i < 30; i++) {
+      const particle = this.add.circle(
+        centerX + Phaser.Math.Between(-20, 20),
+        centerY - 100,
+        Phaser.Math.Between(3, 6),
+        Phaser.Utils.Array.GetRandom([0xffd700, 0xffed4a, 0xffa500]),
+        0.9
+      );
+      this.tweens.add({
+        targets: particle,
+        x: particle.x + Phaser.Math.Between(-150, 150),
+        y: particle.y + Phaser.Math.Between(-100, 150),
+        alpha: 0,
+        scale: 0,
+        duration: Phaser.Math.Between(600, 1200),
+        delay: Phaser.Math.Between(0, 300),
+        onComplete: () => particle.destroy(),
+      });
+    }
+
+    // Transition to normal game over content after a delay
+    this.time.delayedCall(2500, () => {
+      // Fade out celebration elements
+      this.tweens.add({
+        targets: [overlay, trophy, title, milestoneText, reward],
+        alpha: 0,
+        duration: 400,
+        onComplete: () => {
+          overlay.destroy();
+          trophy.destroy();
+          title.destroy();
+          milestoneText.destroy();
+          reward.destroy();
+          this.showGameOverContent(leaderboard);
+        },
+      });
+    });
+  }
+
+  /**
+   * Show the normal game over content (score, leaderboard, buttons)
+   */
+  private showGameOverContent(leaderboard: HighScoreEntry[]): void {
     // Create semi-transparent overlay
     const overlay = this.add.rectangle(
       GAME_WIDTH / 2,

@@ -10,6 +10,7 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { CurrencyManager } from '../systems/CurrencyManager';
 import { ShopManager } from '../systems/ShopManager';
+import { ITEM_TO_MILESTONE, MILESTONES } from '../systems/MilestoneSystem';
 import {
   ShopCategory,
   type ShopItem,
@@ -267,6 +268,17 @@ export class ShopScene extends Phaser.Scene {
       equipBg.on('pointerover', () => equipBg.setFillStyle(0x4a9e4a));
       equipBg.on('pointerout', () => equipBg.setFillStyle(0x3d8b3d));
       equipBg.on('pointerdown', () => this.equipItem(item));
+    } else if (item.price < 0) {
+      // Milestone-locked item
+      const milestoneId = ITEM_TO_MILESTONE[item.id];
+      const milestone = MILESTONES.find(m => m.id === milestoneId);
+      const milestoneName = milestone?.name || 'Milestone';
+      
+      const lockedText = this.add.text(x, y + 38, `🔒 ${milestoneName}`, {
+        font: '12px Arial',
+        color: '#888888',
+      }).setOrigin(0.5);
+      this.itemContainer.add(lockedText);
     } else if (item.price === 0) {
       // Free item that's not purchased yet (shouldn't happen for default, but just in case)
       const freeBg = this.add.rectangle(x, y + 38, 100, 30, 0x3d8b3d)
