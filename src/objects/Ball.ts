@@ -49,6 +49,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private spotlightTimer: Phaser.Time.TimerEvent | null = null;
   private spotlightGraphics: Phaser.GameObjects.Graphics | null = null;
   private getBricksCallback: (() => Array<{ x: number; y: number }>) | null = null;
+  private spotlightTarget: { x: number; y: number } | null = null;
 
   // Collision cooldown to prevent velocity modifications right after collision
   private collisionCooldown: number = 0;
@@ -418,6 +419,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.isSpotlight = false;
     this.spotlightTimer = null;
     this.getBricksCallback = null;
+    this.spotlightTarget = null;
 
     // Destroy light cone graphics
     if (this.spotlightGraphics) {
@@ -437,26 +439,43 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   }
 
   /**
-   * Apply gentle steering toward the nearest brick
-   * Called each frame when spotlight is active
+   * Steer toward locked-on target brick.
+   * Picks a target once and homes toward it until destroyed, then picks another.
+   * Large turning circle (~2.6s for full 360° at 60fps) for smooth arcs.
    */
   private updateSpotlightSteering(): void {
     const body = this.body as Phaser.Physics.Arcade.Body;
     if (!body || body.velocity.length() === 0) return;
 
-    // Find nearest brick
-    const nearestBrick = this.findNearestBrick();
-    if (!nearestBrick) return;
+    // Check if current target still exists (brick not destroyed)
+    if (this.spotlightTarget) {
+      const bricks = this.getBricksCallback?.() ?? [];
+      const tolerance = 5;
+      const stillExists = bricks.some(
+        (b) =>
+          Math.abs(b.x - this.spotlightTarget!.x) < tolerance &&
+          Math.abs(b.y - this.spotlightTarget!.y) < tolerance
+      );
+      if (!stillExists) {
+        this.spotlightTarget = null;
+      }
+    }
+
+    // Pick a new target if needed
+    if (!this.spotlightTarget) {
+      this.spotlightTarget = this.findNearestBrick();
+    }
+    if (!this.spotlightTarget) return;
 
     // Calculate angle to target
-    const angleToTarget = Phaser.Math.Angle.Between(this.x, this.y, nearestBrick.x, nearestBrick.y);
+    const angleToTarget = Phaser.Math.Angle.Between(this.x, this.y, this.spotlightTarget.x, this.spotlightTarget.y);
     const currentAngle = Math.atan2(body.velocity.y, body.velocity.x);
 
     // Calculate angle difference (wrapped to -PI to PI)
     const angleDiff = Phaser.Math.Angle.Wrap(angleToTarget - currentAngle);
 
-    // Gentle steering: max ~2.8 degrees per frame (0.05 radians)
-    const steerAmount = Phaser.Math.Clamp(angleDiff, -0.05, 0.05);
+    // Steering: max 0.04 rad/frame → ~2.6s for full 360° at 60fps
+    const steerAmount = Phaser.Math.Clamp(angleDiff, -0.04, 0.04);
     const newAngle = currentAngle + steerAmount;
 
     // Apply new velocity maintaining current speed
