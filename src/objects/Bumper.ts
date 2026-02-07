@@ -70,11 +70,13 @@ export class Bumper extends Phaser.Physics.Arcade.Sprite {
     // Flash to white
     this.setTint(COLORS.BUMPER_FLASH);
 
-    // Scale punch for impact feel
+    // Scale punch for impact feel (relative to display scale, not texture scale)
+    const baseScaleX = this.scaleX;
+    const baseScaleY = this.scaleY;
     this.scene.tweens.add({
       targets: this,
-      scaleX: 1.15,
-      scaleY: 1.15,
+      scaleX: baseScaleX * 1.15,
+      scaleY: baseScaleY * 1.15,
       duration: this.flashDuration / 2,
       yoyo: true,
       ease: 'Quad.easeOut',
