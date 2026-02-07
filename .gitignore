@@ -47,3 +47,4 @@ coverage/
 *.temp
 .playwright-mcp/
 
+.claude/settings.local.json
