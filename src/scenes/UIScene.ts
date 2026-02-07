@@ -413,7 +413,7 @@ export class UIScene extends Phaser.Scene {
 
     // Power-up icon
     const icon = this.add.image(0, 0, `powerup-${type}`);
-    icon.setScale(1.5);
+    icon.setDisplaySize(28, 28);  // Slightly larger than game size for UI visibility
     container.add(icon);
 
     // Timer bar (if duration provided)
