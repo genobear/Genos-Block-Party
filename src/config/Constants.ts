@@ -41,6 +41,9 @@ export const SPEED_EFFECTS = {
   ELECTRIC: 1.5, // Fast ball (150% of normal)
 } as const;
 
+// Spotlight homing settings
+export const SPOTLIGHT_STEER_RATE = 2.5; // radians per second (~0.042 rad/frame at 60fps)
+
 // Brick settings
 export const BRICK_WIDTH = 64;
 export const BRICK_HEIGHT = 28;

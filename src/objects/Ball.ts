@@ -4,6 +4,7 @@ import {
   PLAY_AREA_Y,
   PLAYABLE_HEIGHT,
   PADDLE_HEIGHT,
+  SPOTLIGHT_STEER_RATE,
 } from '../config/Constants';
 import { Paddle } from './Paddle';
 import { BallEffectManager } from '../effects/BallEffectManager';
@@ -50,6 +51,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
   private spotlightGraphics: Phaser.GameObjects.Graphics | null = null;
   private getBricksCallback: (() => Array<{ x: number; y: number }>) | null = null;
   private spotlightTarget: { x: number; y: number } | null = null;
+  private spotlightPostUpdateBound: (() => void) | null = null;
 
   // Collision cooldown to prevent velocity modifications right after collision
   private collisionCooldown: number = 0;
@@ -147,8 +149,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.collisionCooldown--;
     }
 
-    // Ensure ball maintains minimum speed if launched (skip during collision cooldown)
-    if (this.launched && this.collisionCooldown === 0) {
+    // Ensure ball maintains minimum speed if launched (skip during collision cooldown and spotlight)
+    if (this.launched && this.collisionCooldown === 0 && !this.isSpotlight) {
       const body = this.body as Phaser.Physics.Arcade.Body;
       const velocity = body.velocity;
       const currentMagnitude = velocity.length();
@@ -171,11 +173,8 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    // Spotlight homing: gently steer toward nearest brick
-    if (this.isSpotlight && this.launched && !this.magneted && this.getBricksCallback) {
-      this.updateSpotlightSteering();
-      this.updateSpotlightGraphics();
-    }
+    // Spotlight homing: steering + graphics handled in 'postupdate' callback
+    // (runs after physics resolution so steering has final word on direction)
 
     // Update conga line ghost positions
     if (this.isCongaLine && this.launched) {
@@ -402,6 +401,10 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
       // Apply spotlight beam visual effect
       this.effectManager?.applyEffect(BallEffectType.SPOTLIGHT_BEAM);
+
+      // Register post-physics steering listener (runs AFTER physics resolves bounces)
+      this.spotlightPostUpdateBound = this.postUpdateSpotlightSteering.bind(this);
+      this.scene.events.on('postupdate', this.spotlightPostUpdateBound);
     }
 
     // Reset timer with new duration
@@ -415,6 +418,12 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
    */
   clearSpotlight(): void {
     if (!this.isSpotlight) return;
+
+    // Remove post-physics listener
+    if (this.spotlightPostUpdateBound) {
+      this.scene.events.off('postupdate', this.spotlightPostUpdateBound);
+      this.spotlightPostUpdateBound = null;
+    }
 
     this.isSpotlight = false;
     this.spotlightTimer = null;
@@ -474,12 +483,14 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     // Calculate angle difference (wrapped to -PI to PI)
     const angleDiff = Phaser.Math.Angle.Wrap(angleToTarget - currentAngle);
 
-    // Steering: max 0.04 rad/frame → ~2.6s for full 360° at 60fps
-    const steerAmount = Phaser.Math.Clamp(angleDiff, -0.04, 0.04);
+    // Delta-time steering: SPOTLIGHT_STEER_RATE rad/s (frame-rate independent)
+    const dt = this.scene.game.loop.delta / 1000;
+    const maxSteer = SPOTLIGHT_STEER_RATE * dt;
+    const steerAmount = Phaser.Math.Clamp(angleDiff, -maxSteer, maxSteer);
     const newAngle = currentAngle + steerAmount;
 
-    // Apply new velocity maintaining current speed
-    const speed = body.velocity.length();
+    // Apply new velocity maintaining canonical speed from speed manager
+    const speed = this.speedManager.getEffectiveSpeed();
     body.setVelocity(
       Math.cos(newAngle) * speed,
       Math.sin(newAngle) * speed
@@ -549,6 +560,19 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       this.spotlightGraphics.closePath();
       this.spotlightGraphics.fillPath();
     }
+  }
+
+  /**
+   * Post-physics spotlight steering.
+   * Called via 'postupdate' event, runs AFTER Phaser resolves all collisions/bounces.
+   * This ensures steering has the "final word" on velocity direction.
+   */
+  private postUpdateSpotlightSteering(): void {
+    if (!this.isSpotlight || !this.launched || this.magneted || !this.getBricksCallback) return;
+    if (!this.active) return;
+
+    this.updateSpotlightSteering();
+    this.updateSpotlightGraphics();
   }
 
   /**
@@ -740,12 +764,17 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.congaGhosts = [];
 
     // Clear spotlight (destroy graphics immediately without animation)
+    if (this.spotlightPostUpdateBound) {
+      this.scene.events.off('postupdate', this.spotlightPostUpdateBound);
+      this.spotlightPostUpdateBound = null;
+    }
     if (this.spotlightTimer) {
       this.spotlightTimer.destroy();
       this.spotlightTimer = null;
     }
     this.isSpotlight = false;
     this.getBricksCallback = null;
+    this.spotlightTarget = null;
     if (this.spotlightGraphics) {
       this.spotlightGraphics.destroy();
       this.spotlightGraphics = null;
