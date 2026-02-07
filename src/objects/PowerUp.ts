@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { PowerUpType } from '../types/PowerUpTypes';
-import { POWERUP_FALL_SPEED, GAME_HEIGHT } from '../config/Constants';
+import { POWERUP_FALL_SPEED, POWERUP_DISPLAY_SIZE, GAME_HEIGHT } from '../config/Constants';
 
 export class PowerUp extends Phaser.Physics.Arcade.Sprite {
   private powerUpType: PowerUpType;
@@ -16,8 +16,13 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // Scale down HD texture (192×192) to game size
+    this.setDisplaySize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+
     // Configure physics body
     const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+    body.setOffset((this.width - POWERUP_DISPLAY_SIZE) / 2, (this.height - POWERUP_DISPLAY_SIZE) / 2);
     body.setAllowGravity(false);
     body.setVelocityY(POWERUP_FALL_SPEED);
 
@@ -31,10 +36,12 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
       ease: 'Sine.easeInOut',
     });
 
-    // Add pulsing glow effect
+    // Add pulsing glow effect (use scaled values, not absolute)
+    const baseScale = this.scaleX;  // After setDisplaySize, this is ~0.125 for 192→24
     scene.tweens.add({
       targets: this,
-      scale: 1.2,
+      scaleX: baseScale * 1.2,
+      scaleY: baseScale * 1.2,
       duration: 400,
       yoyo: true,
       repeat: -1,
@@ -90,12 +97,14 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     this.setPosition(x, y);
     this.setActive(true);
     this.setVisible(true);
-    this.setScale(1);
     this.setAlpha(1);  // Reset alpha (was set to 0 during collect animation)
 
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.enable = true;  // Explicitly enable before reset
     body.reset(x, y);
+    this.setDisplaySize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+    body.setSize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+    body.setOffset((this.width - POWERUP_DISPLAY_SIZE) / 2, (this.height - POWERUP_DISPLAY_SIZE) / 2);
     body.setAllowGravity(false);
     body.setVelocityY(POWERUP_FALL_SPEED);
 
@@ -110,9 +119,11 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
       ease: 'Sine.easeInOut',
     });
 
+    const baseScale = this.scaleX;  // After setDisplaySize, this is ~0.125 for 192→24
     this.scene.tweens.add({
       targets: this,
-      scale: 1.2,
+      scaleX: baseScale * 1.2,
+      scaleY: baseScale * 1.2,
       duration: 400,
       yoyo: true,
       repeat: -1,
@@ -126,9 +137,11 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
   playCollectAnimation(onComplete?: () => void): void {
     this.scene.tweens.killTweensOf(this);
 
+    const collectScale = this.scaleX * 2;  // Double current display scale, not absolute
     this.scene.tweens.add({
       targets: this,
-      scale: 2,
+      scaleX: collectScale,
+      scaleY: collectScale,
       alpha: 0,
       duration: 200,
       ease: 'Quad.easeOut',

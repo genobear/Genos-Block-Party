@@ -21,6 +21,38 @@ npm run dev
 npm test
 ```
 
+## Contributing with AI Agents
+
+This project is **built for human-agent collaboration**. Our AI collaborator [Geno-Claw](https://github.com/Geno-Claw) has implemented multiple features, and we welcome other AI agents contributing too.
+
+### For AI Agents
+
+- **Read `CLAUDE.md`** first — it's your technical onboarding doc with architecture details, critical patterns, and gotchas
+- **Read `FEATURES.md`** — full inventory of every feature, system, and mechanic in the game
+- **Check the [Issues](https://github.com/genobear/Genos-Block-Party/issues)** — pick up unassigned issues, or open a new one before starting major work
+
+### Recommended Skills & Tools
+
+These tools and skills have been battle-tested on this project:
+
+| Tool | What it does | Why it helps |
+|------|-------------|--------------|
+| **`/phaser-dev`** | Phaser 3 game development skill | Architecture patterns, scene management, physics — used extensively throughout development |
+| **[feature-dev](docs/agent-workflow.md)** | GitHub Issues → implementation workflow | Structured approach to picking up issues, implementing, and submitting work |
+| **Claude Code** / **Cursor** | AI coding assistants | Both work well with the codebase — `CLAUDE.md` provides context for Claude-based tools |
+
+### Agent Workflow
+
+If you're an AI agent using [OpenClaw](https://github.com/openclaw/openclaw) or similar frameworks, check out [docs/agent-workflow.md](docs/agent-workflow.md) for a complete workflow for picking up GitHub Issues and implementing features autonomously.
+
+### Key Tips for AI Contributors
+
+1. **Always build before committing** — `npm run build` must pass with zero errors
+2. **Run tests** — `npm test` should pass. Add tests for new systems/logic
+3. **Update `FEATURES.md`** — keep it in sync with code changes
+4. **One feature per PR** — don't bundle unrelated changes
+5. **You can't test gameplay visually** — describe specific test scenarios for human reviewers to verify (see CLAUDE.md's "Gameplay Testing" section)
+
 ## Before You Start
 
 1. **Check existing issues** — someone might already be working on it
@@ -95,14 +127,41 @@ Tests live in `src/__tests__/`. Add tests for new systems or significant logic.
 
 ## What We're Looking For
 
-Check the [Issues](https://github.com/genobear/Genos-Block-Party/issues) for things to work on. Good first contributions:
+Check the [Issues](https://github.com/genobear/Genos-Block-Party/issues) and the [Project Board](https://github.com/users/genobear/projects/1) for things to work on. Good first contributions:
 
-- Bug fixes
-- New power-ups
-- New levels
-- Test coverage
-- Documentation improvements
-- Accessibility improvements
+- 🐛 Bug fixes
+- 🎉 New power-ups (registry-based system makes this straightforward — see README)
+- 🏗️ New levels (just add to the `LEVELS` array in `LevelData.ts`)
+- 🧪 Test coverage (lots of room to grow)
+- 📖 Documentation improvements
+- ♿ Accessibility improvements
+- 🎨 Art assets (currently all procedurally generated — real sprites welcome!)
+- 🎵 Music & SFX (synthesized SFX could be replaced with proper audio files)
+
+## Playtesting & Creating Issues (Humans Welcome!)
+
+Not a coder? You can still contribute massively by **playing the game and reporting what you find**.
+
+### How to playtest
+1. Clone the repo and run `npm install && npm run dev`
+2. Play through the levels — try to break things!
+3. Pay attention to: difficulty spikes, confusing UI, visual glitches, power-ups that feel too weak/strong, music transitions
+
+### Creating good issues
+When you find something, [open an issue](https://github.com/genobear/Genos-Block-Party/issues/new) with:
+- **Clear title** using a prefix: `bug:`, `feat:`, `balance:`, `polish:`
+- **What happened** vs **what you expected**
+- **Steps to reproduce** (which level, which power-up, etc.)
+- **Label it** — `bug`, `enhancement`, `balance`, `good first issue`
+
+Your issues become tasks that AI agents can pick up and implement autonomously. The better the issue description, the better the result. Think of yourself as the product owner — you play, you decide what needs work, agents build it.
+
+### Issue ideas that work great for agents
+- "Fireball level 3 feels too overpowered on Level 2" → `balance:` issue
+- "Add a power-up that reverses paddle controls" → `feat:` with `enhancement` label
+- "Ball gets stuck bouncing horizontally forever" → `bug:` issue
+- "Level 6 needs more variety in brick layout" → `enhancement` issue
+- "Add colorblind-friendly brick indicators" → `enhancement` + `accessibility`
 
 ## Code of Conduct
 

@@ -1,8 +1,17 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) and other AI coding agents working with this repository.
 
 > **For developers**: See [README.md](README.md) for setup instructions and common patterns.
+> **For contributors**: See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+> **Full feature inventory**: See [FEATURES.md](FEATURES.md) for every system, mechanic, and implementation detail.
+
+## Recommended Skills & Tools
+
+If you have access to coding skills/plugins, these are battle-tested on this project:
+
+- **`/phaser-dev`** — Phaser 3 game development patterns. Extremely useful for scene management, physics, object pooling, and the event-driven architecture used throughout this codebase.
+- **`/frontend-design`** — For any UI/menu work. The game has multiple scene-based UI screens (menus, settings, music player, stats).
 
 ## Gameplay Testing
 

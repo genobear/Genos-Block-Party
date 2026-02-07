@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { COLORS, PADDLE_WIDTH, PADDLE_HEIGHT, BALL_RADIUS, BRICK_WIDTH, BRICK_HEIGHT, PLAYABLE_WIDTH, AUDIO, BUMPER } from '../config/Constants';
-import { PowerUpType, POWERUP_CONFIGS } from '../types/PowerUpTypes';
+import { AUDIO } from '../config/Constants';
 import { AudioManager } from '../systems/AudioManager';
 import { LoadingOverlay } from '../utils/LoadingOverlay';
 import type { AudioManifest } from '../types/AudioManifest';
-import { PADDLE_SKINS } from '../types/ShopTypes';
+// PADDLE_SKINS import no longer needed for texture generation (sprites loaded from files)
+// import { PADDLE_SKINS } from '../types/ShopTypes';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -27,6 +27,62 @@ export class BootScene extends Phaser.Scene {
 
     // Load audio manifest first
     this.load.json('audio-manifest', 'audio/manifest.json');
+
+    // Load brick sprite images (4 types × 3 health levels)
+    const brickTypes = ['present', 'pinata', 'balloon', 'drifter'];
+    for (const type of brickTypes) {
+      for (let health = 1; health <= 3; health++) {
+        this.load.image(
+          `brick-${type}-${health}`,
+          `assets/sprites/brick-${type}-${health}.png`
+        );
+      }
+    }
+
+    // Load paddle skin sprites (replaces programmatic texture generation)
+    const paddleSkins = ['default', 'neon', 'gold', 'rainbow', 'invisible', 'bash', 'destroyer', 'master', 'time'];
+    for (const skin of paddleSkins) {
+      this.load.image(`paddle-skin-${skin}`, `assets/sprites/paddle-skin-${skin}.png`);
+    }
+    // Also load 'paddle' key pointing to default skin (used as initial texture in Paddle constructor)
+    this.load.image('paddle', 'assets/sprites/paddle-skin-default.png');
+
+    // Load power-up icon sprites (replaces programmatic texture generation)
+    const powerupTypes = [
+      'balloon', 'cake', 'drinks', 'disco', 'mystery', 'powerball',
+      'fireball', 'electricball', 'partypopper', 'bassdrop', 'djscratch',
+      'bouncehouse', 'partyfavor', 'confetticannon', 'congaline', 'spotlight', 'dancefloor'
+    ];
+    for (const type of powerupTypes) {
+      this.load.image(`powerup-${type}`, `assets/sprites/powerup-${type}.png`);
+    }
+
+    // Load ball, safety net, and bumper sprites (replaces programmatic texture generation)
+    this.load.image('ball', 'assets/sprites/ball.png');
+    this.load.image('safety-net', 'assets/sprites/safety-net.png');
+    this.load.image('bumper', 'assets/sprites/bumper.png');
+
+    // Load particle effect sprites (replaces programmatic texture generation)
+    const particleTypes = [
+      'confetti', 'streamer', 'sparkle', 'spark', 'flame',
+      'mirror-facet', 'light-ray', 'glint', 'speedline', 'electric', 'glow'
+    ];
+    for (const type of particleTypes) {
+      this.load.image(`particle-${type}`, `assets/sprites/particle-${type}.png`);
+    }
+
+    // Load UI sprites
+    this.load.image('ui-heart', 'assets/sprites/ui-heart.png');
+    this.load.image('ui-coin', 'assets/sprites/ui-coin.png');
+
+    // Load achievement badge sprites
+    const badgeTypes = [
+      'brick-basher', 'block-buster', 'demolition-expert', 'combo-master',
+      'power-hungry', 'party-veteran', 'endurance', 'perfect-run'
+    ];
+    for (const badge of badgeTypes) {
+      this.load.image(`badge-${badge}`, `assets/sprites/badge-${badge}.png`);
+    }
 
     // Generate placeholder graphics
     this.createPlaceholderGraphics();
@@ -65,323 +121,15 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createPlaceholderGraphics(): void {
-    // Create paddle texture (DJ deck style)
-    const paddleGraphics = this.make.graphics({ x: 0, y: 0 });
-    paddleGraphics.fillStyle(COLORS.PADDLE);
-    paddleGraphics.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 8);
-    // Add accent lines for DJ deck look
-    paddleGraphics.fillStyle(COLORS.PADDLE_ACCENT);
-    paddleGraphics.fillCircle(20, PADDLE_HEIGHT / 2, 6);
-    paddleGraphics.fillCircle(PADDLE_WIDTH - 20, PADDLE_HEIGHT / 2, 6);
-    paddleGraphics.generateTexture('paddle', PADDLE_WIDTH, PADDLE_HEIGHT);
-    paddleGraphics.destroy();
+    // Ball, safety net, and bumper textures now loaded from sprite files in preload()
 
-    // Create ball texture
-    const ballGraphics = this.make.graphics({ x: 0, y: 0 });
-    ballGraphics.fillStyle(COLORS.BALL);
-    ballGraphics.fillCircle(BALL_RADIUS, BALL_RADIUS, BALL_RADIUS);
-    ballGraphics.generateTexture('ball', BALL_RADIUS * 2, BALL_RADIUS * 2);
-    ballGraphics.destroy();
+    // Brick textures are now loaded as sprite images in preload()
 
-    // Create brick textures for each type and health level
-    this.createBrickTextures();
+    // Power-up textures now loaded from sprite files in preload()
 
-    // Create power-up textures
-    this.createPowerUpTextures();
+    // Paddle skin textures now loaded from sprite files in preload()
 
-    // Create paddle skin textures for the Party Shop
-    this.createPaddleSkinTextures();
-
-    // Create particle textures
-    this.createParticleTextures();
-
-    // Create safety net texture (Bounce House power-up)
-    this.createSafetyNetTexture();
-
-    // Create bumper texture (pinball obstacle)
-    this.createBumperTexture();
-  }
-
-  /**
-   * Generate paddle textures for each shop skin variant
-   * Same structure as the default paddle texture but with skin colors
-   */
-  private createPaddleSkinTextures(): void {
-    for (const skin of PADDLE_SKINS) {
-      const g = this.make.graphics({ x: 0, y: 0 });
-      g.fillStyle(skin.color);
-      g.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 8);
-      // Accent circles (DJ deck look)
-      g.fillStyle(skin.accentColor);
-      g.fillCircle(20, PADDLE_HEIGHT / 2, 6);
-      g.fillCircle(PADDLE_WIDTH - 20, PADDLE_HEIGHT / 2, 6);
-      g.generateTexture(`paddle-skin-${skin.id}`, PADDLE_WIDTH, PADDLE_HEIGHT);
-      g.destroy();
-    }
-  }
-
-  private createBrickTextures(): void {
-    const types = [
-      { name: 'present', color: COLORS.PRESENT },
-      { name: 'pinata', color: COLORS.PINATA },
-      { name: 'balloon', color: COLORS.BALLOON },
-      { name: 'drifter', color: COLORS.DRIFTER },
-    ];
-
-    types.forEach(({ name, color }) => {
-      for (let health = 1; health <= 3; health++) {
-        const g = this.make.graphics({ x: 0, y: 0 });
-
-        // Opacity based on health (3 = full, 1 = faded)
-        const alpha = 0.4 + (health / 3) * 0.6;
-
-        // Main brick body
-        g.fillStyle(color, alpha);
-        g.fillRoundedRect(2, 2, BRICK_WIDTH - 4, BRICK_HEIGHT - 4, 4);
-
-        // Border
-        g.lineStyle(2, 0xffffff, alpha * 0.5);
-        g.strokeRoundedRect(2, 2, BRICK_WIDTH - 4, BRICK_HEIGHT - 4, 4);
-
-        // Health indicator dots
-        g.fillStyle(0xffffff, alpha);
-        const dotY = BRICK_HEIGHT - 6;
-        const dotStartX = (BRICK_WIDTH - (health * 8)) / 2;
-        for (let i = 0; i < health; i++) {
-          g.fillCircle(dotStartX + 4 + i * 8, dotY, 2);
-        }
-
-        g.generateTexture(`brick-${name}-${health}`, BRICK_WIDTH, BRICK_HEIGHT);
-        g.destroy();
-      }
-    });
-  }
-
-  private createPowerUpTextures(): void {
-    const powerUps = [
-      { name: 'balloon', color: POWERUP_CONFIGS[PowerUpType.BALLOON].color, symbol: 'B' },
-      { name: 'cake', color: POWERUP_CONFIGS[PowerUpType.CAKE].color, symbol: 'C' },
-      { name: 'drinks', color: POWERUP_CONFIGS[PowerUpType.DRINKS].color, symbol: 'D' },
-      { name: 'disco', color: POWERUP_CONFIGS[PowerUpType.DISCO].color, symbol: 'M' },
-      { name: 'mystery', color: POWERUP_CONFIGS[PowerUpType.MYSTERY].color, symbol: '?' },
-      { name: 'powerball', color: POWERUP_CONFIGS[PowerUpType.POWERBALL].color, symbol: 'P' },
-      { name: 'fireball', color: POWERUP_CONFIGS[PowerUpType.FIREBALL].color, symbol: 'F' },
-      { name: 'electricball', color: POWERUP_CONFIGS[PowerUpType.ELECTRICBALL].color, symbol: 'Z' },
-      { name: 'partypopper', color: POWERUP_CONFIGS[PowerUpType.PARTY_POPPER].color, symbol: '💣' },
-      { name: 'bassdrop', color: POWERUP_CONFIGS[PowerUpType.BASS_DROP].color, symbol: '♪' },
-      { name: 'djscratch', color: POWERUP_CONFIGS[PowerUpType.DJ_SCRATCH].color, symbol: 'S' },
-      { name: 'bouncehouse', color: POWERUP_CONFIGS[PowerUpType.BOUNCE_HOUSE].color, symbol: 'N' },
-      { name: 'partyfavor', color: POWERUP_CONFIGS[PowerUpType.PARTY_FAVOR].color, symbol: '+' },
-    ];
-
-    const size = 24;
-
-    powerUps.forEach(({ name, color }) => {
-      const g = this.make.graphics({ x: 0, y: 0 });
-
-      // Circle background
-      g.fillStyle(color);
-      g.fillCircle(size / 2, size / 2, size / 2 - 1);
-
-      // Border
-      g.lineStyle(2, 0xffffff, 0.8);
-      g.strokeCircle(size / 2, size / 2, size / 2 - 1);
-
-      g.generateTexture(`powerup-${name}`, size, size);
-      g.destroy();
-    });
-  }
-
-  private createParticleTextures(): void {
-    // Confetti particle (small rectangle)
-    const confetti = this.make.graphics({ x: 0, y: 0 });
-    confetti.fillStyle(0xffffff);
-    confetti.fillRect(0, 0, 8, 4);
-    confetti.generateTexture('particle-confetti', 8, 4);
-    confetti.destroy();
-
-    // Streamer particle (longer rectangle)
-    const streamer = this.make.graphics({ x: 0, y: 0 });
-    streamer.fillStyle(0xffffff);
-    streamer.fillRect(0, 0, 4, 16);
-    streamer.generateTexture('particle-streamer', 4, 16);
-    streamer.destroy();
-
-    // Sparkle particle (star-like diamond)
-    const sparkle = this.make.graphics({ x: 0, y: 0 });
-    sparkle.fillStyle(0xffffff);
-    sparkle.beginPath();
-    sparkle.moveTo(6, 0);
-    sparkle.lineTo(8, 4);
-    sparkle.lineTo(12, 6);
-    sparkle.lineTo(8, 8);
-    sparkle.lineTo(6, 12);
-    sparkle.lineTo(4, 8);
-    sparkle.lineTo(0, 6);
-    sparkle.lineTo(4, 4);
-    sparkle.closePath();
-    sparkle.fillPath();
-    sparkle.generateTexture('particle-sparkle', 12, 12);
-    sparkle.destroy();
-
-    // Spark particle (small circle for danger trail)
-    const spark = this.make.graphics({ x: 0, y: 0 });
-    spark.fillStyle(0xffffff);
-    spark.fillCircle(4, 4, 4);
-    spark.generateTexture('particle-spark', 8, 8);
-    spark.destroy();
-
-    // Flame particle (larger soft circle for fireball trail)
-    const flame = this.make.graphics({ x: 0, y: 0 });
-    flame.fillStyle(0xffffff);
-    flame.fillCircle(6, 6, 6);
-    flame.generateTexture('particle-flame', 12, 12);
-    flame.destroy();
-
-    // Mirror facet particle (small diamond for mirror ball reflections)
-    const mirrorFacet = this.make.graphics({ x: 0, y: 0 });
-    mirrorFacet.fillStyle(0xffffff);
-    mirrorFacet.beginPath();
-    mirrorFacet.moveTo(4, 0);
-    mirrorFacet.lineTo(8, 4);
-    mirrorFacet.lineTo(4, 8);
-    mirrorFacet.lineTo(0, 4);
-    mirrorFacet.closePath();
-    mirrorFacet.fillPath();
-    mirrorFacet.generateTexture('particle-mirror-facet', 8, 8);
-    mirrorFacet.destroy();
-
-    // Light ray particle (elongated beam for mirror ball light reflections)
-    const lightRay = this.make.graphics({ x: 0, y: 0 });
-    lightRay.fillStyle(0xffffff);
-    lightRay.beginPath();
-    lightRay.moveTo(2, 0);
-    lightRay.lineTo(4, 0);
-    lightRay.lineTo(4, 20);
-    lightRay.lineTo(2, 20);
-    lightRay.closePath();
-    lightRay.fillPath();
-    // Add tapered glow at top
-    lightRay.fillStyle(0xffffff, 0.6);
-    lightRay.fillCircle(3, 2, 3);
-    lightRay.generateTexture('particle-light-ray', 6, 20);
-    lightRay.destroy();
-
-    // Glint particle (4-point star for light refractions)
-    const glint = this.make.graphics({ x: 0, y: 0 });
-    glint.fillStyle(0xffffff);
-    glint.beginPath();
-    // Vertical spike
-    glint.moveTo(5, 0);
-    glint.lineTo(6, 4);
-    glint.lineTo(5, 10);
-    glint.lineTo(4, 4);
-    glint.closePath();
-    glint.fillPath();
-    // Horizontal spike
-    glint.beginPath();
-    glint.moveTo(0, 5);
-    glint.lineTo(4, 4);
-    glint.lineTo(10, 5);
-    glint.lineTo(4, 6);
-    glint.closePath();
-    glint.fillPath();
-    glint.generateTexture('particle-glint', 10, 10);
-    glint.destroy();
-
-    // Speed line particle (elongated tapered streak for fast ball trail)
-    const speedline = this.make.graphics({ x: 0, y: 0 });
-    speedline.fillStyle(0xffffff);
-    speedline.fillRect(0, 5, 2, 2);  // Core (brightest)
-    speedline.fillStyle(0xffffff, 0.7);
-    speedline.fillRect(0, 3, 2, 2);  // Upper fade
-    speedline.fillRect(0, 7, 2, 2);  // Lower fade
-    speedline.fillStyle(0xffffff, 0.3);
-    speedline.fillRect(0, 0, 2, 3);  // Top tip
-    speedline.fillRect(0, 9, 2, 3);  // Bottom tip
-    speedline.generateTexture('particle-speedline', 2, 12);
-    speedline.destroy();
-
-    // Electric particle (small lightning bolt fragment for energy crackle)
-    const electric = this.make.graphics({ x: 0, y: 0 });
-    electric.fillStyle(0xffffff);
-    electric.fillRect(2, 0, 2, 2);
-    electric.fillRect(1, 2, 2, 2);
-    electric.fillRect(3, 4, 2, 2);
-    electric.generateTexture('particle-electric', 6, 6);
-    electric.destroy();
-
-    // Glow particle (soft radial gradient circle for balloon trail bubbles)
-    const glow = this.make.graphics({ x: 0, y: 0 });
-    // Create layered circles with decreasing alpha for soft glow effect
-    glow.fillStyle(0xffffff, 0.15);
-    glow.fillCircle(8, 8, 8);
-    glow.fillStyle(0xffffff, 0.3);
-    glow.fillCircle(8, 8, 6);
-    glow.fillStyle(0xffffff, 0.5);
-    glow.fillCircle(8, 8, 4);
-    glow.fillStyle(0xffffff, 0.8);
-    glow.fillCircle(8, 8, 2);
-    glow.generateTexture('particle-glow', 16, 16);
-    glow.destroy();
-  }
-
-  /**
-   * Create safety net texture (wide green bar for Bounce House power-up)
-   */
-  private createSafetyNetTexture(): void {
-    const netWidth = PLAYABLE_WIDTH;
-    const netHeight = 10;
-    const g = this.make.graphics({ x: 0, y: 0 });
-
-    // Glowing green bar
-    g.fillStyle(0x90ee90, 0.9);
-    g.fillRoundedRect(0, 0, netWidth, netHeight, 4);
-
-    // White border for visibility
-    g.lineStyle(1, 0xffffff, 0.5);
-    g.strokeRoundedRect(0, 0, netWidth, netHeight, 4);
-
-    // Center dot pattern for visual texture
-    g.fillStyle(0xffffff, 0.3);
-    for (let i = 20; i < netWidth; i += 40) {
-      g.fillCircle(i, netHeight / 2, 2);
-    }
-
-    g.generateTexture('safety-net', netWidth, netHeight);
-    g.destroy();
-  }
-
-  /**
-   * Create bumper texture (classic pinball bumper look with ring/glow effect)
-   */
-  private createBumperTexture(): void {
-    const size = BUMPER.SIZE;
-    const center = size / 2;
-    const g = this.make.graphics({ x: 0, y: 0 });
-
-    // Outer glow ring (softer, larger)
-    g.fillStyle(COLORS.BUMPER, 0.3);
-    g.fillCircle(center, center, center);
-
-    // Main body (bright red)
-    g.fillStyle(COLORS.BUMPER, 1);
-    g.fillCircle(center, center, center - 4);
-
-    // Inner highlight ring (white)
-    g.lineStyle(2, 0xffffff, 0.6);
-    g.strokeCircle(center, center, center - 6);
-
-    // Center cap (darker red for depth)
-    g.fillStyle(0xcc3333, 1);
-    g.fillCircle(center, center, center - 12);
-
-    // Center highlight (shiny dot)
-    g.fillStyle(0xffffff, 0.7);
-    g.fillCircle(center - 4, center - 4, 4);
-
-    g.generateTexture('bumper', size, size);
-    g.destroy();
+    // Particle textures now loaded from sprite files in preload()
   }
 
   /**

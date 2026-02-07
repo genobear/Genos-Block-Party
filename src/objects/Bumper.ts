@@ -17,6 +17,9 @@ export class Bumper extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this, true); // true = static body
 
+    // Scale HD sprite to game dimensions
+    this.setDisplaySize(BUMPER.SIZE, BUMPER.SIZE);
+
     // Configure circular physics body
     const body = this.body as Phaser.Physics.Arcade.StaticBody;
     const radius = BUMPER.SIZE / 2;
@@ -67,14 +70,20 @@ export class Bumper extends Phaser.Physics.Arcade.Sprite {
     // Flash to white
     this.setTint(COLORS.BUMPER_FLASH);
 
-    // Scale punch for impact feel
+    // Scale punch for impact feel — use setDisplaySize to stay safe
+    const targetSize = BUMPER.SIZE;
+    const punchSize = targetSize * 1.15;
+    this.setDisplaySize(punchSize, punchSize);
     this.scene.tweens.add({
       targets: this,
-      scaleX: 1.15,
-      scaleY: 1.15,
-      duration: this.flashDuration / 2,
-      yoyo: true,
+      displayWidth: targetSize,
+      displayHeight: targetSize,
+      duration: this.flashDuration,
       ease: 'Quad.easeOut',
+      onComplete: () => {
+        // Ensure exact game size is restored
+        this.setDisplaySize(targetSize, targetSize);
+      },
     });
 
     // Return to normal color after flash duration

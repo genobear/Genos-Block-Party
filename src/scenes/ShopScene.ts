@@ -15,7 +15,6 @@ import { ITEM_TO_MILESTONE, MILESTONES } from '../systems/MilestoneSystem';
 import {
   ShopCategory,
   type ShopItem,
-  type PaddleSkinConfig,
   type BallTrailConfig,
   PADDLE_SKINS,
   BALL_TRAILS,
@@ -66,12 +65,9 @@ export class ShopScene extends Phaser.Scene {
       color: '#daa520',
     }).setOrigin(0.5);
 
-    // Currency display
-    const coinIcon = this.add.circle(GAME_WIDTH - 130, 60, 12, 0xffd700);
-    this.add.text(coinIcon.x - 6, coinIcon.y, '¢', {
-      font: 'bold 14px Arial',
-      color: '#000000',
-    }).setOrigin(0.5);
+    // Currency display using HD coin sprite
+    const coinIcon = this.add.image(GAME_WIDTH - 130, 60, 'ui-coin');
+    coinIcon.setDisplaySize(24, 24);
 
     this.currencyText = this.add.text(GAME_WIDTH - 100, 60, `${this.currencyManager.getTotalCurrency()}`, {
       font: 'bold 24px Arial',
@@ -223,27 +219,15 @@ export class ShopScene extends Phaser.Scene {
 
     // Preview visual
     if (item.category === ShopCategory.PADDLE_SKIN) {
-      const skin = item as PaddleSkinConfig;
-      const previewW = 80;
-      const previewH = 14;
-      const previewAlpha = skin.alpha ?? 1;
-
-      const preview = this.add.rectangle(x, y - 35, previewW, previewH, skin.color, previewAlpha);
-      preview.setStrokeStyle(1, 0xffffff, 0.3);
+      // Use the actual paddle skin sprite asset
+      const preview = this.add.image(x, y - 35, 'paddle-skin-' + item.id);
+      preview.setDisplaySize(80, 20);
       this.itemContainer.add(preview);
-
-      // Accent dots
-      const leftDot = this.add.circle(x - 25, y - 35, 4, skin.accentColor, previewAlpha);
-      const rightDot = this.add.circle(x + 25, y - 35, 4, skin.accentColor, previewAlpha);
-      this.itemContainer.add(leftDot);
-      this.itemContainer.add(rightDot);
     } else {
-      // Ball trail preview — colored circles
+      // Ball trail preview — ball sprite with trail color dots
       const trail = item as BallTrailConfig;
       if (trail.colors.length > 0) {
-        const ballPreview = this.add.circle(x, y - 35, 8, 0xffffff);
-        this.itemContainer.add(ballPreview);
-        // Trail dots behind
+        // Trail dots behind the ball
         for (let i = 0; i < Math.min(trail.colors.length, 4); i++) {
           const dot = this.add.circle(
             x - 14 - i * 10,
@@ -254,9 +238,15 @@ export class ShopScene extends Phaser.Scene {
           );
           this.itemContainer.add(dot);
         }
+        // Ball sprite in front
+        const ballPreview = this.add.image(x, y - 35, 'ball');
+        ballPreview.setDisplaySize(16, 16);
+        this.itemContainer.add(ballPreview);
       } else {
-        // Default "none" — just show a ball
-        const ballPreview = this.add.circle(x, y - 35, 8, 0xffffff, 0.5);
+        // Default "none" — just show the ball sprite
+        const ballPreview = this.add.image(x, y - 35, 'ball');
+        ballPreview.setDisplaySize(16, 16);
+        ballPreview.setAlpha(0.5);
         this.itemContainer.add(ballPreview);
         const noText = this.add.text(x, y - 20, '(no trail)', {
           font: '10px Arial',

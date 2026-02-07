@@ -114,26 +114,26 @@ export class UIScene extends Phaser.Scene {
   private updateLivesIcons(lives: number): void {
     // Remove existing life icons
     this.livesContainer.each((child: Phaser.GameObjects.GameObject) => {
-      if (child instanceof Phaser.GameObjects.Arc) {
+      if (child instanceof Phaser.GameObjects.Image || child instanceof Phaser.GameObjects.Arc) {
         child.destroy();
       }
     });
 
-    // Add life icons (hearts represented as circles)
+    // Add life icons using HD heart sprite
     for (let i = 0; i < lives; i++) {
-      const heart = this.add.circle(
+      const heart = this.add.image(
         -(i * 28) - 14,
         28,
-        10,
-        0xff6b6b
+        'ui-heart'
       );
+      heart.setDisplaySize(20, 20);
       this.livesContainer.add(heart);
 
       // Add subtle pulse to last life when low
       if (lives === 1) {
         this.tweens.add({
           targets: heart,
-          scale: 1.2,
+          scale: heart.scaleX * 1.2,
           duration: 300,
           yoyo: true,
           repeat: -1,
@@ -413,7 +413,7 @@ export class UIScene extends Phaser.Scene {
 
     // Power-up icon
     const icon = this.add.image(0, 0, `powerup-${type}`);
-    icon.setScale(1.5);
+    icon.setDisplaySize(28, 28);  // Slightly larger than game size for UI visibility
     container.add(icon);
 
     // Timer bar (if duration provided)

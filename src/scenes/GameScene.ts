@@ -23,6 +23,7 @@ import { AchievementManager, Achievement } from '../systems/AchievementManager';
 import { PowerUpType } from '../types/PowerUpTypes';
 import { BrickType } from '../types/BrickTypes';
 import { SafetyNet } from '../objects/SafetyNet';
+import { ConfettiStreamer } from '../objects/ConfettiStreamer';
 import { BallEffectType } from '../effects/BallEffectTypes';
 import { LEVELS, LevelData } from '../config/LevelData';
 import {
@@ -39,6 +40,7 @@ import {
   AUDIO,
   COLORS,
   BALL_SPEED_BASE,
+  CONFETTI_CANNON,
 } from '../config/Constants';
 
 export class GameScene extends Phaser.Scene {
@@ -61,9 +63,6 @@ export class GameScene extends Phaser.Scene {
 
   // Bounce House safety net collider
   private safetyNetCollider: Phaser.Physics.Arcade.Collider | null = null;
-
-  // Conga Line ghost collision tracking (prevent multiple hits per frame)
-  private ghostHitBricks: Set<Brick> = new Set();
 
   // Audio
   private audioManager!: AudioManager;
@@ -95,6 +94,9 @@ export class GameScene extends Phaser.Scene {
   // Achievement tracking
   private achievementManager!: AchievementManager;
   private livesAtLevelStart: number = STARTING_LIVES;
+
+  // Active confetti streamer projectiles
+  private activeStreamers: ConfettiStreamer[] = [];
 
   constructor() {
     super('GameScene');
@@ -337,6 +339,10 @@ export class GameScene extends Phaser.Scene {
       this.unsubscribeTrackChange = null;
     }
 
+    // Clean up active confetti streamers
+    this.activeStreamers.forEach((s) => s.destroy());
+    this.activeStreamers = [];
+
     // Clean up visual effects
     if (this.isInDanger) {
       this.exitDangerMode();
@@ -359,8 +365,10 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem.update();
     this.ballPool.update();
 
-    // Check conga line ghost collisions with bricks
-    this.updateCongaLineCollisions();
+    // Update active confetti streamers
+    for (let i = this.activeStreamers.length - 1; i >= 0; i--) {
+      this.activeStreamers[i].update(delta);
+    }
 
     // Update multiplier decay
     const previousMultiplier = this.multiplierSystem.getValue();
@@ -620,100 +628,6 @@ export class GameScene extends Phaser.Scene {
 
     // Play bounce sound
     this.audioManager.playSFX(AUDIO.SFX.BOUNCE);
-  }
-
-  // ========== CONGA LINE GHOST COLLISIONS ==========
-
-  /**
-   * Check for conga line ghost ball collisions with bricks
-   * Ghosts pass through bricks but deal 1 damage on contact
-   */
-  private updateCongaLineCollisions(): void {
-    // Clear the hit tracking set each frame
-    this.ghostHitBricks.clear();
-
-    // Check all active balls for conga line ghosts
-    this.ballPool.getActiveBalls().forEach((ball) => {
-      if (!ball.isCongaLineActive()) return;
-
-      const ghosts = ball.getCongaGhosts();
-      ghosts.forEach((ghost) => {
-        if (!ghost.visible) return;
-
-        // Get ghost bounds
-        const ghostBounds = ghost.getBounds();
-
-        // Check overlap with all active bricks
-        this.bricks.children.iterate((child) => {
-          const brick = child as Brick;
-          if (!brick || !brick.active) return true;
-
-          // Skip if we already hit this brick this frame
-          if (this.ghostHitBricks.has(brick)) return true;
-
-          // Check bounds overlap
-          const brickBounds = brick.getBounds();
-          if (Phaser.Geom.Intersects.RectangleToRectangle(ghostBounds, brickBounds)) {
-            // Mark brick as hit this frame
-            this.ghostHitBricks.add(brick);
-
-            // Deal damage to brick
-            this.damageBrickFromGhost(brick);
-          }
-
-          return true;
-        });
-      });
-    });
-  }
-
-  /**
-   * Apply damage to a brick from a conga line ghost
-   * Similar to handleBrickDestroyed but simplified for ghost hits
-   */
-  private damageBrickFromGhost(brick: Brick): void {
-    // Increment multiplier
-    this.incrementMultiplier();
-
-    // Apply 1 damage
-    const destroyed = brick.takeDamage(1);
-
-    if (destroyed) {
-      // Track brick destroyed for lifetime stats
-      this.statsManager.recordBrickDestroyed();
-
-      // Score for destroyed brick
-      this.addScore(brick.getScoreValue());
-
-      // Roll for power-up drop (ghost hits are like AOE - maybe add penalty?)
-      if (brick.shouldDropPowerUp(false)) {
-        const dropPos = brick.getPowerUpDropPosition();
-        this.powerUpSystem.spawn(dropPos.x, dropPos.y);
-      }
-
-      // Audio for destroyed brick
-      this.audioManager.playSFX(AUDIO.SFX.HORN);
-
-      // Confetti burst
-      const brickColor = this.getBrickColorForParticles(brick.getType());
-      this.particleSystem.burstConfetti(brick.x, brick.y, brickColor);
-
-      // Immediately deactivate for countActive()
-      brick.setActive(false);
-      brick.disableBody(true);
-
-      // Play destroy animation
-      brick.playDestroyAnimation();
-
-      // Check level completion
-      if (this.bricks.countActive() === 0) {
-        this.handleLevelComplete();
-      }
-    } else {
-      // Hit but not destroyed - play pop sound and add small score
-      this.audioManager.playSFX(AUDIO.SFX.POP);
-      this.addScore(brick.getScoreValue());
-    }
   }
 
   private handleAllBallsLost(): void {
@@ -1128,7 +1042,7 @@ export class GameScene extends Phaser.Scene {
   // ========== CONFETTI CANNON ==========
 
   /**
-   * Handle Confetti Cannon power-up: fire confetti at 5-8 random bricks for 1 damage each
+   * Handle Confetti Cannon power-up: launch wavy streamer projectiles at nearby bricks
    */
   private handleConfettiCannon(): void {
     // Collect all active bricks
@@ -1141,68 +1055,126 @@ export class GameScene extends Phaser.Scene {
       return true;
     });
 
-    // Shuffle and pick 5-8 random bricks
-    const targetCount = Phaser.Math.Between(5, 8);
-    Phaser.Utils.Array.Shuffle(activeBricks);
-    const targets = activeBricks.slice(0, Math.min(targetCount, activeBricks.length));
+    if (activeBricks.length === 0) return;
 
-    // Brief camera shake
-    this.cameras.main.shake(150, 0.01);
-
-    // Play party horn SFX
-    this.audioManager.playSFX(AUDIO.SFX.AIRHORN);
-
-    // Create confetti particle burst from paddle
-    this.createConfettiEffect();
-
-    // Apply 1 damage to each target brick
-    targets.forEach((brick) => {
-      this.incrementMultiplier();
-      const destroyed = brick.takeDamage(1);
-      if (destroyed) {
-        this.handleBrickDestroyed(brick);
-      } else {
-        // Visual flash on hit brick
-        this.tweens.add({
-          targets: brick,
-          alpha: { from: 0.3, to: 1 },
-          duration: 200,
-        });
-      }
+    // Sort by distance from paddle (nearest first)
+    const paddleX = this.paddle.x;
+    const paddleY = this.paddle.y;
+    activeBricks.sort((a, b) => {
+      const distA = Phaser.Math.Distance.Between(paddleX, paddleY, a.x, a.y);
+      const distB = Phaser.Math.Distance.Between(paddleX, paddleY, b.x, b.y);
+      return distA - distB;
     });
 
-    // Check level completion after all bricks processed
-    if (this.bricks.countActive() === 0) {
-      this.handleLevelComplete();
+    // Pick nearest 5-8 bricks
+    const targetCount = Phaser.Math.Between(
+      CONFETTI_CANNON.STREAMER_COUNT_MIN,
+      CONFETTI_CANNON.STREAMER_COUNT_MAX
+    );
+    const targets = activeBricks.slice(0, Math.min(targetCount, activeBricks.length));
+
+    // Brief camera shake + SFX
+    this.cameras.main.shake(150, 0.01);
+    this.audioManager.playSFX(AUDIO.SFX.AIRHORN);
+
+    // Initial confetti burst from paddle (smaller since streamers are the main visual)
+    this.createConfettiLaunchBurst();
+
+    // Fire streamers with stagger delay
+    targets.forEach((brick, index) => {
+      this.time.delayedCall(index * CONFETTI_CANNON.STAGGER_DELAY, () => {
+        this.launchStreamer(brick, index);
+      });
+    });
+  }
+
+  /**
+   * Launch a single confetti streamer projectile toward a target brick
+   */
+  private launchStreamer(target: Brick, index: number): void {
+    if (!target || !target.active) return;
+
+    const color = CONFETTI_CANNON.COLORS[index % CONFETTI_CANNON.COLORS.length];
+
+    // Scale travel duration by distance (farther = slightly longer)
+    const dist = Phaser.Math.Distance.Between(
+      this.paddle.x, this.paddle.y, target.x, target.y
+    );
+    const maxDist = Phaser.Math.Distance.Between(0, this.paddle.y, GAME_WIDTH, PLAY_AREA_Y);
+    const distT = Phaser.Math.Clamp(dist / maxDist, 0, 1);
+    const travelDuration = Phaser.Math.Linear(
+      CONFETTI_CANNON.TRAVEL_DURATION_MIN,
+      CONFETTI_CANNON.TRAVEL_DURATION_MAX,
+      distT
+    );
+
+    const streamer = new ConfettiStreamer(
+      this,
+      this.paddle.x,
+      this.paddle.y - 10,
+      target,
+      color,
+      travelDuration,
+      (brick: Brick) => this.handleStreamerHit(brick),
+      (s: ConfettiStreamer) => {
+        const idx = this.activeStreamers.indexOf(s);
+        if (idx !== -1) {
+          this.activeStreamers.splice(idx, 1);
+        }
+        // Check level completion after last streamer resolves
+        if (this.activeStreamers.length === 0 && this.bricks.countActive() === 0) {
+          this.handleLevelComplete();
+        }
+      }
+    );
+
+    this.activeStreamers.push(streamer);
+  }
+
+  /**
+   * Handle damage when a confetti streamer reaches its target brick
+   */
+  private handleStreamerHit(brick: Brick): void {
+    if (!brick || !brick.active) return;
+
+    this.incrementMultiplier();
+
+    const destroyed = brick.takeDamage(1);
+    if (destroyed) {
+      this.handleBrickDestroyed(brick);
+    } else {
+      this.tweens.add({
+        targets: brick,
+        alpha: { from: 0.3, to: 1 },
+        duration: 200,
+      });
+      this.audioManager.playSFX(AUDIO.SFX.POP);
     }
   }
 
   /**
-   * Create colorful confetti burst effect from paddle position
+   * Create a small confetti burst from the paddle when the cannon fires
    */
-  private createConfettiEffect(): void {
+  private createConfettiLaunchBurst(): void {
     const paddleX = this.paddle.x;
     const paddleY = this.paddle.y;
 
-    // Colorful confetti colors
-    const colors = [0xff1493, 0x00ff00, 0xffff00, 0x00ffff, 0xff6600, 0xff00ff];
-
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 15; i++) {
       const confetti = this.add.rectangle(
-        paddleX + Phaser.Math.Between(-20, 20),
+        paddleX + Phaser.Math.Between(-15, 15),
         paddleY,
-        Phaser.Math.Between(4, 8),
-        Phaser.Math.Between(4, 8),
-        Phaser.Utils.Array.GetRandom(colors)
+        Phaser.Math.Between(3, 6),
+        Phaser.Math.Between(3, 6),
+        Phaser.Utils.Array.GetRandom(CONFETTI_CANNON.COLORS as unknown as number[])
       );
 
       this.tweens.add({
         targets: confetti,
-        x: confetti.x + Phaser.Math.Between(-100, 100),
-        y: confetti.y - Phaser.Math.Between(100, 300),
+        x: confetti.x + Phaser.Math.Between(-60, 60),
+        y: confetti.y - Phaser.Math.Between(30, 80),
         angle: Phaser.Math.Between(-180, 180),
         alpha: { from: 1, to: 0 },
-        duration: Phaser.Math.Between(500, 1000),
+        duration: Phaser.Math.Between(300, 500),
         ease: 'Quad.easeOut',
         onComplete: () => confetti.destroy(),
       });
