@@ -192,6 +192,10 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
       // Update ghost positions from history (300ms, 600ms, 900ms behind)
       for (let i = 0; i < this.congaGhosts.length; i++) {
         const ghost = this.congaGhosts[i];
+
+        // Skip repositioning if ghost is mid-echo animation
+        if (ghost.getData('echoing')) continue;
+
         const targetTime = now - (i + 1) * Ball.CONGA_INTERVAL_MS;
 
         // Find the position from history closest to targetTime

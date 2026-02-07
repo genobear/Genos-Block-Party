@@ -195,6 +195,11 @@ export class CollisionHandler {
       this.powerUpSystem.onBombDetonated();
     }
 
+    // Trigger conga line impact echoes if active
+    if (ball.isCongaLineActive()) {
+      this.processImpactEchoes(ball, brick);
+    }
+
     // Roll for drops BEFORE applying damage (each damage point rolls independently)
     const dropsToSpawn = brick.rollDropsForDamage(damage, false);
 
@@ -361,6 +366,113 @@ export class CollisionHandler {
 
     // Collect the power-up (applies game effect)
     this.powerUpSystem.collect(powerUp);
+  }
+
+  // ========== CONGA LINE (IMPACT ECHOES) ==========
+
+  /**
+   * Send visible conga ghosts to nearby bricks on ball-brick collision.
+   * Each ghost flies to a random nearby brick, deals 1 damage, then returns.
+   */
+  private processImpactEchoes(ball: Ball, sourceBrick: Brick): void {
+    const ghosts = ball.getCongaGhosts().filter(
+      (g) => g.visible && !g.getData('echoing')
+    );
+    if (ghosts.length === 0) return;
+
+    const targets = this.findNearbyBricksForEcho(sourceBrick, ghosts.length);
+    if (targets.length === 0) return;
+
+    targets.forEach((targetBrick, index) => {
+      if (index >= ghosts.length) return;
+      const ghost = ghosts[index];
+
+      // Store current trail position for return trip
+      const returnX = ghost.x;
+      const returnY = ghost.y;
+
+      // Lock ghost out of trail repositioning
+      ghost.setData('echoing', true);
+
+      // Phase 1: Fly to target brick
+      this.scene.tweens.add({
+        targets: ghost,
+        x: targetBrick.x,
+        y: targetBrick.y,
+        duration: 120,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          // Deal damage on arrival
+          this.processEchoDamage(targetBrick);
+
+          // White flash on impact
+          ghost.setTint(0xffffff);
+          this.scene.time.delayedCall(50, () => {
+            if (ghost.active) ghost.setTint(0xe040fb);
+          });
+
+          // Phase 2: Fly back to trail position
+          this.scene.tweens.add({
+            targets: ghost,
+            x: returnX,
+            y: returnY,
+            duration: 200,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              ghost.setData('echoing', false);
+            },
+          });
+        },
+      });
+    });
+  }
+
+  /**
+   * Find up to `count` random active bricks within echo radius of the source brick.
+   */
+  private findNearbyBricksForEcho(source: Brick, count: number): Brick[] {
+    if (!this.bricks) return [];
+
+    const ECHO_RADIUS = (BRICK_WIDTH + BRICK_PADDING) * 2.5;
+    const candidates: Brick[] = [];
+
+    this.bricks.children.iterate((child: Phaser.GameObjects.GameObject) => {
+      const brick = child as Brick;
+      if (!brick || !brick.active || brick === source) return true;
+
+      const dist = Phaser.Math.Distance.Between(source.x, source.y, brick.x, brick.y);
+      if (dist <= ECHO_RADIUS) {
+        candidates.push(brick);
+      }
+      return true;
+    });
+
+    Phaser.Utils.Array.Shuffle(candidates);
+    return candidates.slice(0, Math.min(count, candidates.length));
+  }
+
+  /**
+   * Apply 1 damage to a brick from a conga echo hit.
+   * Uses AOE scoring (50%) and AOE drop penalty, reuses processAOEBrickDestroyed.
+   */
+  private processEchoDamage(brick: Brick): void {
+    if (!brick || !brick.active) return;
+
+    this.onBrickHit();
+    this.onScoreChange(Math.floor(brick.getScoreValue() * 0.5));
+
+    if (brick.shouldDropPowerUp(true)) {
+      const dropPos = brick.getPowerUpDropPosition();
+      this.powerUpSystem.spawn(dropPos.x, dropPos.y);
+    }
+
+    const isDestroyed = brick.takeDamage(1);
+
+    if (isDestroyed) {
+      this.processAOEBrickDestroyed(brick);
+    } else {
+      this.audioManager.playSFX(AUDIO.SFX.POP);
+    }
   }
 
   // ========== PARTY POPPER (3x3 BOMB) ==========

@@ -62,9 +62,6 @@ export class GameScene extends Phaser.Scene {
   // Bounce House safety net collider
   private safetyNetCollider: Phaser.Physics.Arcade.Collider | null = null;
 
-  // Conga Line ghost collision tracking (prevent multiple hits per frame)
-  private ghostHitBricks: Set<Brick> = new Set();
-
   // Audio
   private audioManager!: AudioManager;
   private unsubscribeTrackChange: (() => void) | null = null;
@@ -359,9 +356,6 @@ export class GameScene extends Phaser.Scene {
     this.powerUpSystem.update();
     this.ballPool.update();
 
-    // Check conga line ghost collisions with bricks
-    this.updateCongaLineCollisions();
-
     // Update multiplier decay
     const previousMultiplier = this.multiplierSystem.getValue();
     this.multiplierSystem.update(time, delta);
@@ -620,100 +614,6 @@ export class GameScene extends Phaser.Scene {
 
     // Play bounce sound
     this.audioManager.playSFX(AUDIO.SFX.BOUNCE);
-  }
-
-  // ========== CONGA LINE GHOST COLLISIONS ==========
-
-  /**
-   * Check for conga line ghost ball collisions with bricks
-   * Ghosts pass through bricks but deal 1 damage on contact
-   */
-  private updateCongaLineCollisions(): void {
-    // Clear the hit tracking set each frame
-    this.ghostHitBricks.clear();
-
-    // Check all active balls for conga line ghosts
-    this.ballPool.getActiveBalls().forEach((ball) => {
-      if (!ball.isCongaLineActive()) return;
-
-      const ghosts = ball.getCongaGhosts();
-      ghosts.forEach((ghost) => {
-        if (!ghost.visible) return;
-
-        // Get ghost bounds
-        const ghostBounds = ghost.getBounds();
-
-        // Check overlap with all active bricks
-        this.bricks.children.iterate((child) => {
-          const brick = child as Brick;
-          if (!brick || !brick.active) return true;
-
-          // Skip if we already hit this brick this frame
-          if (this.ghostHitBricks.has(brick)) return true;
-
-          // Check bounds overlap
-          const brickBounds = brick.getBounds();
-          if (Phaser.Geom.Intersects.RectangleToRectangle(ghostBounds, brickBounds)) {
-            // Mark brick as hit this frame
-            this.ghostHitBricks.add(brick);
-
-            // Deal damage to brick
-            this.damageBrickFromGhost(brick);
-          }
-
-          return true;
-        });
-      });
-    });
-  }
-
-  /**
-   * Apply damage to a brick from a conga line ghost
-   * Similar to handleBrickDestroyed but simplified for ghost hits
-   */
-  private damageBrickFromGhost(brick: Brick): void {
-    // Increment multiplier
-    this.incrementMultiplier();
-
-    // Apply 1 damage
-    const destroyed = brick.takeDamage(1);
-
-    if (destroyed) {
-      // Track brick destroyed for lifetime stats
-      this.statsManager.recordBrickDestroyed();
-
-      // Score for destroyed brick
-      this.addScore(brick.getScoreValue());
-
-      // Roll for power-up drop (ghost hits are like AOE - maybe add penalty?)
-      if (brick.shouldDropPowerUp(false)) {
-        const dropPos = brick.getPowerUpDropPosition();
-        this.powerUpSystem.spawn(dropPos.x, dropPos.y);
-      }
-
-      // Audio for destroyed brick
-      this.audioManager.playSFX(AUDIO.SFX.HORN);
-
-      // Confetti burst
-      const brickColor = this.getBrickColorForParticles(brick.getType());
-      this.particleSystem.burstConfetti(brick.x, brick.y, brickColor);
-
-      // Immediately deactivate for countActive()
-      brick.setActive(false);
-      brick.disableBody(true);
-
-      // Play destroy animation
-      brick.playDestroyAnimation();
-
-      // Check level completion
-      if (this.bricks.countActive() === 0) {
-        this.handleLevelComplete();
-      }
-    } else {
-      // Hit but not destroyed - play pop sound and add small score
-      this.audioManager.playSFX(AUDIO.SFX.POP);
-      this.addScore(brick.getScoreValue());
-    }
   }
 
   private handleAllBallsLost(): void {
