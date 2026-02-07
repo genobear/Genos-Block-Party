@@ -181,7 +181,7 @@ Unlocked after completing the 10-level Story Mode campaign. Features infinite pr
 | **DJ Scratch** | 🧲 | 15s | 12 | Magnet paddle — ball sticks on contact, click to release |
 | **Confetti Cannon** | 🎊 | Instant | 10 | Fires confetti at 5-8 random bricks for 1 damage each |
 | **Conga Line** | 💃 | 8s | 8 | Trailing ghost balls deal damage to bricks |
-| **Spotlight** | 🔦 | 8s | 8 | Gentle homing toward nearest brick |
+| **Spotlight** | 🔦 | 8s | 8 | Homing — locks onto target brick |
 | **Dance Floor** | 🪩 | Instant | 10 | Shuffles all bricks to random grid positions |
 
 ### Fireball Stacking
@@ -221,9 +221,10 @@ Unlocked after completing the 10-level Story Mode campaign. Features infinite pr
 - Timer refreshes if collected again while active
 
 ### Spotlight Details
-- Ball gently curves toward the nearest brick while the effect is active
-- **Steering algorithm**: On each frame, calculates angle to nearest brick and adjusts velocity by max ~2.8° per frame
-- Subtle homing — player still has control over general direction, but ball "drifts" toward bricks
+- Ball locks onto a target brick and continuously homes toward it until that brick is destroyed
+- **Target selection**: Picks nearest brick once, then steers toward it persistently — no frame-by-frame recalculation
+- **After destroying the target**: automatically picks the next nearest brick and continues homing
+- **Steering algorithm**: Max ~2.3° per frame (0.04 rad) for a large, smooth turning circle (~2.6s for full 360°)
 - **Visual effects**:
   - Golden glow and tint on ball (0xffd700)
   - Light cone/beam emanating from ball in its direction of travel
