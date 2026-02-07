@@ -606,6 +606,8 @@ Achievement-based milestones that unlock exclusive cosmetic rewards:
 
 - Milestones are checked at game end
 - Achievement celebration overlay shows when milestones are unlocked
+- Paddle skin previews display the actual pixel art sprite assets
+- Ball trail previews show the ball sprite with colored trail particle dots
 - Milestone rewards appear in Party Shop with "🔒 [Milestone Name]" until unlocked
 - Once unlocked, milestone items show "✓ Unlocked" and can be equipped for free
 - Progress is saved in localStorage under `genos-block-party-milestones`
