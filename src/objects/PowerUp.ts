@@ -36,10 +36,12 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
       ease: 'Sine.easeInOut',
     });
 
-    // Add pulsing glow effect
+    // Add pulsing glow effect (use scaled values, not absolute)
+    const baseScale = this.scaleX;  // After setDisplaySize, this is ~0.125 for 192→24
     scene.tweens.add({
       targets: this,
-      scale: 1.2,
+      scaleX: baseScale * 1.2,
+      scaleY: baseScale * 1.2,
       duration: 400,
       yoyo: true,
       repeat: -1,
@@ -95,7 +97,6 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     this.setPosition(x, y);
     this.setActive(true);
     this.setVisible(true);
-    this.setScale(1);
     this.setAlpha(1);  // Reset alpha (was set to 0 during collect animation)
 
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -118,9 +119,11 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
       ease: 'Sine.easeInOut',
     });
 
+    const baseScale = this.scaleX;  // After setDisplaySize, this is ~0.125 for 192→24
     this.scene.tweens.add({
       targets: this,
-      scale: 1.2,
+      scaleX: baseScale * 1.2,
+      scaleY: baseScale * 1.2,
       duration: 400,
       yoyo: true,
       repeat: -1,
@@ -134,9 +137,11 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
   playCollectAnimation(onComplete?: () => void): void {
     this.scene.tweens.killTweensOf(this);
 
+    const collectScale = this.scaleX * 2;  // Double current display scale, not absolute
     this.scene.tweens.add({
       targets: this,
-      scale: 2,
+      scaleX: collectScale,
+      scaleY: collectScale,
       alpha: 0,
       duration: 200,
       ease: 'Quad.easeOut',
