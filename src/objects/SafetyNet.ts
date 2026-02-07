@@ -29,8 +29,16 @@ export class SafetyNet extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this, true); // Static body
 
-    // Scale HD sprite to game dimensions (800×10)
+    // Scale sprite to game dimensions (800×10)
     this.setDisplaySize(PLAYABLE_WIDTH, 10);
+
+    // Resize the static body to match display size (not native sprite size)
+    const body = this.body as Phaser.Physics.Arcade.StaticBody;
+    body.setSize(PLAYABLE_WIDTH, 10);
+    body.setOffset(
+      (this.width - PLAYABLE_WIDTH) / 2,
+      (this.height - 10) / 2,
+    );
 
     // Capture computed scales so spawn animation preserves display size
     const targetScaleX = this.scaleX;
