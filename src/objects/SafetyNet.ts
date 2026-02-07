@@ -32,6 +32,10 @@ export class SafetyNet extends Phaser.Physics.Arcade.Sprite {
     // Scale HD sprite to game dimensions (800×10)
     this.setDisplaySize(PLAYABLE_WIDTH, 10);
 
+    // Capture computed scales so spawn animation preserves display size
+    const targetScaleX = this.scaleX;
+    const targetScaleY = this.scaleY;
+
     // Semi-transparent glowing green bar
     this.setAlpha(0.7);
     this.setDepth(5);
@@ -46,11 +50,11 @@ export class SafetyNet extends Phaser.Physics.Arcade.Sprite {
       ease: 'Sine.easeInOut',
     });
 
-    // Spawn animation: scale in vertically
-    this.setScale(1, 0);
+    // Spawn animation: scale in vertically (from 0 to target, preserving display size)
+    this.setScale(targetScaleX, 0);
     scene.tweens.add({
       targets: this,
-      scaleY: 1,
+      scaleY: targetScaleY,
       duration: 300,
       ease: 'Back.easeOut',
     });
@@ -84,12 +88,12 @@ export class SafetyNet extends Phaser.Physics.Arcade.Sprite {
     particles.explode();
     this.scene.time.delayedCall(500, () => particles.destroy());
 
-    // Scale up and fade out
+    // Scale up and fade out (multiply current scales for proportional burst)
     this.scene.tweens.add({
       targets: this,
       alpha: 0,
-      scaleY: 3,
-      scaleX: 1.3,
+      scaleY: this.scaleY * 3,
+      scaleX: this.scaleX * 1.3,
       duration: 300,
       ease: 'Quad.easeOut',
       onComplete: () => {
