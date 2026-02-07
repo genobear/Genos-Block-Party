@@ -52,6 +52,7 @@ export const BRICK_COLS = 10;
 export const STARTING_LIVES = 3;
 export const POWERUP_DROP_CHANCE = 0.25;
 export const POWERUP_FALL_SPEED = 150;
+export const POWERUP_DISPLAY_SIZE = 24;
 
 // Colors (hex)
 // Note: Power-up colors are defined in POWERUP_CONFIGS (src/types/PowerUpTypes.ts)

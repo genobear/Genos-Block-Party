@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { PowerUpType } from '../types/PowerUpTypes';
-import { POWERUP_FALL_SPEED, GAME_HEIGHT } from '../config/Constants';
+import { POWERUP_FALL_SPEED, POWERUP_DISPLAY_SIZE, GAME_HEIGHT } from '../config/Constants';
 
 export class PowerUp extends Phaser.Physics.Arcade.Sprite {
   private powerUpType: PowerUpType;
@@ -16,8 +16,13 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
+    // Scale down HD texture (192×192) to game size
+    this.setDisplaySize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+
     // Configure physics body
     const body = this.body as Phaser.Physics.Arcade.Body;
+    body.setSize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+    body.setOffset((this.width - POWERUP_DISPLAY_SIZE) / 2, (this.height - POWERUP_DISPLAY_SIZE) / 2);
     body.setAllowGravity(false);
     body.setVelocityY(POWERUP_FALL_SPEED);
 
@@ -96,6 +101,9 @@ export class PowerUp extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.enable = true;  // Explicitly enable before reset
     body.reset(x, y);
+    this.setDisplaySize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+    body.setSize(POWERUP_DISPLAY_SIZE, POWERUP_DISPLAY_SIZE);
+    body.setOffset((this.width - POWERUP_DISPLAY_SIZE) / 2, (this.height - POWERUP_DISPLAY_SIZE) / 2);
     body.setAllowGravity(false);
     body.setVelocityY(POWERUP_FALL_SPEED);
 
