@@ -70,16 +70,20 @@ export class Bumper extends Phaser.Physics.Arcade.Sprite {
     // Flash to white
     this.setTint(COLORS.BUMPER_FLASH);
 
-    // Scale punch for impact feel (relative to display scale, not texture scale)
-    const baseScaleX = this.scaleX;
-    const baseScaleY = this.scaleY;
+    // Scale punch for impact feel — use setDisplaySize to stay safe
+    const targetSize = BUMPER.SIZE;
+    const punchSize = targetSize * 1.15;
+    this.setDisplaySize(punchSize, punchSize);
     this.scene.tweens.add({
       targets: this,
-      scaleX: baseScaleX * 1.15,
-      scaleY: baseScaleY * 1.15,
-      duration: this.flashDuration / 2,
-      yoyo: true,
+      displayWidth: targetSize,
+      displayHeight: targetSize,
+      duration: this.flashDuration,
       ease: 'Quad.easeOut',
+      onComplete: () => {
+        // Ensure exact game size is restored
+        this.setDisplaySize(targetSize, targetSize);
+      },
     });
 
     // Return to normal color after flash duration
