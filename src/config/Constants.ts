@@ -95,6 +95,21 @@ export const DRIFTER = {
   ESCAPE_THRESHOLD: 60,   // y position to escape
 } as const;
 
+// Confetti Cannon streamer projectile settings
+export const CONFETTI_CANNON = {
+  STREAMER_COUNT_MIN: 5,
+  STREAMER_COUNT_MAX: 8,
+  TRAVEL_DURATION_MIN: 400,   // ms for nearest bricks
+  TRAVEL_DURATION_MAX: 700,   // ms for farthest bricks
+  SINE_AMPLITUDE_MIN: 15,     // px min perpendicular oscillation
+  SINE_AMPLITUDE_MAX: 30,     // px max perpendicular oscillation
+  SINE_FREQUENCY_MIN: 2,      // min full oscillations over travel
+  SINE_FREQUENCY_MAX: 4,      // max full oscillations over travel
+  TIMEOUT: 2000,              // ms auto-destroy safety
+  STAGGER_DELAY: 80,          // ms between each streamer launch
+  COLORS: [0xff1493, 0x00ff00, 0xffff00, 0x00ffff, 0xff6600, 0xff00ff] as readonly number[],
+} as const;
+
 // Bumper settings (pinball-style obstacles)
 export const BUMPER = {
   BOOST_MULTIPLIER: 1.5,  // Velocity multiplier on contact
